@@ -24,12 +24,14 @@ function defState() {
     stickers: {}, // 贴纸名 -> 数量
     tickets: 0,   // 转盘券
     wheel: null,  // 家长自定义转盘奖品，null=用默认
-    vouchers: []  // 转盘中的实物奖励券 {n, d, used}
+    vouchers: [], // 转盘中的实物奖励券 {n, d, used}
+    wheelTouched: todayStr() // 上次更换转盘奖品的日期，驱动14天上新提醒
   };
 }
 let S = defState();
 try { const raw = localStorage.getItem(LS_KEY); if (raw) S = Object.assign(defState(), JSON.parse(raw)); } catch (e) {}
 S.daily = Object.assign(defState().daily, S.daily);
+if (!S.wheelTouched) S.wheelTouched = todayStr();
 function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} }
 function unitS(id) { if (!S.units[id]) S.units[id] = { learned: [], stars: 0 }; return S.units[id]; }
 
@@ -744,6 +746,10 @@ function renderArcade() {
 const WHEEL_DEFAULT = ["📺 看电视30分钟", "🍦 吃一次小零食", "⚽ 户外玩1小时", "🌠 满足一个小愿望", "🌙 晚睡15分钟", "🎲 亲子游戏半小时", "🪙 50金币", "🔄 再转一次"];
 const WHEEL_COLORS = ["#ffd9e8", "#e3dcff", "#d5f0ff", "#ffefd0", "#dcf5dc", "#ffe0d5", "#e8f8ff", "#f5e0ff", "#fff0f5", "#e0ffe8", "#fff5d5", "#e5e8ff"];
 function getWheel() { return (S.wheel && S.wheel.length >= 2) ? S.wheel : WHEEL_DEFAULT; }
+const WHEEL_STALE_DAYS = 14;
+function wheelAgeDays() { return Math.floor((new Date(todayStr()) - new Date(S.wheelTouched)) / 864e5); }
+function wheelStale() { return wheelAgeDays() >= WHEEL_STALE_DAYS; }
+function touchWheel() { S.wheelTouched = todayStr(); save(); }
 let spinning = false;
 
 function renderWheel() {
@@ -770,7 +776,8 @@ function renderWheel() {
       ② 当天特别勤奋（金币赚满60）再 +1 张<br>
       ③ 单元挑战第一次拿满3星 +1 张<br>
       ④ 连续学习每满3天 +1 张
-    </div>`;
+    </div>
+    ${wheelStale() ? `<div class="card" style="background:#fff3d6;text-align:center;font-size:13px;color:#e8842d;font-weight:700">🎁 转盘奖品已经 ${wheelAgeDays()} 天没换新啦，快让爸爸妈妈上新奖品！</div>` : ""}`;
   $("#spinBtn").onclick = doSpin;
   show("wheel", "🎡 幸运大转盘");
 }
@@ -864,7 +871,8 @@ function renderParent() {
   $("#scr-parent").innerHTML = `
     <div class="card">
       <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-bottom:4px">🎡 转盘奖品（${prizes.length}项）</div>
-      <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">奖品里写「XX金币」会自动发金币，写「再转一次」会返还转盘券，其余都会变成孩子的实物奖励券。建议2~12项。</div>
+      <div style="font-size:12px;margin-bottom:4px;font-weight:700;color:${wheelStale() ? "#e8842d" : "#b8a8c8"}">${wheelAgeDays() === 0 ? "✅ 今天刚更换过奖品" : "距上次更换奖品已 " + wheelAgeDays() + " 天" + (wheelStale() ? "，建议换1~2个孩子当下最想要的，保持新鲜感！" : "（建议每14天上新）")}</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">奖品里写「XX金币」会自动发金币，写「再转一次」会返还转盘券，其余都会变成孩子的实物奖励券。建议2~12项，保留「50金币」和「再转一次」两格可以让实物大奖更有期待感。</div>
       ${prizes.map((p, i) => `<div class="pRow"><span class="pName">${esc(p)}</span><button class="pDel" data-i="${i}">✕</button></div>`).join("")}
       <div class="pRow" style="border:none">
         <input class="pInput" id="pNew" placeholder="新奖品，如：🎨 买一支新画笔">
@@ -880,7 +888,7 @@ function renderParent() {
     b.onclick = () => {
       const list = getWheel().slice();
       if (list.length <= 2) { toast("至少保留2个奖品"); return; }
-      list.splice(+b.dataset.i, 1); S.wheel = list; save(); renderParent();
+      list.splice(+b.dataset.i, 1); S.wheel = list; touchWheel(); renderParent();
     };
   });
   $("#pAdd").onclick = () => {
@@ -888,9 +896,9 @@ function renderParent() {
     if (!v) return;
     const list = getWheel().slice();
     if (list.length >= 12) { toast("最多12个奖品"); return; }
-    list.push(v); S.wheel = list; save(); renderParent();
+    list.push(v); S.wheel = list; touchWheel(); renderParent();
   };
-  $("#pReset").onclick = () => { S.wheel = null; save(); renderParent(); toast("已恢复默认奖品"); };
+  $("#pReset").onclick = () => { S.wheel = null; touchWheel(); renderParent(); toast("已恢复默认奖品"); };
   $("#pTicket").onclick = () => { S.tickets++; save(); toast("已补发1张转盘券 🎟️"); };
   show("parent", "🔐 家长设置");
 }
@@ -909,7 +917,7 @@ function renderReward() {
   $("#scr-reward").innerHTML = `
     <div class="card actRow" id="toWheel" style="background:linear-gradient(135deg,#fff3d6,#ffe0ef)">
       <span class="aIcon">🎡</span>
-      <span class="aName">幸运大转盘<span class="aSub">转出真实奖励！转盘券：${S.tickets} 张</span></span>
+      <span class="aName">幸运大转盘<span class="aSub">转出真实奖励！转盘券：${S.tickets} 张${wheelStale() ? " · 🎁该上新奖品啦" : ""}</span></span>
       <span class="aGo">▶</span>
     </div>
     <div class="card actRow" id="toVoucher">
