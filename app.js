@@ -28,7 +28,11 @@ function defState() {
     wheelTouched: todayStr(), // 上次更换转盘奖品的日期，驱动14天上新提醒
     theme: "candy",
     themesOwned: ["candy"],
-    sound: true
+    sound: true,
+    phonics: {},   // 拼读规则id -> {learned:true, stars:0}
+    learnedAt: {}, // 单词 -> 首次学会日期（驱动隔日复现）
+    history: {},   // 日期 -> {right, total, w, g, mins}
+    bestExam: 0    // 魔法大考最高分
   };
 }
 let S = defState();
@@ -128,12 +132,17 @@ function wrongCount() { return Object.keys(S.wrong).length; }
 function bumpDaily(key, n) {
   ensureDaily();
   S.daily[key] += (n || 1);
+  if (key === "g") hToday().g++;
   checkTasks();
 }
 /* 每日任务量按约15分钟设计：学5词≈4分钟 + 3局游戏≈8分钟 + 3错词≈2分钟 */
+function noFreshWords() {
+  return UNITS.filter(isUnlocked).every(u => unitS(u.id).learned.length >= u.words.length);
+}
 function taskDone() {
   return {
-    t1: S.daily.w >= 5,
+    /* 已解锁单元的新词全学完时，改为「复习也算数」，否则任务永远无法完成 */
+    t1: S.daily.w >= 5 || (noFreshWords() && S.daily.g >= 2),
     t2: S.daily.g >= 3,
     t3: S.daily.r >= 3 || (wrongCount() === 0 && S.daily.g >= 1)
   };
@@ -155,10 +164,28 @@ function checkTasks() {
   save();
 }
 
-/* ---------------- 错词本 ---------------- */
-function recordWrong(w) { S.wrong[w] = (S.wrong[w] || 0) + 2; save(); }
+/* ---------------- 错词本 + 答题统计 ---------------- */
+function hToday() {
+  const d = todayStr();
+  if (!S.history[d]) S.history[d] = { right: 0, total: 0, w: 0, g: 0 };
+  return S.history[d];
+}
+function logAnswer(isRight) {
+  const h = hToday(); h.total++; if (isRight) h.right++; save();
+}
+function recordWrong(w) { S.wrong[w] = (S.wrong[w] || 0) + 2; logAnswer(false); save(); }
 function recordRight(w) {
-  if (S.wrong[w]) { S.wrong[w]--; if (S.wrong[w] <= 0) delete S.wrong[w]; save(); }
+  logAnswer(true);
+  if (S.wrong[w]) { S.wrong[w]--; if (S.wrong[w] <= 0) delete S.wrong[w]; }
+  save();
+}
+/* 隔日复现：昨天学的词 + 错词优先出题 */
+function priorityPick(pool, n) {
+  const y = yesterdayStr();
+  const hot = pool.filter(w => S.wrong[w.w] || S.learnedAt[w.w] === y);
+  const cold = pool.filter(w => !S.wrong[w.w] && S.learnedAt[w.w] !== y);
+  const picked = shuffle(hot).slice(0, n);
+  return shuffle(picked.concat(shuffle(cold).slice(0, n - picked.length)));
 }
 
 /* ---------------- 导航 ---------------- */
@@ -182,7 +209,7 @@ document.querySelectorAll(".tab").forEach(t => {
   t.onclick = () => {
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
     t.classList.add("on");
-    ({ home: () => goTab(renderHome), map: () => goTab(renderMap), arcade: () => goTab(renderArcade), reward: () => goTab(renderReward) })[t.dataset.tab]();
+    ({ home: () => goTab(renderHome), map: () => goTab(renderMap), phonics: () => goTab(renderPhonicsList), arcade: () => goTab(renderArcade), reward: () => goTab(renderReward) })[t.dataset.tab]();
   };
 });
 
@@ -229,7 +256,7 @@ function renderHome() {
     </div>
     <div class="sectionTitle">📋 今日任务 · 约15分钟（全完成 +20🪙+🎟️）</div>
     <div class="card">
-      <div class="taskRow ${d.t1 ? "done" : ""}"><span class="tIcon">📖</span><span class="tName">学会 5 个新单词</span><span class="tProg">${Math.min(S.daily.w, 5)}/5</span></div>
+      <div class="taskRow ${d.t1 ? "done" : ""}"><span class="tIcon">📖</span><span class="tName">${noFreshWords() ? "复习巩固（新词已学完）" : "学会 5 个新单词"}</span><span class="tProg">${noFreshWords() ? Math.min(S.daily.g, 2) + "/2" : Math.min(S.daily.w, 5) + "/5"}</span></div>
       <div class="taskRow ${d.t2 ? "done" : ""}"><span class="tIcon">🎮</span><span class="tName">完成 3 局小游戏</span><span class="tProg">${Math.min(S.daily.g, 3)}/3</span></div>
       <div class="taskRow ${d.t3 ? "done" : ""}"><span class="tIcon">📕</span><span class="tName">消灭 3 个错词</span><span class="tProg">${wc === 0 ? "无错词" : Math.min(S.daily.r, 3) + "/3"}</span></div>
     </div>
@@ -345,10 +372,7 @@ function startLearn(u) {
   function quiz() {
     let qi = 0, right = 0;
     function q() {
-      if (qi >= batch.length) {
-        batch.forEach(w => { if (!reviewMode && right > 0 && !us.learned.includes(w.w)) {} });
-        return finishLearn();
-      }
+      if (qi >= batch.length) return finishLearn();
       const w = batch[qi];
       const opts = shuffle([w].concat(sample(u.words.filter(x => x.w !== w.w), 3)));
       $("#scr-learn").innerHTML = `
@@ -367,8 +391,13 @@ function startLearn(u) {
           if (o.w === w.w) {
             b.classList.add("right"); sndRight(); right++;
             recordRight(w.w);
-            if (!us.learned.includes(w.w)) { us.learned.push(w.w); bumpDaily("w"); }
-            else if (reviewMode) bumpDaily("w");
+            /* 只有真正新学会的词才计入「学会5个新单词」，复习不刷任务 */
+            if (!us.learned.includes(w.w)) {
+              us.learned.push(w.w);
+              S.learnedAt[w.w] = todayStr();
+              hToday().w++;
+              bumpDaily("w");
+            }
             save();
           } else {
             b.classList.add("wrong"); sndWrong(); recordWrong(w.w);
@@ -502,7 +531,10 @@ function startListen(pool, u) {
 /* ================= 游戏3：拼写工坊 ================= */
 function startSpell(pool, u) {
   const cands = pool.filter(w => /^[a-zA-Z]+$/.test(w.w) && w.w.length >= 3 && w.w.length <= 9);
-  const qs = sample(cands.length >= 5 ? cands : pool.filter(w => /^[a-zA-Z]+$/.test(w.w)), Math.min(5, cands.length || 3));
+  const fallback = pool.filter(w => /^[a-zA-Z]+$/.test(w.w));
+  const src = cands.length >= 5 ? cands : fallback;
+  if (!src.length) { toast("这里还没有适合拼写的单词，换个游戏试试～"); goBack(); return; }
+  const qs = sample(src, Math.min(5, src.length));
   let qi = 0, right = 0;
   function q() {
     if (qi >= qs.length) {
@@ -725,17 +757,20 @@ function startReview() {
 /* ================= 游戏厅 ================= */
 function renderArcade() {
   const pool = unlockedWords(), sents = unlockedSents();
+  const learnedN = UNITS.reduce((a, u) => a + unitS(u.id).learned.length, 0);
   const games = [
-    { icon: "🔗", name: "词语配对", sub: "已解锁单词随机出题", fn: () => startMatch(pool) },
-    { icon: "👂", name: "听音选图", sub: "练出小小顺风耳", fn: () => startListen(pool) },
-    { icon: "🔤", name: "拼写工坊", sub: "字母积木拼拼拼", fn: () => startSpell(pool) },
+    { icon: "🎙️", name: "魔法回声（跟读）", sub: "对着手机大声读，看看能拿几颗星", fn: () => startEcho(unlockedSents().concat(ECHO_EXTRA)) },
+    { icon: "🏆", name: "魔法大考", sub: learnedN < 8 ? "学会8个词后解锁" : "跨单元综合复习 · 最高 " + (S.bestExam || 0) + " 分", fn: () => startExam() },
+    { icon: "🔗", name: "词语配对", sub: "已解锁单词随机出题", fn: () => startMatch(priorityPick(pool, 20)) },
+    { icon: "👂", name: "听音选图", sub: "练出小小顺风耳", fn: () => startListen(priorityPick(pool, 20)) },
+    { icon: "🔤", name: "拼写工坊", sub: "字母积木拼拼拼", fn: () => startSpell(priorityPick(pool, 20)) },
     { icon: "🚂", name: "句子小火车", sub: "重点句型排排队", fn: () => startSentence(sents) },
     { icon: "📕", name: "错词大扫除", sub: wrongCount() ? "还有 " + wrongCount() + " 个错词" : "错词本是空的", fn: () => startReview() }
   ];
   $("#scr-arcade").innerHTML = `
     <div class="card" style="text-align:center;padding:12px">
       <div style="font-size:15px;font-weight:700;color:#9b59b6">🎮 想玩什么随便挑！</div>
-      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">题目来自已解锁的 ${UNITS.filter(isUnlocked).length} 个单元</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">题目来自已解锁的 ${UNITS.filter(isUnlocked).length} 个单元，昨天学的词和错词会优先出现</div>
     </div>
     ${games.map((g, i) => `
       <div class="card actRow" data-i="${i}">
@@ -890,7 +925,19 @@ function renderParent() {
       <button class="btn ghost" id="pReset" style="flex:1">恢复默认奖品</button>
       <button class="btn ghost" id="pTicket" style="flex:1">补发1张转盘券</button>
     </div>
+    <div class="card actRow" id="pReport">
+      <span class="aIcon">📊</span>
+      <span class="aName">学习报告<span class="aSub">掌握进度 · 7天趋势 · 高频错词</span></span>
+      <span class="aGo">▶</span>
+    </div>
+    <div class="card actRow" id="pBackup">
+      <span class="aIcon">💾</span>
+      <span class="aName">备份与恢复进度<span class="aSub">换手机、清缓存前务必备份一次</span></span>
+      <span class="aGo">▶</span>
+    </div>
     <div style="font-size:11px;color:#c0b0d0;text-align:center">改完直接生效，孩子下次打开转盘就是新奖品</div>`;
+  $("#pReport").onclick = () => go(renderReport);
+  $("#pBackup").onclick = () => go(renderBackup);
   document.querySelectorAll("#scr-parent .pDel").forEach(b => {
     b.onclick = () => {
       const list = getWheel().slice();
@@ -908,6 +955,390 @@ function renderParent() {
   $("#pReset").onclick = () => { S.wheel = null; touchWheel(); renderParent(); toast("已恢复默认奖品"); };
   $("#pTicket").onclick = () => { S.tickets++; save(); toast("已补发1张转盘券 🎟️"); };
   show("parent", "🔐 家长设置");
+}
+
+/* ================= 自然拼读（Let's spell） ================= */
+function phS(id) { if (!S.phonics[id]) S.phonics[id] = { learned: false, stars: 0 }; return S.phonics[id]; }
+function blankWord(word, reSrc) {
+  return word.toLowerCase().replace(new RegExp(reSrc), (s, g) => typeof g === "string" ? "▢" + g + "▢" : "▢".repeat(s.length));
+}
+function renderPhonicsList() {
+  $("#scr-phonics").innerHTML = `
+    <div class="card" style="text-align:center;padding:12px">
+      <div style="font-size:15px;font-weight:700;color:#9b59b6">🔮 拼读魔法学院</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">学会拼读规则，看到生词也能自己念出来！</div>
+    </div>
+    ${["四上", "四下"].map(bk => `
+      <div class="bookLabel">—— ✨ ${bk}册 · Let's spell ——</div>
+      ${PHONICS.filter(p => p.book === bk).map(p => {
+        const ps = phS(p.id);
+        return `<div class="card actRow" data-pid="${p.id}">
+          <span class="aIcon">${p.icon}</span>
+          <span class="aName">${esc(p.label)} <span style="color:#b98ff0">${esc(p.ipa)}</span><span class="aSub">${ps.learned ? "已学过" : "还没学"} · ${p.words.length}个例词</span></span>
+          <span class="unitStars" style="color:#ffb830">${"★".repeat(ps.stars) + "☆".repeat(3 - ps.stars)}</span>
+        </div>`;
+      }).join("")}`).join("")}`;
+  document.querySelectorAll("#scr-phonics .actRow").forEach(c => {
+    c.onclick = () => go(() => renderPhonicRule(PHONICS.find(p => p.id === c.dataset.pid)));
+  });
+  show("phonics", "🔮 拼读魔法学院");
+}
+
+function renderPhonicRule(p) {
+  $("#scr-phonic").innerHTML = `
+    <div class="card" style="text-align:center">
+      <div style="font-size:44px">${p.icon}</div>
+      <div style="font-size:30px;font-weight:800;color:#6a4a8a;letter-spacing:2px">${esc(p.label)}</div>
+      <div style="font-size:20px;color:#b98ff0;font-weight:700">${esc(p.ipa)}</div>
+      <div style="font-size:13px;color:#7a5a9a;margin-top:8px;line-height:1.6;text-align:left;background:#fff6fb;border-radius:14px;padding:10px">💡 ${p.tip}</div>
+    </div>
+    <div class="sectionTitle">🔊 点一点，听听这些词的共同点</div>
+    <div class="optGrid" id="phWords">
+      ${p.words.map((w, i) => `<button class="optBtn" data-i="${i}">
+        <span class="oEmoji">${w.e}</span>
+        <span style="font-size:16px">${esc(blankWord(w.w, p.re)).replace(/▢/g, '<b style="color:#e56ba0">▢</b>')}</span>
+        <div style="font-size:13px;color:#b08ac0;font-weight:400">${esc(w.w)} ${w.zh}</div>
+      </button>`).join("")}
+    </div>
+    <div style="height:14px"></div>
+    <button class="btn" id="phGo">🎯 挑战拼读关卡</button>`;
+  document.querySelectorAll("#phWords .optBtn").forEach(b => {
+    b.onclick = () => { speak(p.words[+b.dataset.i].w, 0.75); tone(800, .05); };
+  });
+  $("#phGo").onclick = () => { phS(p.id).learned = true; save(); go(() => startPhonicGame(p)); };
+  show("phonic", esc(p.label) + " 规则");
+}
+
+/* 拼读关卡：补全字母组合 + 听音归类 两种题型 */
+function startPhonicGame(p) {
+  const qs = shuffle(p.words).slice(0, 6);
+  const others = PHONICS.filter(x => x.id !== p.id);
+  let qi = 0, right = 0;
+  function q() {
+    if (qi >= qs.length) {
+      bumpDaily("g");
+      const stars = right === qs.length ? 3 : right >= qs.length - 1 ? 2 : 1;
+      const ps = phS(p.id);
+      if (stars > ps.stars) { ps.stars = stars; save(); }
+      return renderResult({
+        stars, title: right === qs.length ? "拼读魔法师！" : "拼读关卡完成！",
+        detail: `答对 ${right}/${qs.length}　规则：${p.label} ${p.ipa}`,
+        coins: right * 3 + (right === qs.length ? 6 : 0),
+        replay: () => startPhonicGame(p)
+      });
+    }
+    const w = qs[qi];
+    const isFill = qi % 2 === 0;
+    let opts, head;
+    if (isFill) {
+      /* 补全：这个词缺的字母组合是哪个？ */
+      opts = shuffle([p].concat(sample(others, 3)));
+      head = `<div class="qEmoji" style="font-size:56px">${w.e}</div>
+        <div class="qText" style="letter-spacing:3px">${esc(blankWord(w.w, p.re)).replace(/▢/g, '<b style="color:#e56ba0">▢</b>')}</div>
+        <div class="qSub">${w.zh} —— 空格里填哪个字母组合？</div>`;
+    } else {
+      /* 听音归类：这个词属于哪个发音家族？ */
+      opts = shuffle([p].concat(sample(others, 3)));
+      head = `<button id="lcSpeak" style="margin-top:0">🔊</button>
+        <div class="qSub">听一听「${esc(w.w)}」，它属于哪个发音家族？</div>`;
+    }
+    $("#scr-play").innerHTML = `
+      <div id="playHead"><div id="playProg">🔮 拼读挑战 ${qi + 1} / ${qs.length}</div></div>
+      <div class="card" id="playQ">${head}</div>
+      <div class="optGrid">${opts.map((o, i) => `<button class="optBtn" data-i="${i}">
+        <span style="font-size:20px;font-weight:800">${esc(o.label)}</span>
+        <div style="font-size:13px;color:#b08ac0;font-weight:400">${esc(o.ipa)}</div>
+      </button>`).join("")}</div>`;
+    speak(w.w, 0.75);
+    if (!isFill) $("#lcSpeak").onclick = () => speak(w.w, 0.75);
+    let locked = false;
+    document.querySelectorAll("#scr-play .optBtn").forEach(b => {
+      b.onclick = () => {
+        if (locked) return; locked = true;
+        const o = opts[+b.dataset.i];
+        if (o.id === p.id) { b.classList.add("right"); sndRight(); right++; logAnswer(true); speak(w.w, 0.75); }
+        else {
+          b.classList.add("wrong"); sndWrong(); logAnswer(false);
+          document.querySelectorAll("#scr-play .optBtn").forEach(x => { if (opts[+x.dataset.i].id === p.id) x.classList.add("right"); });
+          toast(w.w + " → " + p.label + " " + p.ipa, 1800);
+        }
+        setTimeout(() => { qi++; q(); }, 1000);
+      };
+    });
+    show("play", "🔮 拼读挑战");
+  }
+  q();
+}
+
+/* ================= 魔法回声（跟读打分） ================= */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function normTxt(s) { return s.toLowerCase().replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim(); }
+function scoreSay(target, heard) {
+  const a = normTxt(target).split(" "), b = normTxt(heard).split(" ");
+  if (!b.length || !b[0]) return 0;
+  let hit = 0;
+  const pool = b.slice();
+  a.forEach(w => { const i = pool.indexOf(w); if (i >= 0) { hit++; pool.splice(i, 1); } });
+  return hit / a.length;
+}
+function startEcho(items) {
+  if (!SR) {
+    $("#scr-echo").innerHTML = `
+      <div class="card" style="text-align:center;padding:30px 16px">
+        <div style="font-size:44px">🎙️</div>
+        <div style="font-size:15px;font-weight:700;color:#9b59b6;margin:8px 0">这个浏览器不支持语音识别</div>
+        <div style="font-size:13px;color:#b8a8c8;line-height:1.7">请用 <b>Chrome</b> 或 <b>Safari</b> 打开本网站，<br>就可以玩「魔法回声」跟读游戏啦～</div>
+      </div>`;
+    show("echo", "🎙️ 魔法回声");
+    return;
+  }
+  const qs = sample(items, Math.min(6, items.length));
+  let qi = 0, total = 0, listening = false, rec = null;
+  function q() {
+    if (qi >= qs.length) {
+      bumpDaily("g");
+      const avg = total / qs.length;
+      const stars = avg >= 0.9 ? 3 : avg >= 0.7 ? 2 : avg >= 0.4 ? 1 : 0;
+      return renderResult({
+        stars, title: stars >= 3 ? "发音超标准！" : stars >= 1 ? "跟读完成，很棒！" : "再多练几遍，加油！",
+        detail: `平均得分 ${Math.round(avg * 100)} 分`,
+        coins: Math.round(avg * qs.length * 4),
+        replay: () => startEcho(items)
+      });
+    }
+    const it = qs[qi];
+    $("#scr-echo").innerHTML = `
+      <div id="playHead"><div id="playProg">🎙️ 第 ${qi + 1} / ${qs.length} 句</div></div>
+      <div class="card" style="text-align:center;padding:22px 14px">
+        <div style="font-size:22px;font-weight:800;color:#6a4a8a;line-height:1.4">${esc(it.en)}</div>
+        <div style="font-size:14px;color:#b08ac0;margin-top:4px">${it.zh}</div>
+        <button id="echoPlay" style="margin-top:12px;font-size:26px;border:none;background:#fff0f7;border-radius:50%;width:56px;height:56px;box-shadow:0 3px 10px rgba(230,120,180,.25)">🔊</button>
+        <div id="echoState" style="font-size:13px;color:#c0a8d0;margin-top:10px">先听一听，再按住下面的按钮大声读出来～</div>
+        <div id="echoScore" style="min-height:56px;margin-top:6px"></div>
+      </div>
+      <button class="btn" id="echoMic">🎙️ 点我开始读</button>
+      <div style="height:10px"></div>
+      <button class="btn ghost" id="echoSkip">跳过这句 →</button>`;
+    speak(it.en, 0.8);
+    $("#echoPlay").onclick = () => speak(it.en, 0.8);
+    $("#echoSkip").onclick = () => { if (rec) try { rec.stop(); } catch (e) {} qi++; q(); };
+    $("#echoMic").onclick = () => {
+      if (listening) return;
+      listening = true;
+      $("#echoMic").textContent = "🔴 正在听……大声读！";
+      $("#echoState").textContent = "我在听哦～";
+      try {
+        rec = new SR();
+        rec.lang = "en-US"; rec.interimResults = false; rec.maxAlternatives = 3;
+        rec.onresult = ev => {
+          let best = 0, heard = "";
+          for (let i = 0; i < ev.results[0].length; i++) {
+            const s = scoreSay(it.en, ev.results[0][i].transcript);
+            if (s > best) { best = s; heard = ev.results[0][i].transcript; }
+          }
+          total += best; listening = false;
+          const pc = Math.round(best * 100);
+          const stars = best >= 0.9 ? "⭐⭐⭐" : best >= 0.7 ? "⭐⭐" : best >= 0.4 ? "⭐" : "💪";
+          logAnswer(best >= 0.7);
+          if (best >= 0.7) { sndRight(); if (best >= 0.9) confetti(); } else sndWrong();
+          $("#echoScore").innerHTML = `<div style="font-size:26px">${stars}</div>
+            <div style="font-size:15px;font-weight:700;color:${best >= 0.7 ? "#7cc576" : "#e8842d"}">${pc} 分${best >= 0.9 ? "　发音太棒了！" : best >= 0.7 ? "　很不错！" : "　再试一次会更好"}</div>
+            <div style="font-size:12px;color:#c0a8d0">我听到的是：${esc(heard || "……")}</div>`;
+          $("#echoMic").textContent = "下一句 →";
+          $("#echoMic").onclick = () => { qi++; q(); };
+        };
+        rec.onerror = ev => {
+          listening = false;
+          $("#echoMic").textContent = "🎙️ 再试一次";
+          $("#echoState").textContent = ev.error === "not-allowed"
+            ? "需要允许使用麦克风才能玩哦，请在浏览器里点「允许」"
+            : "没听清楚，靠近一点再读一遍～";
+        };
+        rec.onend = () => {
+          if (listening) { listening = false; $("#echoMic").textContent = "🎙️ 再读一次"; $("#echoState").textContent = "没听到声音，大声一点～"; }
+        };
+        rec.start();
+      } catch (e) {
+        listening = false;
+        $("#echoState").textContent = "麦克风打不开，换 Chrome 或 Safari 试试";
+      }
+    };
+    show("echo", "🎙️ 魔法回声");
+  }
+  q();
+}
+
+/* ================= 魔法大考（跨单元综合复习） ================= */
+function startExam() {
+  const learned = [];
+  UNITS.forEach(u => { const us = unitS(u.id); u.words.forEach(w => { if (us.learned.includes(w.w)) learned.push(w); }); });
+  if (learned.length < 8) { toast("先去学更多单词，学会8个词就能参加大考啦！", 2400); goBack(); return; }
+  const n = Math.min(15, learned.length);
+  const qs = priorityPick(learned, n);
+  const types = shuffle(qs.map((_, i) => ["enzh", "listen", "zhen"][i % 3]));
+  let qi = 0, right = 0;
+  function q() {
+    if (qi >= qs.length) return finish();
+    const w = qs[qi], type = types[qi];
+    const opts = shuffle([w].concat(sample(learned.filter(x => x.w !== w.w), 3)));
+    let head, optHtml;
+    if (type === "enzh") {
+      head = `<div class="qText">${esc(w.w)}</div><div class="qSub">选出正确的意思</div>`;
+      optHtml = opts.map((o, i) => `<button class="optBtn" data-i="${i}"><span class="oEmoji">${o.e}</span>${o.zh}</button>`).join("");
+    } else if (type === "listen") {
+      head = `<button id="lcSpeak" style="margin-top:0">🔊</button><div class="qSub">听一听，选出对的</div>`;
+      optHtml = opts.map((o, i) => `<button class="optBtn" data-i="${i}"><span class="oEmoji">${o.e}</span>${o.zh}</button>`).join("");
+    } else {
+      head = `<div class="qEmoji" style="font-size:56px">${w.e}</div><div class="qSub">${w.zh} —— 选出英文</div>`;
+      optHtml = opts.map((o, i) => `<button class="optBtn" data-i="${i}">${esc(o.w)}</button>`).join("");
+    }
+    $("#scr-play").innerHTML = `
+      <div id="playHead"><div id="playProg">🏆 魔法大考 ${qi + 1} / ${qs.length}　已答对 ${right}</div></div>
+      <div class="card" id="playQ">${head}</div>
+      <div class="optGrid">${optHtml}</div>`;
+    if (type !== "zhen") speak(w.w);
+    if (type === "listen") $("#lcSpeak").onclick = () => speak(w.w);
+    let locked = false;
+    document.querySelectorAll("#scr-play .optBtn").forEach(b => {
+      b.onclick = () => {
+        if (locked) return; locked = true;
+        const o = opts[+b.dataset.i];
+        if (o.w === w.w) { b.classList.add("right"); sndRight(); right++; recordRight(w.w); if (type === "zhen") speak(w.w); }
+        else {
+          b.classList.add("wrong"); sndWrong(); recordWrong(w.w);
+          document.querySelectorAll("#scr-play .optBtn").forEach(x => { if (opts[+x.dataset.i].w === w.w) x.classList.add("right"); });
+        }
+        setTimeout(() => { qi++; q(); }, 850);
+      };
+    });
+    show("play", "🏆 魔法大考");
+  }
+  function finish() {
+    bumpDaily("g");
+    const score = Math.round(right / qs.length * 100);
+    const stars = score >= 90 ? 3 : score >= 75 ? 2 : score >= 60 ? 1 : 0;
+    let newBest = false;
+    if (score > S.bestExam) { S.bestExam = score; newBest = true; save(); }
+    renderResult({
+      stars, title: score >= 90 ? "综合复习满分学霸！" : score >= 60 ? "大考通过！" : "还需再复习一下",
+      detail: `得分 ${score} 分（答对 ${right}/${qs.length}）${newBest ? "　🎉 刷新纪录！" : "　最高纪录 " + S.bestExam + " 分"}`,
+      coins: right * 3 + (score >= 90 ? 10 : 0),
+      replay: () => startExam()
+    });
+  }
+  q();
+}
+
+/* ================= 家长学习报告 ================= */
+function last7() {
+  const out = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 864e5);
+    const k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    out.push({ k, label: "日一二三四五六"[d.getDay()], h: S.history[k] || null });
+  }
+  return out;
+}
+function renderReport() {
+  const days = last7();
+  const active = days.filter(d => d.h && d.h.total > 0).length;
+  const totalWords = UNITS.reduce((a, u) => a + u.words.length, 0);
+  const mastered = UNITS.reduce((a, u) => a + unitS(u.id).learned.length, 0);
+  const allR = Object.values(S.history).reduce((a, h) => a + h.right, 0);
+  const allT = Object.values(S.history).reduce((a, h) => a + h.total, 0);
+  const acc = allT ? Math.round(allR / allT * 100) : 0;
+  const top = Object.entries(S.wrong).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const maxT = Math.max(10, ...days.map(d => d.h ? d.h.total : 0));
+  $("#scr-report").innerHTML = `
+    <div class="card">
+      <div style="display:flex;text-align:center">
+        <div style="flex:1"><div style="font-size:24px;font-weight:800;color:#9b59b6">${mastered}<span style="font-size:13px;color:#c0a8d0">/${totalWords}</span></div><div style="font-size:11px;color:#b8a8c8">掌握单词</div></div>
+        <div style="flex:1"><div style="font-size:24px;font-weight:800;color:#7cc576">${acc}%</div><div style="font-size:11px;color:#b8a8c8">总正确率</div></div>
+        <div style="flex:1"><div style="font-size:24px;font-weight:800;color:#e8a33d">${S.streak}</div><div style="font-size:11px;color:#b8a8c8">连续天数</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="sectionTitle" style="margin:0 0 10px">📊 最近7天（学习 ${active}/7 天）</div>
+      <div style="display:flex;align-items:flex-end;gap:6px;height:110px">
+        ${days.map(d => {
+          const t = d.h ? d.h.total : 0;
+          const r = d.h ? d.h.right : 0;
+          const hp = Math.round(t / maxT * 84);
+          const rp = t ? Math.round(r / t * 100) : 0;
+          return `<div style="flex:1;text-align:center">
+            <div style="font-size:10px;color:#b8a8c8;font-variant-numeric:tabular-nums">${t ? rp + "%" : ""}</div>
+            <div style="height:${Math.max(hp, 3)}px;border-radius:6px 6px 0 0;background:${t ? "linear-gradient(180deg,#ffd166,#ff9ec6)" : "#f0e8f8"}"></div>
+            <div style="font-size:11px;color:#b8a8c8;margin-top:3px">${d.label}</div>
+            <div style="font-size:9px;color:#d0c0e0">${t ? t + "题" : "—"}</div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+    <div class="card">
+      <div class="sectionTitle" style="margin:0 0 6px">📕 最常出错的词（Top 5）</div>
+      ${top.length ? top.map(([w, c]) => {
+        const info = WORD_INDEX[w];
+        return `<div class="vRow"><span style="font-size:20px">${info ? info.e : "❓"}</span>
+          <span class="vName">${esc(w)}<span class="vDate">${info ? info.zh : ""}</span></span>
+          <span style="font-size:12px;color:#e8842d;font-weight:700">待巩固 ${c}</span></div>`;
+      }).join("") : `<div style="font-size:13px;color:#b8a8c8;padding:8px 2px">目前没有错词，很棒！</div>`}
+    </div>
+    <div class="card">
+      <div class="sectionTitle" style="margin:0 0 6px">🏆 综合能力</div>
+      <div class="vRow"><span style="font-size:20px">🏆</span><span class="vName">魔法大考最高分<span class="vDate">跨单元综合测试</span></span><span style="font-size:14px;font-weight:700;color:#9b59b6">${S.bestExam || "—"}</span></div>
+      <div class="vRow"><span style="font-size:20px">🔮</span><span class="vName">拼读规则<span class="vDate">Let's spell 自然拼读</span></span><span style="font-size:14px;font-weight:700;color:#9b59b6">${Object.values(S.phonics).filter(p => p.stars > 0).length}/${PHONICS.length}</span></div>
+      <div class="vRow"><span style="font-size:20px">🎟️</span><span class="vName">已兑现的实物奖励<span class="vDate">转盘奖励券</span></span><span style="font-size:14px;font-weight:700;color:#9b59b6">${S.vouchers.filter(v => v.used).length} 次</span></div>
+    </div>`;
+  show("report", "📊 学习报告");
+}
+
+/* ================= 进度备份码 ================= */
+function exportCode() {
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify(S)))); } catch (e) { return ""; }
+}
+function importCode(code) {
+  try {
+    const obj = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+    if (!obj || typeof obj.coins !== "number" || !obj.units) return false;
+    S = Object.assign(defState(), obj);
+    ensureDaily(); save(); applyTheme(); updateCoinBox();
+    return true;
+  } catch (e) { return false; }
+}
+function renderBackup() {
+  const code = exportCode();
+  $("#scr-backup").innerHTML = `
+    <div class="card">
+      <div class="sectionTitle" style="margin:0 0 6px">💾 备份进度</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">进度只存在这台手机里。清缓存、换手机会全部丢失（包括宠物、贴纸、连续天数）。把下面这串码复制保存到微信收藏或备忘录，随时可以恢复。</div>
+      <textarea id="bkOut" readonly style="width:100%;height:90px;border:2px solid #eadcf2;border-radius:12px;padding:8px;font-size:11px;color:#7a5a9a;background:#fff;resize:none">${esc(code)}</textarea>
+      <div style="height:8px"></div>
+      <button class="btn small" id="bkCopy">📋 复制备份码</button>
+      <span style="font-size:11px;color:#c0b0d0;margin-left:8px">${(code.length / 1024).toFixed(1)} KB</span>
+    </div>
+    <div class="card">
+      <div class="sectionTitle" style="margin:0 0 6px">📥 恢复进度</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">粘贴之前保存的备份码，会<b style="color:#e05a5a">覆盖</b>当前手机上的全部进度。</div>
+      <textarea id="bkIn" placeholder="在这里粘贴备份码……" style="width:100%;height:90px;border:2px solid #eadcf2;border-radius:12px;padding:8px;font-size:11px;color:#7a5a9a;background:#fff;resize:none"></textarea>
+      <div style="height:8px"></div>
+      <button class="btn small ghost" id="bkIn2">📥 恢复这份进度</button>
+    </div>`;
+  $("#bkCopy").onclick = () => {
+    const t = $("#bkOut"); t.select(); t.setSelectionRange(0, 99999);
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) {}
+    if (navigator.clipboard) navigator.clipboard.writeText(code).then(() => toast("✅ 备份码已复制")).catch(() => { if (!ok) toast("请长按上面的文字手动复制"); });
+    else toast(ok ? "✅ 备份码已复制" : "请长按上面的文字手动复制");
+  };
+  let armed = false;
+  $("#bkIn2").onclick = () => {
+    const v = $("#bkIn").value.trim();
+    if (!v) { toast("请先粘贴备份码"); return; }
+    if (!armed) { armed = true; $("#bkIn2").textContent = "⚠️ 会覆盖当前进度，再点一次确认"; return; }
+    if (importCode(v)) { confetti(); sndWin(); toast("🎉 进度已恢复！", 2400); parentOK = true; navStack = [renderHome]; renderHome(); }
+    else { sndWrong(); toast("备份码不对，检查一下有没有复制完整"); armed = false; $("#bkIn2").textContent = "📥 恢复这份进度"; }
+  };
+  show("backup", "💾 备份与恢复");
 }
 
 /* ================= 主题换装屋 ================= */

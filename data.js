@@ -292,6 +292,111 @@ const UNITS = [
   }
 ];
 
+/* ============================================================
+ * 自然拼读 Phonics（对应教材 Let's spell 板块）
+ * 前4条=魔法e规则(四上)，后4条=元音字母组合(四下)
+ * re: 用于把规则字母挖空的正则；words 里每个词都必须能匹配
+ * ============================================================ */
+const PHONICS = [
+  {
+    id: "ph1", label: "a-e", ipa: "/eɪ/", book: "四上", icon: "🎂",
+    tip: "单词末尾有个不发音的「魔法 e」，它会让前面的 a 读出字母本来的名字 /eɪ/。",
+    re: "a([b-df-hj-np-tv-z]+)e$",
+    words: [
+      { w: "cake", zh: "蛋糕", e: "🎂" }, { w: "name", zh: "名字", e: "📛" },
+      { w: "face", zh: "脸", e: "😊" }, { w: "lake", zh: "湖", e: "🏞️" },
+      { w: "game", zh: "游戏", e: "🎮" }, { w: "gate", zh: "大门", e: "🚧" },
+      { w: "plane", zh: "飞机", e: "✈️" }, { w: "grape", zh: "葡萄", e: "🍇" }
+    ]
+  },
+  {
+    id: "ph2", label: "i-e", ipa: "/aɪ/", book: "四上", icon: "🪁",
+    tip: "魔法 e 在末尾，前面的 i 就读 /aɪ/，像「爱」的音。",
+    re: "i([b-df-hj-np-tv-z]+)e$",
+    words: [
+      { w: "five", zh: "五", e: "5️⃣" }, { w: "nine", zh: "九", e: "9️⃣" },
+      { w: "kite", zh: "风筝", e: "🪁" }, { w: "rice", zh: "米饭", e: "🍚" },
+      { w: "bike", zh: "自行车", e: "🚲" }, { w: "time", zh: "时间", e: "⏰" },
+      { w: "smile", zh: "微笑", e: "😄" }, { w: "ice", zh: "冰", e: "🧊" }
+    ]
+  },
+  {
+    id: "ph3", label: "o-e", ipa: "/əʊ/", book: "四上", icon: "👃",
+    tip: "魔法 e 在末尾，前面的 o 读 /əʊ/，嘴巴要圆圆的。",
+    re: "o([b-df-hj-np-tv-z]+)e$",
+    words: [
+      { w: "nose", zh: "鼻子", e: "👃" }, { w: "home", zh: "家", e: "🏠" },
+      { w: "rose", zh: "玫瑰", e: "🌹" }, { w: "note", zh: "便条", e: "🎵" },
+      { w: "hole", zh: "洞", e: "🕳️" }, { w: "bone", zh: "骨头", e: "🦴" },
+      { w: "phone", zh: "电话", e: "📱" }, { w: "stone", zh: "石头", e: "🪨" }
+    ]
+  },
+  {
+    id: "ph4", label: "u-e", ipa: "/juː/", book: "四上", icon: "🐱",
+    tip: "魔法 e 在末尾，前面的 u 读 /juː/，就像在说「You」。",
+    re: "u([b-df-hj-np-tv-z]+)e$",
+    words: [
+      { w: "cute", zh: "可爱的", e: "🐱" }, { w: "huge", zh: "巨大的", e: "🐘" },
+      { w: "tube", zh: "管子", e: "🧪" }, { w: "cube", zh: "方块", e: "🎲" },
+      { w: "mule", zh: "骡子", e: "🐎" }, { w: "use", zh: "使用", e: "♻️" },
+      { w: "excuse", zh: "原谅", e: "🙏" }, { w: "June", zh: "六月", e: "📅" }
+    ]
+  },
+  {
+    id: "ph5", label: "ee", ipa: "/iː/", book: "四下", icon: "🌳",
+    tip: "两个 e 手拉手，读长长的 /iː/，像笑着说「衣——」。",
+    re: "ee",
+    words: [
+      { w: "bee", zh: "蜜蜂", e: "🐝" }, { w: "tree", zh: "树", e: "🌳" },
+      { w: "sleep", zh: "睡觉", e: "😴" }, { w: "green", zh: "绿色", e: "🟢" },
+      { w: "feet", zh: "脚", e: "🦶" }, { w: "meet", zh: "见面", e: "🤝" },
+      { w: "week", zh: "星期", e: "📆" }, { w: "sweet", zh: "甜的", e: "🍬" }
+    ]
+  },
+  {
+    id: "ph6", label: "ea", ipa: "/iː/", book: "四下", icon: "🍵",
+    tip: "e 和 a 在一起，常常也读 /iː/，和 ee 是好朋友。",
+    re: "ea",
+    words: [
+      { w: "tea", zh: "茶", e: "🍵" }, { w: "eat", zh: "吃", e: "🍽️" },
+      { w: "meat", zh: "肉", e: "🥩" }, { w: "read", zh: "读", e: "📖" },
+      { w: "seat", zh: "座位", e: "💺" }, { w: "clean", zh: "干净的", e: "🧹" },
+      { w: "bean", zh: "豆子", e: "🫘" }, { w: "teacher", zh: "老师", e: "🧑‍🏫" }
+    ]
+  },
+  {
+    id: "ph7", label: "ai / ay", ipa: "/eɪ/", book: "四下", icon: "🌧️",
+    tip: "ai 常在词中间，ay 常在词尾，都读 /eɪ/。",
+    re: "(?:ai|ay)",
+    words: [
+      { w: "rain", zh: "雨", e: "🌧️" }, { w: "tail", zh: "尾巴", e: "🐕" },
+      { w: "wait", zh: "等待", e: "⏳" }, { w: "paint", zh: "画画", e: "🎨" },
+      { w: "day", zh: "白天", e: "☀️" }, { w: "play", zh: "玩", e: "⚽" },
+      { w: "say", zh: "说", e: "💬" }, { w: "way", zh: "路", e: "🛣️" }
+    ]
+  },
+  {
+    id: "ph8", label: "oo", ipa: "/uː/ /ʊ/", book: "四下", icon: "🌙",
+    tip: "两个 o 手拉手，多数读长音 /uː/（moon），少数读短音 /ʊ/（book）。",
+    re: "oo",
+    words: [
+      { w: "moon", zh: "月亮", e: "🌙" }, { w: "food", zh: "食物", e: "🍔" },
+      { w: "zoo", zh: "动物园", e: "🦁" }, { w: "room", zh: "房间", e: "🚪" },
+      { w: "book", zh: "书", e: "📕" }, { w: "cook", zh: "烹饪", e: "👨‍🍳" },
+      { w: "foot", zh: "脚", e: "👣" }, { w: "school", zh: "学校", e: "🏫" }
+    ]
+  }
+];
+
+/* 跟读打分（魔法回声）的常用句，配合各单元句型 */
+const ECHO_EXTRA = [
+  { en: "Good morning!", zh: "早上好！" },
+  { en: "How are you?", zh: "你好吗？" },
+  { en: "Nice to meet you.", zh: "很高兴认识你。" },
+  { en: "Thank you very much.", zh: "非常感谢你。" },
+  { en: "See you tomorrow.", zh: "明天见。" }
+];
+
 /* 扭蛋贴纸库：r=稀有度 1普通 2稀有 3传说 */
 const STICKERS = [
   { n: "草莓甜甜", e: "🍓", r: 1 }, { n: "棒棒糖", e: "🍭", r: 1 },
