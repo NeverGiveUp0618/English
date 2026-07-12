@@ -29,6 +29,7 @@ function defState() {
     theme: "candy",
     themesOwned: ["candy"],
     sound: true,
+    testMode: false, // 家长测试模式：解锁全部内容，给孩子用前记得关掉
     phonics: {},   // 拼读规则id -> {learned:true, stars:0}
     learnedAt: {}, // 单词 -> 首次学会日期（驱动隔日复现）
     history: {},   // 日期 -> {right, total, w, g, mins}
@@ -54,6 +55,18 @@ function pickVoice() {
 }
 if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 
+/* ---------------- 真人发音（edge-tts 预合成 mp3，主通道） ----------------
+ * 手机自带的语音合成引擎经常没有英文语音包（安卓）或被系统限制，
+ * 所以单词/句子发音一律播放网站里预先合成好的 mp3；找不到文件时才退回系统 TTS。
+ */
+const AUD = typeof Audio !== "undefined" ? new Audio() : null;
+if (AUD) { AUD.preload = "auto"; AUD.crossOrigin = "anonymous"; }
+const SILENT_WAV = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=";
+function audioFile(text) {
+  if (typeof AUDIO_MAP === "undefined") return null;
+  return AUDIO_MAP[text] || null;
+}
+
 /* iOS/安卓要求：音频必须先在一次真实触摸里"解锁"，否则后续全部静音 */
 let audioReady = false, ttsWarned = false;
 function unlockAudio() {
@@ -64,7 +77,11 @@ function unlockAudio() {
     if (AC.state === "suspended") AC.resume();
   } catch (e) {}
   try {
-    /* 直接在手势里播一句静音，解锁 speechSynthesis */
+    /* 在手势里播一段静音，解锁 <audio> 播放权限 */
+    if (AUD) { AUD.src = SILENT_WAV; const p = AUD.play(); if (p && p.catch) p.catch(() => {}); }
+  } catch (e) {}
+  try {
+    /* 顺便解锁 speechSynthesis（兜底通道用） */
     const u = new SpeechSynthesisUtterance(" ");
     u.volume = 0.01; u.lang = "en-US";
     speechSynthesis.speak(u);
@@ -83,10 +100,27 @@ function ttsFail() {
   ttsWarned = true;
   toast("🔇 听不到发音？去「奖励屋→家长设置→发音自检」看看", 4000);
 }
+/* 主通道：播放预合成 mp3 */
 function speak(text, rate) {
+  unlockAudio();
+  const f = audioFile(text);
+  if (AUD && f) {
+    try {
+      AUD.pause();
+      AUD.src = "audio/" + f;
+      AUD.playbackRate = Math.min(1, Math.max(0.6, rate || 0.95));
+      AUD.currentTime = 0;
+      const p = AUD.play();
+      if (p && p.catch) p.catch(() => speakTTS(text, rate));   // 被浏览器拦截 → 退回系统TTS
+      return;
+    } catch (e) { /* 落到 TTS */ }
+  }
+  speakTTS(text, rate);
+}
+/* 兜底通道：系统语音合成 */
+function speakTTS(text, rate) {
   if (!("speechSynthesis" in window)) { ttsFail(); return; }
   try {
-    unlockAudio();
     if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "en-US"; u.rate = rate || 0.8; u.volume = 1; u.pitch = 1.1;
@@ -258,6 +292,7 @@ document.querySelectorAll(".tab").forEach(t => {
 /* ---------------- 解锁逻辑 ---------------- */
 function bookUnits(book) { return UNITS.filter(u => u.book === book); }
 function isUnlocked(u) {
+  if (S.testMode) return true;
   const list = bookUnits(u.book);
   const idx = list.indexOf(u);
   if (idx === 0) return true;
@@ -287,6 +322,7 @@ function renderHome() {
   const cu = currentUnit();
   const wc = wrongCount();
   $("#scr-home").innerHTML = `
+    ${S.testMode ? `<div class="card" id="testBanner" style="background:#fff3d6;text-align:center;padding:10px;font-size:13px;font-weight:700;color:#e8842d">🧪 测试模式开启中（全部内容已解锁）· 点我关闭</div>` : ""}
     <div class="card" id="petCard">
       <div id="streakChip">🔥 连续 ${S.streak} 天</div>
       <button id="themeQuick" style="position:absolute;top:10px;right:10px;border:none;background:none;font-size:22px">🎨</button>
@@ -321,6 +357,9 @@ function renderHome() {
   $("#homeWheel").onclick = () => go(renderWheel);
   $("#homeVoucher").onclick = () => go(renderVoucher);
   $("#themeQuick").onclick = () => go(renderTheme);
+  if (S.testMode) $("#testBanner").onclick = () => {
+    S.testMode = false; save(); toast("✅ 测试模式已关闭，恢复正常闯关", 2200); renderHome();
+  };
   show("home", "魔法英语乐园");
   updateCoinBox();
 }
@@ -1162,6 +1201,22 @@ function renderParent() {
   }
   const prizes = getWheel();
   $("#scr-parent").innerHTML = `
+    <div class="card" style="${S.testMode ? "background:#fff3d6" : ""}">
+      <div class="actRow">
+        <span class="aIcon">🧪</span>
+        <span class="aName">测试模式<span class="aSub">${S.testMode ? "开启中：全部单元/皮肤已解锁，给孩子用前请关掉" : "打开后可直接试玩全部内容，不受金币和关卡限制"}</span></span>
+        <button class="themeBtn ${S.testMode ? "cur" : "lock"}" id="pTest">${S.testMode ? "已开启" : "已关闭"}</button>
+      </div>
+      ${S.testMode ? `
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn small ghost" id="tCoin">🪙 +1000 金币</button>
+        <button class="btn small ghost" id="tTicket">🎟️ +5 转盘券</button>
+        <button class="btn small ghost" id="tSkin">🎨 解锁全部皮肤</button>
+        <button class="btn small ghost" id="tWords">📖 标记全部单词已学</button>
+        <button class="btn small ghost" id="tReset" style="color:#e05a5a">🗑️ 清空全部进度</button>
+      </div>
+      <div style="font-size:11px;color:#c0a8d0;margin-top:8px">试玩完记得：先「清空全部进度」再关掉测试模式，孩子就是全新的档</div>` : ""}
+    </div>
     <div class="card">
       <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-bottom:4px">🎡 转盘奖品（${prizes.length}项）</div>
       <div style="font-size:12px;margin-bottom:4px;font-weight:700;color:${wheelStale() ? "#e8842d" : "#b8a8c8"}">${wheelAgeDays() === 0 ? "✅ 今天刚更换过奖品" : "距上次更换奖品已 " + wheelAgeDays() + " 天" + (wheelStale() ? "，建议换1~2个孩子当下最想要的，保持新鲜感！" : "（建议每14天上新）")}</div>
@@ -1195,6 +1250,29 @@ function renderParent() {
   $("#pReport").onclick = () => go(renderReport);
   $("#pBackup").onclick = () => go(renderBackup);
   $("#pAudio").onclick = () => go(renderAudioCheck);
+  $("#pTest").onclick = () => {
+    S.testMode = !S.testMode; save();
+    toast(S.testMode ? "🧪 测试模式已开启，全部内容解锁" : "✅ 测试模式已关闭，恢复正常闯关", 2200);
+    sndCoin(); renderParent();
+  };
+  if (S.testMode) {
+    $("#tCoin").onclick = () => { addCoins(1000); toast("已加 1000 金币"); renderParent(); };
+    $("#tTicket").onclick = () => { S.tickets += 5; save(); toast("已加 5 张转盘券"); renderParent(); };
+    $("#tSkin").onclick = () => { S.themesOwned = THEMES.map(t => t.id); save(); toast("全部皮肤已解锁"); };
+    $("#tWords").onclick = () => {
+      UNITS.forEach(u => { const us = unitS(u.id); u.words.forEach(w => { if (!us.learned.includes(w.w)) us.learned.push(w.w); }); });
+      save(); toast("全部单词已标记为学过（大考/游戏厅可直接玩）", 2400);
+    };
+    let armed = false;
+    $("#tReset").onclick = () => {
+      if (!armed) { armed = true; $("#tReset").textContent = "⚠️ 再点一次确认清空"; return; }
+      const keepTest = true;
+      S = defState(); S.testMode = keepTest; save();
+      applyTheme(); updateCoinBox();
+      toast("已清空全部进度", 2000); sndWin();
+      renderParent();
+    };
+  }
   document.querySelectorAll("#scr-parent .pDel").forEach(b => {
     b.onclick = () => {
       const list = getWheel().slice();
@@ -1427,8 +1505,9 @@ function startEcho(items) {
 
 /* ================= 魔法大考（跨单元综合复习） ================= */
 function startExam() {
-  const learned = [];
+  let learned = [];
   UNITS.forEach(u => { const us = unitS(u.id); u.words.forEach(w => { if (us.learned.includes(w.w)) learned.push(w); }); });
+  if (S.testMode && learned.length < 8) learned = unlockedWords();   // 测试模式：直接用全部单词
   if (learned.length < 8) { toast("先去学更多单词，学会8个词就能参加大考啦！", 2400); goBack(); return; }
   const n = Math.min(15, learned.length);
   const qs = priorityPick(learned, n);
@@ -1605,34 +1684,39 @@ function renderAudioCheck() {
   const en = vs.filter(v => /^en(-|_|$)/i.test(v.lang));
   if (!enVoice) pickVoice();
   const acState = AC ? AC.state : "尚未创建";
+  const nMp3 = typeof AUDIO_MAP !== "undefined" ? Object.keys(AUDIO_MAP).length : 0;
   const row = (k, v, ok) => `<div class="vRow"><span style="font-size:18px">${ok ? "✅" : "⚠️"}</span><span class="vName">${k}<span class="vDate">${esc(String(v))}</span></span></div>`;
   $("#scr-audio").innerHTML = `
     <div class="card">
       <div class="sectionTitle" style="margin:0 0 6px">🔊 发音自检</div>
-      ${row("浏览器支持语音合成", has ? "支持" : "不支持（请换 Chrome 或 Safari）", has)}
-      ${row("可用的英文发音", en.length ? en.length + " 个" : "0 个 —— 这就是没声音的原因", en.length > 0)}
-      ${row("当前使用的声音", enVoice ? enVoice.name + "（" + enVoice.lang + "）" : "无", !!enVoice)}
-      ${row("音效通道状态", acState, acState === "running" || acState === "尚未创建")}
+      ${row("真人发音包（主通道）", nMp3 ? nMp3 + " 条已就绪" : "未加载 —— 请刷新网页", nMp3 > 0)}
+      ${row("音效通道", acState, acState === "running" || acState === "尚未创建")}
+      ${row("系统语音合成（备用）", has ? (en.length + " 个英文语音") : "不支持", has)}
       ${row("游戏音效开关", S.sound === false ? "已关闭" : "开着", S.sound !== false)}
     </div>
     <div class="card" style="text-align:center">
-      <button class="btn" id="acTest">🔊 点我测试发音（Hello）</button>
+      <button class="btn" id="acTest">🔊 测试真人发音（cake）</button>
       <div style="height:10px"></div>
-      <button class="btn ghost" id="acTest2">🎵 点我测试音效</button>
-      <div id="acHint" style="font-size:12px;color:#b8a8c8;margin-top:10px">点上面按钮，应该能听到英文和「叮」的声音</div>
+      <button class="btn ghost" id="acTest3">🗣️ 测试整句发音</button>
+      <div style="height:10px"></div>
+      <button class="btn ghost" id="acTest2">🎵 测试音效（叮）</button>
+      <div id="acHint" style="font-size:12px;color:#b8a8c8;margin-top:10px">现在的单词发音是网站内置的真人录音（mp3），不再依赖手机的语音引擎</div>
     </div>
     <div class="card" style="font-size:12px;color:#7a5a9a;line-height:1.9">
-      <b style="color:#9b59b6">还是没声音？按顺序检查：</b><br>
-      1️⃣ <b>iPhone</b>：机身左侧的<b>静音开关</b>拨到「响铃」那一侧（拨到静音时，网页发音会被完全静音，这是最常见的原因）<br>
-      2️⃣ 手机音量键调大，并确认没插耳机<br>
-      3️⃣ <b>安卓</b>：如果上面显示「可用英文发音 0 个」，去 设置 → 语言和输入法 → 文字转语音，安装/启用 Google 语音服务并下载英语语音包<br>
-      4️⃣ 微信/QQ 内置浏览器可能不支持，请用<b>系统自带浏览器</b>（Safari / Chrome）打开网站<br>
-      5️⃣ 首次进入必须先点一下屏幕，声音才会被允许播放（这是手机浏览器的安全限制）
+      <b style="color:#9b59b6">只听到「叮」但没有人声？按顺序检查：</b><br>
+      1️⃣ 先<b>彻底关掉再重开</b>网页/桌面App一次（旧版本缓存里没有真人发音包）<br>
+      2️⃣ <b>iPhone</b>：机身左侧<b>静音开关</b>拨到「响铃」那一侧；再按音量上键把媒体音量调大<br>
+      3️⃣ 确认没插着耳机 / 没连着蓝牙音箱<br>
+      4️⃣ 用 <b>Safari 或 Chrome</b> 打开，微信内置浏览器可能拦截音频<br>
+      5️⃣ 第一次进入要先点一下屏幕，浏览器才允许出声（手机的安全限制）
     </div>`;
   $("#acTest").onclick = () => {
-    unlockAudio();
-    speak("Hello! I am your English pet.", 0.85);
-    $("#acHint").textContent = "已发出发音指令……如果还是听不到，看下面的检查清单";
+    unlockAudio(); speak("cake", 0.95);
+    $("#acHint").textContent = "应该听到一个女声在读 cake";
+  };
+  $("#acTest3").onclick = () => {
+    unlockAudio(); speak("Hello! I am your English pet.", 0.95);
+    $("#acHint").textContent = "应该听到一整句英文";
   };
   $("#acTest2").onclick = () => { unlockAudio(); sndWin(); };
   show("audio", "🔊 发音自检");
@@ -1672,6 +1756,7 @@ function renderTheme() {
     b.onclick = () => {
       const t = THEMES[+b.dataset.i];
       if (S.theme === t.id) return;
+      if (S.testMode && !S.themesOwned.includes(t.id)) S.themesOwned.push(t.id);   // 测试模式：皮肤免费
       if (S.themesOwned.includes(t.id)) {
         S.theme = t.id; save(); applyTheme(); sndCoin();
         toast("换上【" + t.n + "】啦！✨"); renderTheme();
