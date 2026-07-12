@@ -18,19 +18,24 @@ const LS_KEY = "magicEnglish_v1";
 function defState() {
   return {
     coins: 0, xp: 0, streak: 0, lastDaily: "",
-    daily: { date: todayStr(), w: 0, g: 0, r: 0, t1: false, t2: false, t3: false, bonus: false },
-    units: {},   // id -> {learned:[], stars:0}
-    wrong: {},   // word -> 次数
-    stickers: {} // 贴纸名 -> 数量
+    daily: { date: todayStr(), w: 0, g: 0, r: 0, earn: 0, t1: false, t2: false, t3: false, t4: false, bonus: false },
+    units: {},    // id -> {learned:[], stars:0, s3:false}
+    wrong: {},    // word -> 次数
+    stickers: {}, // 贴纸名 -> 数量
+    tickets: 0,   // 转盘券
+    wheel: null,  // 家长自定义转盘奖品，null=用默认
+    vouchers: []  // 转盘中的实物奖励券 {n, d, used}
   };
 }
 let S = defState();
 try { const raw = localStorage.getItem(LS_KEY); if (raw) S = Object.assign(defState(), JSON.parse(raw)); } catch (e) {}
+S.daily = Object.assign(defState().daily, S.daily);
 function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} }
 function unitS(id) { if (!S.units[id]) S.units[id] = { learned: [], stars: 0 }; return S.units[id]; }
 
 /* 跨天重置每日任务 */
-if (S.daily.date !== todayStr()) S.daily = defState().daily;
+function ensureDaily() { if (S.daily.date !== todayStr()) S.daily = defState().daily; }
+ensureDaily();
 
 /* ---------------- 语音 ---------------- */
 let enVoice = null;
@@ -97,18 +102,25 @@ function petNext(xp) { return PET_STAGES.find(p => p.xp > xp) || null; }
 function addCoins(n) {
   if (n <= 0) return;
   const before = petStage(S.xp).n;
-  S.coins += n; S.xp += n; save();
+  S.coins += n; S.xp += n;
+  ensureDaily(); S.daily.earn += n;
+  if (S.daily.earn >= 60 && !S.daily.t4) { S.daily.t4 = true; addTicket(1, "今日勤奋超额"); }
+  save();
   $("#coinNum").textContent = S.coins;
   coinFly(n); sndCoin();
   const after = petStage(S.xp);
   if (after.n !== before) { confetti(); sndWin(); toast("🎊 宠物进化成【" + after.n + "】啦！", 2600); }
+}
+function addTicket(n, reason) {
+  S.tickets += n; save();
+  setTimeout(() => toast("🎡 获得转盘券 ×" + n + "（" + reason + "）", 2400), 900);
 }
 function updateCoinBox() { $("#coinNum").textContent = S.coins; }
 
 /* ---------------- 每日任务 ---------------- */
 function wrongCount() { return Object.keys(S.wrong).length; }
 function bumpDaily(key, n) {
-  if (S.daily.date !== todayStr()) S.daily = defState().daily;
+  ensureDaily();
   S.daily[key] += (n || 1);
   checkTasks();
 }
@@ -130,6 +142,8 @@ function checkTasks() {
     S.lastDaily = todayStr();
     addCoins(20); confetti(); sndWin();
     setTimeout(() => toast("🔥 今日全部任务完成！奖励20金币，连续 " + S.streak + " 天！", 2800), 400);
+    addTicket(1, "完成今日全部任务");
+    if (S.streak > 0 && S.streak % 3 === 0) setTimeout(() => addTicket(1, "连续学习" + S.streak + "天"), 1600);
   }
   save();
 }
@@ -216,6 +230,8 @@ function renderHome() {
     <div class="homeGrid">
       <div class="card" id="homeReview"><div class="hIcon">📕</div><div class="hName">错词本</div><div class="hSub">${wc ? wc + " 个词等你消灭" : "干干净净，真棒！"}</div></div>
       <div class="card" id="homeAlbum"><div class="hIcon">📔</div><div class="hName">贴纸册</div><div class="hSub">已收集 ${Object.keys(S.stickers).length}/${STICKERS.length}</div></div>
+      <div class="card" id="homeWheel"><div class="hIcon">🎡</div><div class="hName">幸运大转盘</div><div class="hSub">${S.tickets ? "有 " + S.tickets + " 张转盘券！" : "完成任务赢转盘券"}</div></div>
+      <div class="card" id="homeVoucher"><div class="hIcon">🎟️</div><div class="hName">我的奖励券</div><div class="hSub">${(() => { const p = S.vouchers.filter(v => !v.used).length; return p ? p + " 张待兑换" : "转转盘赢真奖励"; })()}</div></div>
     </div>`;
   $("#petEmoji").onclick = () => {
     const p = PRAISES[Math.floor(Math.random() * PRAISES.length)];
@@ -225,6 +241,8 @@ function renderHome() {
   $("#homeGo").onclick = () => go(() => renderUnit(cu));
   $("#homeReview").onclick = () => { if (wrongCount()) go(() => startReview()); else toast("错词本是空的，去玩游戏吧！"); };
   $("#homeAlbum").onclick = () => go(renderAlbum);
+  $("#homeWheel").onclick = () => go(renderWheel);
+  $("#homeVoucher").onclick = () => go(renderVoucher);
   show("home", "魔法英语乐园");
   updateCoinBox();
 }
@@ -637,6 +655,7 @@ function startBoss(u) {
     const us = unitS(u.id);
     let bonus = 0;
     if (stars > us.stars) { bonus = (stars - us.stars) * 15; us.stars = stars; save(); }
+    if (stars === 3 && !us.s3) { us.s3 = true; save(); addTicket(1, u.num + " 首次满星"); }
     const nextTip = stars >= 1 ? "🎉 下一单元已解锁！" : "答对5题以上才能拿星星，再试一次！";
     renderResult({
       stars, title: stars >= 3 ? "满星通关，超级学霸！" : stars >= 1 ? "挑战成功！" : "差一点点，别放弃！",
@@ -721,6 +740,161 @@ function renderArcade() {
   show("arcade", "🎮 游戏厅");
 }
 
+/* ================= 幸运大转盘（实物奖励） ================= */
+const WHEEL_DEFAULT = ["📺 看电视30分钟", "🍦 吃一次小零食", "⚽ 户外玩1小时", "🌠 满足一个小愿望", "🌙 晚睡15分钟", "🎲 亲子游戏半小时", "🪙 50金币", "🔄 再转一次"];
+const WHEEL_COLORS = ["#ffd9e8", "#e3dcff", "#d5f0ff", "#ffefd0", "#dcf5dc", "#ffe0d5", "#e8f8ff", "#f5e0ff", "#fff0f5", "#e0ffe8", "#fff5d5", "#e5e8ff"];
+function getWheel() { return (S.wheel && S.wheel.length >= 2) ? S.wheel : WHEEL_DEFAULT; }
+let spinning = false;
+
+function renderWheel() {
+  const prizes = getWheel(), n = prizes.length, seg = 360 / n;
+  const stops = prizes.map((p, i) => `${WHEEL_COLORS[i % WHEEL_COLORS.length]} ${i * seg}deg ${(i + 1) * seg}deg`).join(",");
+  $("#scr-wheel").innerHTML = `
+    <div class="card" style="text-align:center;padding:16px 10px">
+      <div style="font-size:16px;font-weight:800;color:#9b59b6">🎡 幸运大转盘</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">转到什么奖什么，爸爸妈妈说话算话！</div>
+      <div id="wheelWrap">
+        <div id="wheelPtr">🔻</div>
+        <div id="wheel" style="background:conic-gradient(${stops})">
+          ${prizes.map((p, i) => `<div class="wLabel" style="transform:rotate(${i * seg + seg / 2}deg)"><span>${esc(p)}</span></div>`).join("")}
+        </div>
+        <div id="wheelHub">🎀</div>
+      </div>
+      <div id="ticketChip">🎟️ 转盘券：${S.tickets} 张</div>
+      <div id="wheelWon"></div>
+      <button class="btn" id="spinBtn" ${S.tickets < 1 ? "disabled" : ""}>${S.tickets < 1 ? "先去完成任务赢券吧" : "开始转！（用1张券）"}</button>
+    </div>
+    <div class="card" style="font-size:12px;color:#b8a8c8;line-height:1.8">
+      <b style="color:#9b59b6">怎么获得转盘券？</b><br>
+      ① 每日三任务全部完成 +1 张<br>
+      ② 当天特别勤奋（金币赚满60）再 +1 张<br>
+      ③ 单元挑战第一次拿满3星 +1 张<br>
+      ④ 连续学习每满3天 +1 张
+    </div>`;
+  $("#spinBtn").onclick = doSpin;
+  show("wheel", "🎡 幸运大转盘");
+}
+
+let wheelTurns = 0;
+function doSpin() {
+  if (spinning || S.tickets < 1) return;
+  spinning = true;
+  S.tickets--; save();
+  $("#ticketChip").textContent = "🎟️ 转盘券：" + S.tickets + " 张";
+  $("#spinBtn").disabled = true;
+  $("#wheelWon").innerHTML = "";
+  const prizes = getWheel(), n = prizes.length, seg = 360 / n;
+  const pick = Math.floor(Math.random() * n);
+  const jitter = (Math.random() * 0.6 - 0.3) * seg;
+  wheelTurns += 5;
+  const target = wheelTurns * 360 - (pick * seg + seg / 2) - jitter;
+  $("#wheel").style.transform = `rotate(${target}deg)`;
+  [0, .5, 1, 1.6, 2.3, 3.1].forEach(t => tone(500 + t * 60, .06, "sine", t, .05));
+  setTimeout(() => {
+    spinning = false;
+    const prize = prizes[pick];
+    confetti(); sndWin();
+    let note = "";
+    const coinM = prize.match(/(\d+)\s*金币/);
+    if (coinM) { addCoins(+coinM[1]); note = "金币已到账！"; }
+    else if (/再转一次/.test(prize)) { S.tickets++; save(); note = "转盘券已返还，再来！"; }
+    else {
+      S.vouchers.unshift({ n: prize, d: todayStr(), used: false }); save();
+      note = "已存入「我的奖励券」，拿给爸爸妈妈兑换～";
+    }
+    $("#wheelWon").innerHTML = `<div class="wonCard"><div class="we">🎉</div><div class="wn">${esc(prize)}</div><div style="font-size:12px;color:#b08ac0;margin-top:4px">${note}</div></div>`;
+    $("#ticketChip").textContent = "🎟️ 转盘券：" + S.tickets + " 张";
+    const btn = $("#spinBtn");
+    if (btn) { btn.disabled = S.tickets < 1; btn.textContent = S.tickets < 1 ? "先去完成任务赢券吧" : "开始转！（用1张券）"; }
+  }, 4300);
+}
+
+/* ================= 我的奖励券 ================= */
+function renderVoucher() {
+  const vs = S.vouchers;
+  $("#scr-voucher").innerHTML = `
+    <div class="card" style="text-align:center;padding:12px">
+      <div style="font-size:15px;font-weight:700;color:#9b59b6">🎟️ 我的奖励券</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">拿给爸爸妈妈看，兑换后点「已兑换」</div>
+    </div>
+    ${vs.length ? `<div class="card">${vs.map((v, i) => `
+      <div class="vRow">
+        <span style="font-size:22px">${v.used ? "✅" : "🎁"}</span>
+        <span class="vName" style="${v.used ? "color:#c0b0d0;text-decoration:line-through" : ""}">${esc(v.n)}<span class="vDate">${v.d}</span></span>
+        <button class="vBtn ${v.used ? "used" : "todo"}" data-i="${i}" ${v.used ? "disabled" : ""}>${v.used ? "已兑换" : "去兑换"}</button>
+      </div>`).join("")}</div>`
+      : `<div class="card" style="text-align:center;color:#b8a8c8;font-size:14px;padding:30px">还没有奖励券<br>去转幸运大转盘吧！🎡</div>`}`;
+  document.querySelectorAll("#scr-voucher .vBtn.todo").forEach(b => {
+    b.onclick = () => {
+      if (b.dataset.confirm) {
+        S.vouchers[+b.dataset.i].used = true; save();
+        sndCoin(); toast("🎉 兑换成功，说到做到！");
+        renderVoucher();
+      } else {
+        b.dataset.confirm = "1"; b.textContent = "再点确认"; b.classList.add("warn");
+        setTimeout(() => { if (b.isConnected && !S.vouchers[+b.dataset.i].used) { delete b.dataset.confirm; b.textContent = "去兑换"; b.classList.remove("warn"); } }, 3000);
+      }
+    };
+  });
+  show("voucher", "🎟️ 奖励券");
+}
+
+/* ================= 家长设置 ================= */
+let parentOK = false;
+function renderParent() {
+  if (!parentOK) {
+    const a = 12 + Math.floor(Math.random() * 78), b = 12 + Math.floor(Math.random() * 78);
+    $("#scr-parent").innerHTML = `
+      <div class="card" style="text-align:center;padding:24px 16px">
+        <div style="font-size:34px">🔐</div>
+        <div style="font-size:15px;font-weight:700;color:#9b59b6;margin:8px 0">家长验证</div>
+        <div style="font-size:14px;color:#7a5a9a;margin-bottom:12px">请计算：<b style="font-size:18px">${a} × ${b} = ?</b></div>
+        <input class="pInput" id="pGate" type="number" inputmode="numeric" placeholder="输入答案" style="text-align:center;max-width:180px">
+        <div style="height:12px"></div>
+        <button class="btn small" id="pGateBtn">确认</button>
+      </div>`;
+    $("#pGateBtn").onclick = () => {
+      if (+$("#pGate").value === a * b) { parentOK = true; renderParent(); }
+      else { sndWrong(); toast("答案不对哦～"); $("#pGate").value = ""; }
+    };
+    show("parent", "🔐 家长设置");
+    return;
+  }
+  const prizes = getWheel();
+  $("#scr-parent").innerHTML = `
+    <div class="card">
+      <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-bottom:4px">🎡 转盘奖品（${prizes.length}项）</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">奖品里写「XX金币」会自动发金币，写「再转一次」会返还转盘券，其余都会变成孩子的实物奖励券。建议2~12项。</div>
+      ${prizes.map((p, i) => `<div class="pRow"><span class="pName">${esc(p)}</span><button class="pDel" data-i="${i}">✕</button></div>`).join("")}
+      <div class="pRow" style="border:none">
+        <input class="pInput" id="pNew" placeholder="新奖品，如：🎨 买一支新画笔">
+        <button class="btn small" id="pAdd">添加</button>
+      </div>
+    </div>
+    <div class="card" style="display:flex;gap:10px">
+      <button class="btn ghost" id="pReset" style="flex:1">恢复默认奖品</button>
+      <button class="btn ghost" id="pTicket" style="flex:1">补发1张转盘券</button>
+    </div>
+    <div style="font-size:11px;color:#c0b0d0;text-align:center">改完直接生效，孩子下次打开转盘就是新奖品</div>`;
+  document.querySelectorAll("#scr-parent .pDel").forEach(b => {
+    b.onclick = () => {
+      const list = getWheel().slice();
+      if (list.length <= 2) { toast("至少保留2个奖品"); return; }
+      list.splice(+b.dataset.i, 1); S.wheel = list; save(); renderParent();
+    };
+  });
+  $("#pAdd").onclick = () => {
+    const v = $("#pNew").value.trim();
+    if (!v) return;
+    const list = getWheel().slice();
+    if (list.length >= 12) { toast("最多12个奖品"); return; }
+    list.push(v); S.wheel = list; save(); renderParent();
+  };
+  $("#pReset").onclick = () => { S.wheel = null; save(); renderParent(); toast("已恢复默认奖品"); };
+  $("#pTicket").onclick = () => { S.tickets++; save(); toast("已补发1张转盘券 🎟️"); };
+  show("parent", "🔐 家长设置");
+}
+
 /* ================= 奖励屋（扭蛋） ================= */
 const GACHA_COST = 20;
 function drawSticker() {
@@ -731,7 +905,18 @@ function drawSticker() {
 }
 function renderReward() {
   const got = Object.keys(S.stickers).length;
+  const pend = S.vouchers.filter(v => !v.used).length;
   $("#scr-reward").innerHTML = `
+    <div class="card actRow" id="toWheel" style="background:linear-gradient(135deg,#fff3d6,#ffe0ef)">
+      <span class="aIcon">🎡</span>
+      <span class="aName">幸运大转盘<span class="aSub">转出真实奖励！转盘券：${S.tickets} 张</span></span>
+      <span class="aGo">▶</span>
+    </div>
+    <div class="card actRow" id="toVoucher">
+      <span class="aIcon">🎟️</span>
+      <span class="aName">我的奖励券<span class="aSub">${pend ? pend + " 张待兑换" : "转到的奖励存在这里"}</span></span>
+      <span class="aGo">▶</span>
+    </div>
     <div class="card" id="gachaBox">
       <div id="gachaEgg">🥚</div>
       <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-top:6px">魔法扭蛋机</div>
@@ -743,7 +928,11 @@ function renderReward() {
       <span class="aIcon">📔</span>
       <span class="aName">我的贴纸册<span class="aSub">已收集 ${got}/${STICKERS.length}</span></span>
       <span class="aGo">▶</span>
-    </div>`;
+    </div>
+    <div id="parentLink">家长设置</div>`;
+  $("#toWheel").onclick = () => go(renderWheel);
+  $("#toVoucher").onclick = () => go(renderVoucher);
+  $("#parentLink").onclick = () => go(renderParent);
   $("#toAlbum").onclick = () => go(renderAlbum);
   $("#gachaBtn").onclick = () => {
     if (S.coins < GACHA_COST) { toast("金币不够啦，去闯关赚金币吧！💪"); sndWrong(); return; }
