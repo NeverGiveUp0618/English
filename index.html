@@ -125,6 +125,46 @@ body {
 #lcSpeak { margin-top: 14px; font-size: 30px; border: none; background: #fff0f7; border-radius: 50%; width: 64px; height: 64px; box-shadow: 0 3px 10px rgba(230,120,180,.25); }
 #learnProg { text-align: center; font-size: 13px; color: #c0a8d0; margin-bottom: 8px; }
 
+/* ---- 魔法孵化：翻卡 ---- */
+.flipWrap { background: none; box-shadow: none; padding: 0; perspective: 1000px; }
+.flipInner { position: relative; width: 100%; min-height: 250px; transition: transform .6s; transform-style: preserve-3d; }
+.flipWrap.flipped .flipInner { transform: rotateY(180deg); }
+.flipBack, .flipFront {
+  position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  background: rgba(255,255,255,.92); border-radius: 22px; box-shadow: 0 4px 14px rgba(180,140,200,.18);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px;
+}
+.flipBack { background: linear-gradient(135deg,#ffeaf4,#ece5ff); animation: shimmer 2s ease-in-out infinite; }
+@keyframes shimmer { 0%,100% { transform: scale(1); } 50% { transform: scale(1.02); } }
+.flipFront { transform: rotateY(180deg); }
+.flipFront #lcEmoji { font-size: 76px; }
+.flipFront #lcWord { font-size: 32px; }
+
+/* ---- 单词进度灯 ---- */
+#wordLights { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+.wl {
+  width: 34px; height: 34px; border-radius: 50%; background: #fff; display: flex;
+  align-items: center; justify-content: center; font-size: 17px; color: #e0d0ee;
+  box-shadow: 0 2px 6px rgba(180,140,200,.2); transition: .3s;
+}
+.wl.on { background: #eefae8; box-shadow: 0 0 10px rgba(124,197,118,.6); transform: scale(1.08); }
+.wl.cur { background: #fff3d6; color: #e8a33d; animation: pulse 1.2s infinite; }
+@keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
+/* ---- 连击 ---- */
+.comboTag {
+  text-align: center; font-size: 15px; font-weight: 800; color: #e8842d;
+  background: #fff3d6; border-radius: 14px; padding: 5px; margin-bottom: 8px;
+  animation: popIn .3s;
+}
+
+/* ---- 闪电轮倒计时 ---- */
+.timerWrap { height: 8px; background: #f0e8f8; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
+.timerBar { height: 100%; width: 100%; border-radius: 8px; background: linear-gradient(90deg,#7cc576,#ffd166); transition: width .1s linear; }
+
+.petEat { animation: bounce .6s; }
+.btn.pop { animation: popIn .35s; }
+
 /* ---- 游戏区通用 ---- */
 #playHead { text-align: center; margin-bottom: 10px; }
 #playProg { font-size: 13px; color: #c0a8d0; }
@@ -328,6 +368,7 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
     <section id="scr-echo" class="screen"></section>
     <section id="scr-report" class="screen"></section>
     <section id="scr-backup" class="screen"></section>
+    <section id="scr-audio" class="screen"></section>
   </main>
 
   <nav id="tabbar">

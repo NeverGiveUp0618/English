@@ -1,4 +1,4 @@
-const CACHE = "magic-english-v4";
+const CACHE = "magic-english-v5";
 const FILES = ["./", "./index.html", "./data.js", "./app.js", "./manifest.json"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

@@ -53,13 +53,51 @@ function pickVoice() {
   enVoice = vs.find(v => /female|samantha|karen|zira|aria|jenny/i.test(v.name)) || vs[0] || null;
 }
 if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+
+/* iOS/安卓要求：音频必须先在一次真实触摸里"解锁"，否则后续全部静音 */
+let audioReady = false, ttsWarned = false;
+function unlockAudio() {
+  if (audioReady) return;
+  audioReady = true;
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === "suspended") AC.resume();
+  } catch (e) {}
+  try {
+    /* 直接在手势里播一句静音，解锁 speechSynthesis */
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0.01; u.lang = "en-US";
+    speechSynthesis.speak(u);
+    pickVoice();
+  } catch (e) {}
+}
+document.addEventListener("touchend", unlockAudio, { passive: true });
+document.addEventListener("click", unlockAudio);
+/* Chrome 长时间不说话会自己暂停，定时唤醒 */
+setInterval(() => {
+  try { if (window.speechSynthesis && speechSynthesis.paused) speechSynthesis.resume(); } catch (e) {}
+}, 5000);
+
+function ttsFail() {
+  if (ttsWarned) return;
+  ttsWarned = true;
+  toast("🔇 听不到发音？去「奖励屋→家长设置→发音自检」看看", 4000);
+}
 function speak(text, rate) {
-  if (!("speechSynthesis" in window)) return;
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = "en-US"; u.rate = rate || 0.8;
-  if (enVoice) u.voice = enVoice;
-  speechSynthesis.speak(u);
+  if (!("speechSynthesis" in window)) { ttsFail(); return; }
+  try {
+    unlockAudio();
+    if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-US"; u.rate = rate || 0.8; u.volume = 1; u.pitch = 1.1;
+    if (!enVoice) pickVoice();
+    if (enVoice) u.voice = enVoice;
+    u.onerror = e => { if (e && e.error !== "interrupted" && e.error !== "canceled") ttsFail(); };
+    /* cancel() 之后立刻 speak 在 iOS 上常常不出声，隔一帧更稳 */
+    setTimeout(() => {
+      try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch (e) { ttsFail(); }
+    }, 50);
+  } catch (e) { ttsFail(); }
 }
 
 /* ---------------- 音效 ---------------- */
@@ -68,6 +106,7 @@ function tone(freq, dur, type, when, vol) {
   if (S.sound === false) return;
   try {
     if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    if (AC.state === "suspended") AC.resume();
     const o = AC.createOscillator(), g = AC.createGain();
     o.type = type || "sine"; o.frequency.value = freq;
     g.gain.value = vol || 0.15;
@@ -201,12 +240,15 @@ function go(render) { navStack.push(render); render(); }
 function goTab(render) { navStack = [render]; render(); }
 function goBack() {
   if (window.speechSynthesis) speechSynthesis.cancel();
+  clearTimer();
   if (navStack.length > 1) navStack.pop();
   navStack[navStack.length - 1]();
 }
 $("#backBtn").onclick = goBack;
 document.querySelectorAll(".tab").forEach(t => {
   t.onclick = () => {
+    clearTimer();
+    if (window.speechSynthesis) speechSynthesis.cancel();
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
     t.classList.add("on");
     ({ home: () => goTab(renderHome), map: () => goTab(renderMap), phonics: () => goTab(renderPhonicsList), arcade: () => goTab(renderArcade), reward: () => goTab(renderReward) })[t.dataset.tab]();
@@ -344,82 +386,291 @@ function renderUnit(u) {
   show("unit", u.zh);
 }
 
-/* ================= 学单词 ================= */
+/* ================= 学单词：魔法孵化（翻卡 → 每词三连击 → 闪电轮） =================
+ * 设计：每个词学完立刻用三种方式提取一遍（听→看→拼），当场对错当场纠正；
+ * 五个词全部点亮后进入限时连击闪电轮，把成就感堆在最后。
+ */
+let liveTimer = null;
+function clearTimer() { if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } }
+
 function startLearn(u) {
   const us = unitS(u.id);
   const fresh = u.words.filter(w => !us.learned.includes(w.w));
   const reviewMode = fresh.length === 0;
   const batch = reviewMode ? sample(u.words, 5) : fresh.slice(0, 5);
-  let idx = 0;
+  const lit = [];           // 已点亮的词下标
+  let idx = 0, coins = 0, combo = 0, maxCombo = 0;
 
-  function card() {
+  const petNow = petStage(S.xp).e;
+  function lights() {
+    return `<div id="wordLights">${batch.map((w, i) =>
+      `<span class="wl ${lit.includes(i) ? "on" : i === idx ? "cur" : ""}">${lit.includes(i) ? w.e : "●"}</span>`).join("")}</div>`;
+  }
+  function comboTag() {
+    const mult = combo >= 4 ? 3 : combo >= 2 ? 2 : 1;
+    return mult > 1 ? `<div class="comboTag">🔥 ${mult} 倍连击！</div>` : "";
+  }
+  function gain(n) {
+    const mult = combo >= 4 ? 3 : combo >= 2 ? 2 : 1;
+    coins += n * mult;
+    return n * mult;
+  }
+
+  /* —— 第1步：翻卡揭晓 —— */
+  function flip() {
     const w = batch[idx];
     $("#scr-learn").innerHTML = `
-      <div id="learnProg">${reviewMode ? "🌟 温故知新" : "✨ 新单词"} ${idx + 1} / ${batch.length}</div>
-      <div class="card" id="learnCard">
-        <div id="lcEmoji">${w.e}</div>
-        <div id="lcWord">${esc(w.w)}</div>
-        <div id="lcZh">${w.zh}</div>
-        <button id="lcSpeak">🔊</button>
+      <div id="learnProg">${reviewMode ? "🌟 温故知新" : "✨ 孵化新单词"} ${idx + 1} / ${batch.length}</div>
+      ${lights()}
+      <div class="card flipWrap" id="flipCard">
+        <div class="flipInner">
+          <div class="flipBack">
+            <div style="font-size:70px">🎴</div>
+            <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-top:6px">点我翻开新单词</div>
+            <div style="font-size:12px;color:#c0a8d0">看看这次是什么？</div>
+          </div>
+          <div class="flipFront">
+            <div id="lcEmoji">${w.e}</div>
+            <div id="lcWord">${esc(w.w)}</div>
+            <div id="lcZh">${w.zh}</div>
+            <button id="lcSpeak">🔊</button>
+          </div>
+        </div>
       </div>
-      <button class="btn" id="lcNext">${idx < batch.length - 1 ? "记住啦，下一个 →" : "都记住了，小测验！🎯"}</button>`;
-    speak(w.w);
-    $("#lcSpeak").onclick = () => speak(w.w);
-    $("#lcNext").onclick = () => { idx++; idx < batch.length ? card() : quiz(); };
-    show("learn", "📖 学单词");
+      <button class="btn" id="lcGo" style="visibility:hidden">开始三连击 →</button>`;
+    const cardEl = $("#flipCard");
+    cardEl.onclick = () => {
+      if (cardEl.classList.contains("flipped")) return;
+      cardEl.classList.add("flipped");
+      tone(600, .08); tone(900, .12, "sine", .08);
+      speak(w.w);
+      confettiSmall(6);
+      setTimeout(() => {
+        const b = $("#lcGo");
+        if (b) { b.style.visibility = "visible"; b.classList.add("pop"); }
+      }, 500);
+    };
+    setTimeout(() => { const s = $("#lcSpeak"); if (s) s.onclick = ev => { ev.stopPropagation(); speak(w.w); }; }, 0);
+    $("#lcGo").onclick = () => drill(0, 0);
+    show("learn", "🥚 魔法孵化");
   }
 
-  function quiz() {
-    let qi = 0, right = 0;
-    function q() {
-      if (qi >= batch.length) return finishLearn();
-      const w = batch[qi];
-      const opts = shuffle([w].concat(sample(u.words.filter(x => x.w !== w.w), 3)));
-      $("#scr-learn").innerHTML = `
-        <div id="learnProg">🎯 小测验 ${qi + 1} / ${batch.length}</div>
-        <div class="card" id="playQ">
-          <div class="qText">${esc(w.w)}</div>
-          <div class="qSub">是什么意思呢？</div>
-        </div>
-        <div class="optGrid">${opts.map((o, i) => `<button class="optBtn" data-i="${i}"><span class="oEmoji">${o.e}</span>${o.zh}</button>`).join("")}</div>`;
+  /* —— 第2步：这个词的三连击（听→看→拼） —— */
+  function drill(step, retried) {
+    const w = batch[idx];
+    if (step >= 3) return litUp();
+    const others = sample(u.words.filter(x => x.w !== w.w), 3);
+    const stepName = ["🔊 听音选图", "🖼️ 看图选词", "🔤 补出字母"][step];
+    let head = "", body = "";
+
+    if (step === 0) {
+      const opts = shuffle([w].concat(others));
+      head = `<button id="lcSpeak" style="margin-top:0">🔊</button><div class="qSub">听一听，是哪一个？</div>`;
+      body = `<div class="optGrid">${opts.map((o, i) => `<button class="optBtn dOpt" data-i="${i}"><span class="oEmoji">${o.e}</span>${o.zh}</button>`).join("")}</div>`;
+      renderDrill(head, body, opts, w, step, retried);
       speak(w.w);
-      let locked = false;
-      document.querySelectorAll("#scr-learn .optBtn").forEach(b => {
+      setTimeout(() => { const s = $("#lcSpeak"); if (s) s.onclick = () => speak(w.w); }, 0);
+    } else if (step === 1) {
+      const opts = shuffle([w].concat(others));
+      head = `<div class="qEmoji" style="font-size:64px">${w.e}</div><div class="qSub">${w.zh} —— 英文怎么写？</div>`;
+      body = `<div class="optGrid">${opts.map((o, i) => `<button class="optBtn dOpt" data-i="${i}">${esc(o.w)}</button>`).join("")}</div>`;
+      renderDrill(head, body, opts, w, step, retried);
+    } else {
+      /* 补字母：挖掉 1~2 个字母，用字母键补回 */
+      const letters = [];
+      [...w.w].forEach((c, i) => { if (/[a-z]/i.test(c)) letters.push(i); });
+      const holes = sample(letters, Math.min(w.w.length <= 4 ? 1 : 2, letters.length)).sort((a, b) => a - b);
+      const shown = [...w.w].map((c, i) => holes.includes(i) ? "▢" : c).join("");
+      const need = holes.map(i => w.w[i].toLowerCase());
+      const extra = "abcdefghijklmnopqrstuvwxyz".split("").filter(c => !need.includes(c));
+      const keys = shuffle(need.concat(sample(extra, 5)));
+      let typed = [];
+      $("#scr-learn").innerHTML = `
+        <div id="learnProg">${stepName}　${idx + 1}/${batch.length} 的第 ${step + 1}/3 关</div>
+        ${lights()}${comboTag()}
+        <div class="card" id="playQ" style="padding:16px">
+          <div class="qEmoji" style="font-size:56px">${w.e}</div>
+          <div class="qText" id="holeWord" style="letter-spacing:2px">${esc(shown).replace(/▢/g, '<b style="color:#e56ba0">▢</b>')}</div>
+          <div class="qSub">${w.zh}　<button id="lcSpeak" style="width:40px;height:40px;font-size:18px;margin-top:0;vertical-align:middle">🔊</button></div>
+        </div>
+        <div id="spellKeys">${keys.map((k, i) => `<button class="key" data-k="${k}" data-i="${i}">${k}</button>`).join("")}</div>`;
+      speak(w.w);
+      $("#lcSpeak").onclick = () => speak(w.w);
+      document.querySelectorAll("#scr-learn .key").forEach(b => {
         b.onclick = () => {
-          if (locked) return; locked = true;
-          const o = opts[+b.dataset.i];
-          if (o.w === w.w) {
-            b.classList.add("right"); sndRight(); right++;
-            recordRight(w.w);
-            /* 只有真正新学会的词才计入「学会5个新单词」，复习不刷任务 */
-            if (!us.learned.includes(w.w)) {
-              us.learned.push(w.w);
-              S.learnedAt[w.w] = todayStr();
-              hToday().w++;
-              bumpDaily("w");
+          if (b.disabled) return;
+          const want = need[typed.length];
+          if (b.dataset.k === want) {
+            typed.push(b.dataset.k); b.disabled = true; tone(760 + typed.length * 60, .08);
+            const cur = [...w.w].map((c, i) => holes.includes(i) && holes.indexOf(i) >= typed.length ? "▢" : c).join("");
+            $("#holeWord").innerHTML = esc(cur).replace(/▢/g, '<b style="color:#e56ba0">▢</b>');
+            if (typed.length === need.length) {
+              $("#holeWord").style.color = "#7cc576";
+              good(w, step, "拼对啦！");
             }
-            save();
           } else {
-            b.classList.add("wrong"); sndWrong(); recordWrong(w.w);
-            document.querySelectorAll("#scr-learn .optBtn").forEach(x => { if (opts[+x.dataset.i].w === w.w) x.classList.add("right"); });
+            b.classList.add("wrong"); sndWrong();
+            bad(w, step, retried, "正确拼写：" + w.w);
           }
-          setTimeout(() => { qi++; q(); }, 900);
         };
       });
-      show("learn", "📖 学单词");
+      show("learn", "🥚 魔法孵化");
+    }
+  }
+
+  function renderDrill(head, body, opts, w, step, retried) {
+    $("#scr-learn").innerHTML = `
+      <div id="learnProg">${["🔊 听音选图", "🖼️ 看图选词", "🔤 补出字母"][step]}　${idx + 1}/${batch.length} 的第 ${step + 1}/3 关</div>
+      ${lights()}${comboTag()}
+      <div class="card" id="playQ">${head}</div>
+      ${body}`;
+    let locked = false;
+    document.querySelectorAll("#scr-learn .dOpt").forEach(b => {
+      b.onclick = () => {
+        if (locked) return; locked = true;
+        const o = opts[+b.dataset.i];
+        if (o.w === w.w) { b.classList.add("right"); good(w, step, ""); }
+        else {
+          b.classList.add("wrong");
+          document.querySelectorAll("#scr-learn .dOpt").forEach(x => { if (opts[+x.dataset.i].w === w.w) x.classList.add("right"); });
+          bad(w, step, retried, "");
+        }
+      };
+    });
+    show("learn", "🥚 魔法孵化");
+  }
+
+  function good(w, step, msg) {
+    sndRight(); combo++; maxCombo = Math.max(maxCombo, combo);
+    recordRight(w.w);
+    const got = gain(2);
+    coinFly(got);
+    if (msg) toast(msg, 900);
+    setTimeout(() => drill(step + 1, 0), 850);
+  }
+  function bad(w, step, retried, msg) {
+    sndWrong(); combo = 0; recordWrong(w.w);
+    speak(w.w, 0.7);
+    toast(msg || (w.w + " = " + w.zh), 1600);
+    /* 错了当场再考一遍同一关，直到会为止（最多重来1次） */
+    setTimeout(() => retried ? drill(step + 1, 0) : drill(step, 1), 1700);
+  }
+
+  /* —— 第3步：点亮这个词 —— */
+  function litUp() {
+    const w = batch[idx];
+    if (!us.learned.includes(w.w)) {
+      us.learned.push(w.w);
+      S.learnedAt[w.w] = todayStr();
+      hToday().w++;
+      bumpDaily("w");
+    }
+    save();
+    lit.push(idx);
+    confettiSmall(10); sndCoin();
+    $("#scr-learn").innerHTML = `
+      <div id="learnProg">✨ 收服成功！</div>
+      ${lights()}
+      <div class="card" style="text-align:center;padding:26px 16px">
+        <div style="font-size:60px" class="petEat">${petNow}</div>
+        <div style="font-size:22px;font-weight:800;color:#7cc576;margin-top:6px">${esc(w.w)} ${w.e}</div>
+        <div style="font-size:14px;color:#b08ac0">${w.zh}　已被你收服！</div>
+        <div style="font-size:12px;color:#c0a8d0;margin-top:6px">${lit.length < batch.length ? "还剩 " + (batch.length - lit.length) + " 个新单词" : "五个单词全部点亮！"}</div>
+      </div>
+      <button class="btn" id="nextW">${lit.length < batch.length ? "孵化下一个 →" : "⚡ 进入闪电轮！"}</button>`;
+    $("#nextW").onclick = () => {
+      if (lit.length < batch.length) { idx++; flip(); }
+      else lightning();
+    };
+    show("learn", "🥚 魔法孵化");
+  }
+
+  /* —— 第4步：闪电轮（限时 + 连击倍率） —— */
+  function lightning() {
+    const qs = shuffle(batch.concat(sample(batch, 3)));
+    let qi = 0, right = 0;
+    combo = 0;
+    function q() {
+      clearTimer();
+      if (qi >= qs.length) return finish();
+      const w = qs[qi];
+      const type = qi % 2 === 0 ? "listen" : "zhen";
+      const opts = shuffle([w].concat(sample(batch.filter(x => x.w !== w.w), 3)));
+      const head = type === "listen"
+        ? `<button id="lcSpeak" style="margin-top:0">🔊</button><div class="qSub">快！听音选图</div>`
+        : `<div class="qEmoji" style="font-size:52px">${w.e}</div><div class="qSub">快！${w.zh} 的英文</div>`;
+      const optHtml = type === "listen"
+        ? opts.map((o, i) => `<button class="optBtn lOpt" data-i="${i}"><span class="oEmoji">${o.e}</span>${o.zh}</button>`).join("")
+        : opts.map((o, i) => `<button class="optBtn lOpt" data-i="${i}">${esc(o.w)}</button>`).join("");
+      $("#scr-learn").innerHTML = `
+        <div id="learnProg">⚡ 闪电轮 ${qi + 1} / ${qs.length}　已答对 ${right}</div>
+        <div class="timerWrap"><div class="timerBar" id="tBar"></div></div>
+        ${comboTag()}
+        <div class="card" id="playQ">${head}</div>
+        <div class="optGrid">${optHtml}</div>`;
+      if (type === "listen") { speak(w.w); setTimeout(() => { const s = $("#lcSpeak"); if (s) s.onclick = () => speak(w.w); }, 0); }
+      let locked = false, left = 8000;
+      const bar = $("#tBar");
+      liveTimer = setInterval(() => {
+        left -= 100;
+        if (bar) bar.style.width = Math.max(0, left / 8000 * 100) + "%";
+        if (left <= 2000 && bar) bar.style.background = "#ff8fab";
+        if (left <= 0) {
+          clearTimer();
+          if (locked) return; locked = true;
+          combo = 0; sndWrong(); recordWrong(w.w);
+          toast("⏰ 太慢啦！" + w.w + " = " + w.zh, 1500);
+          document.querySelectorAll("#scr-learn .lOpt").forEach(x => { if (opts[+x.dataset.i].w === w.w) x.classList.add("right"); });
+          setTimeout(() => { qi++; q(); }, 1400);
+        }
+      }, 100);
+      document.querySelectorAll("#scr-learn .lOpt").forEach(b => {
+        b.onclick = () => {
+          if (locked) return; locked = true;
+          clearTimer();
+          const o = opts[+b.dataset.i];
+          if (o.w === w.w) {
+            b.classList.add("right"); sndRight(); right++; combo++;
+            maxCombo = Math.max(maxCombo, combo);
+            recordRight(w.w);
+            const got = gain(3); coinFly(got);
+            if (combo === 2 || combo === 4) { toast("🔥 " + (combo >= 4 ? 3 : 2) + " 倍连击！", 1000); confettiSmall(8); }
+          } else {
+            b.classList.add("wrong"); sndWrong(); combo = 0; recordWrong(w.w);
+            document.querySelectorAll("#scr-learn .lOpt").forEach(x => { if (opts[+x.dataset.i].w === w.w) x.classList.add("right"); });
+          }
+          setTimeout(() => { qi++; q(); }, 800);
+        };
+      });
+      show("learn", "⚡ 闪电轮");
     }
     q();
-    function finishLearn() {
-      const coins = right * 2 + (right === batch.length ? 5 : 0);
+    function finish() {
+      clearTimer();
+      bumpDaily("g");
+      const stars = right === qs.length ? 3 : right >= qs.length - 2 ? 2 : 1;
       renderResult({
-        stars: right === batch.length ? 3 : right >= 3 ? 2 : 1,
-        title: right === batch.length ? "太厉害了，全对！" : "学完 " + batch.length + " 个单词！",
-        detail: `答对 ${right}/${batch.length}`,
-        coins, replay: () => startLearn(u)
+        stars,
+        title: right === qs.length ? "闪电轮全对，太强了！" : "五个新单词已收服！",
+        detail: `闪电轮答对 ${right}/${qs.length}　最高连击 ${maxCombo} 连`,
+        coins: coins + (right === qs.length ? 8 : 0),
+        replay: () => startLearn(u)
       });
     }
   }
-  card();
+
+  flip();
+}
+function confettiSmall(n) {
+  const ems = ["✨", "⭐", "💖"];
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement("div");
+    d.className = "confetti"; d.textContent = ems[i % ems.length];
+    d.style.left = (30 + Math.random() * 40) + "vw";
+    d.style.fontSize = "18px";
+    d.style.animationDuration = (1 + Math.random()) + "s";
+    document.body.appendChild(d); setTimeout(() => d.remove(), 2200);
+  }
 }
 
 /* ================= 通用结算页 ================= */
@@ -935,9 +1186,15 @@ function renderParent() {
       <span class="aName">备份与恢复进度<span class="aSub">换手机、清缓存前务必备份一次</span></span>
       <span class="aGo">▶</span>
     </div>
+    <div class="card actRow" id="pAudio">
+      <span class="aIcon">🔊</span>
+      <span class="aName">发音自检<span class="aSub">听不到单词发音时点这里</span></span>
+      <span class="aGo">▶</span>
+    </div>
     <div style="font-size:11px;color:#c0b0d0;text-align:center">改完直接生效，孩子下次打开转盘就是新奖品</div>`;
   $("#pReport").onclick = () => go(renderReport);
   $("#pBackup").onclick = () => go(renderBackup);
+  $("#pAudio").onclick = () => go(renderAudioCheck);
   document.querySelectorAll("#scr-parent .pDel").forEach(b => {
     b.onclick = () => {
       const list = getWheel().slice();
@@ -1339,6 +1596,46 @@ function renderBackup() {
     else { sndWrong(); toast("备份码不对，检查一下有没有复制完整"); armed = false; $("#bkIn2").textContent = "📥 恢复这份进度"; }
   };
   show("backup", "💾 备份与恢复");
+}
+
+/* ================= 发音自检 ================= */
+function renderAudioCheck() {
+  const has = "speechSynthesis" in window;
+  const vs = has ? speechSynthesis.getVoices() : [];
+  const en = vs.filter(v => /^en(-|_|$)/i.test(v.lang));
+  if (!enVoice) pickVoice();
+  const acState = AC ? AC.state : "尚未创建";
+  const row = (k, v, ok) => `<div class="vRow"><span style="font-size:18px">${ok ? "✅" : "⚠️"}</span><span class="vName">${k}<span class="vDate">${esc(String(v))}</span></span></div>`;
+  $("#scr-audio").innerHTML = `
+    <div class="card">
+      <div class="sectionTitle" style="margin:0 0 6px">🔊 发音自检</div>
+      ${row("浏览器支持语音合成", has ? "支持" : "不支持（请换 Chrome 或 Safari）", has)}
+      ${row("可用的英文发音", en.length ? en.length + " 个" : "0 个 —— 这就是没声音的原因", en.length > 0)}
+      ${row("当前使用的声音", enVoice ? enVoice.name + "（" + enVoice.lang + "）" : "无", !!enVoice)}
+      ${row("音效通道状态", acState, acState === "running" || acState === "尚未创建")}
+      ${row("游戏音效开关", S.sound === false ? "已关闭" : "开着", S.sound !== false)}
+    </div>
+    <div class="card" style="text-align:center">
+      <button class="btn" id="acTest">🔊 点我测试发音（Hello）</button>
+      <div style="height:10px"></div>
+      <button class="btn ghost" id="acTest2">🎵 点我测试音效</button>
+      <div id="acHint" style="font-size:12px;color:#b8a8c8;margin-top:10px">点上面按钮，应该能听到英文和「叮」的声音</div>
+    </div>
+    <div class="card" style="font-size:12px;color:#7a5a9a;line-height:1.9">
+      <b style="color:#9b59b6">还是没声音？按顺序检查：</b><br>
+      1️⃣ <b>iPhone</b>：机身左侧的<b>静音开关</b>拨到「响铃」那一侧（拨到静音时，网页发音会被完全静音，这是最常见的原因）<br>
+      2️⃣ 手机音量键调大，并确认没插耳机<br>
+      3️⃣ <b>安卓</b>：如果上面显示「可用英文发音 0 个」，去 设置 → 语言和输入法 → 文字转语音，安装/启用 Google 语音服务并下载英语语音包<br>
+      4️⃣ 微信/QQ 内置浏览器可能不支持，请用<b>系统自带浏览器</b>（Safari / Chrome）打开网站<br>
+      5️⃣ 首次进入必须先点一下屏幕，声音才会被允许播放（这是手机浏览器的安全限制）
+    </div>`;
+  $("#acTest").onclick = () => {
+    unlockAudio();
+    speak("Hello! I am your English pet.", 0.85);
+    $("#acHint").textContent = "已发出发音指令……如果还是听不到，看下面的检查清单";
+  };
+  $("#acTest2").onclick = () => { unlockAudio(); sndWin(); };
+  show("audio", "🔊 发音自检");
 }
 
 /* ================= 主题换装屋 ================= */
