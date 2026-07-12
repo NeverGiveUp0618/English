@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#ffd6e8">
+<title>魔法英语乐园</title>
+<link rel="manifest" href="manifest.json">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body {
+  font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", -apple-system, sans-serif;
+  background: linear-gradient(160deg, #ffe5f1 0%, #e8e5ff 55%, #dff3ff 100%);
+  background-attachment: fixed;
+  color: #5a4a6a;
+  user-select: none; -webkit-user-select: none;
+  overflow: hidden;
+}
+#app { height: 100%; display: flex; flex-direction: column; max-width: 520px; margin: 0 auto; }
+
+/* ---- 顶栏 ---- */
+#topbar {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 14px 10px;
+}
+#backBtn {
+  width: 38px; height: 38px; border: none; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 8px rgba(180,140,200,.25);
+  font-size: 18px; color: #b565a7; visibility: hidden;
+}
+#barTitle { flex: 1; font-size: 18px; font-weight: 700; color: #9b59b6; text-align: center; }
+#coinBox {
+  background: #fff; border-radius: 20px; padding: 6px 12px;
+  font-size: 15px; font-weight: 700; color: #e8a33d;
+  box-shadow: 0 2px 8px rgba(180,140,200,.25);
+}
+
+/* ---- 主区 ---- */
+#screens { flex: 1 1 auto; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 4px 14px 20px; }
+.screen { display: none; animation: fadeIn .25s ease; }
+.screen.on { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* ---- 底部导航 ---- */
+#tabbar {
+  flex: 0 0 auto; display: flex; background: rgba(255,255,255,.92);
+  border-radius: 24px 24px 0 0; box-shadow: 0 -4px 16px rgba(180,140,200,.2);
+  padding: 6px 6px calc(env(safe-area-inset-bottom, 0px) + 6px);
+}
+.tab { flex: 1; border: none; background: none; text-align: center; padding: 6px 0 4px; border-radius: 16px; }
+.tab .ti { font-size: 24px; display: block; filter: grayscale(.6); transition: .15s; }
+.tab .tn { font-size: 11px; color: #b8a8c8; }
+.tab.on { background: #ffeaf4; }
+.tab.on .ti { filter: none; transform: scale(1.12); }
+.tab.on .tn { color: #e56ba0; font-weight: 700; }
+
+/* ---- 通用卡片 / 按钮 ---- */
+.card {
+  background: rgba(255,255,255,.9); border-radius: 22px; padding: 16px;
+  box-shadow: 0 4px 14px rgba(180,140,200,.18); margin-bottom: 14px;
+}
+.btn {
+  display: block; width: 100%; border: none; border-radius: 18px;
+  padding: 14px; font-size: 17px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, #ff9ec6, #b98ff0);
+  box-shadow: 0 4px 12px rgba(230,120,180,.35);
+  transition: transform .1s;
+}
+.btn:active { transform: scale(.96); }
+.btn.ghost { background: #fff; color: #b565a7; box-shadow: 0 2px 8px rgba(180,140,200,.2); }
+.btn.small { width: auto; display: inline-block; padding: 10px 20px; font-size: 15px; }
+.btn:disabled { opacity: .45; }
+
+/* ---- 首页 ---- */
+#petCard { text-align: center; position: relative; overflow: hidden; }
+#streakChip { position: absolute; top: 12px; left: 12px; background: #fff3d6; color: #e8842d; font-size: 13px; font-weight: 700; border-radius: 14px; padding: 4px 10px; }
+#petEmoji { font-size: 84px; line-height: 1.2; display: inline-block; transition: transform .15s; }
+#petEmoji.bounce { animation: bounce .5s; }
+@keyframes bounce { 0%,100% { transform: none; } 30% { transform: translateY(-16px) scale(1.08); } 60% { transform: translateY(0) scale(.95); } }
+#petStage { font-size: 17px; font-weight: 700; color: #9b59b6; margin-top: 2px; }
+#petTip { font-size: 12px; color: #b8a8c8; margin-top: 2px; }
+.xpbarWrap { background: #f0e8f8; border-radius: 10px; height: 12px; margin: 10px 24px 4px; overflow: hidden; }
+.xpbar { height: 100%; border-radius: 10px; background: linear-gradient(90deg, #ffd166, #ff9ec6); transition: width .4s; }
+#xpText { font-size: 11px; color: #c0b0d0; }
+.sectionTitle { font-size: 15px; font-weight: 700; color: #9b59b6; margin: 4px 2px 8px; }
+.taskRow { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px dashed #f0e0ee; }
+.taskRow:last-child { border-bottom: none; }
+.taskRow .tIcon { font-size: 22px; }
+.taskRow .tName { flex: 1; font-size: 14px; }
+.taskRow .tProg { font-size: 13px; color: #c0a0d0; font-weight: 700; }
+.taskRow.done .tName { color: #b8d0a8; text-decoration: line-through; }
+.taskRow.done .tProg { color: #7cc576; }
+.homeGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.homeGrid .card { margin-bottom: 0; text-align: center; padding: 14px 8px; }
+.homeGrid .hIcon { font-size: 34px; }
+.homeGrid .hName { font-size: 14px; font-weight: 700; margin-top: 4px; }
+.homeGrid .hSub { font-size: 11px; color: #c0a8d0; margin-top: 2px; }
+
+/* ---- 地图 ---- */
+.bookLabel { text-align: center; font-size: 14px; font-weight: 700; color: #b98ff0; margin: 10px 0 8px; }
+.unitCard { display: flex; align-items: center; gap: 12px; }
+.unitCard.locked { opacity: .55; filter: grayscale(.7); }
+.unitIcon { font-size: 38px; }
+.unitInfo { flex: 1; }
+.unitName { font-size: 16px; font-weight: 700; color: #7a5a9a; }
+.unitZh { font-size: 12px; color: #b8a8c8; }
+.unitStars { font-size: 16px; letter-spacing: 2px; }
+.unitProg { font-size: 11px; color: #c0a8d0; margin-top: 2px; }
+
+/* ---- 单元页 ---- */
+.actRow { display: flex; align-items: center; gap: 12px; }
+.actRow .aIcon { font-size: 32px; }
+.actRow .aName { flex: 1; font-size: 16px; font-weight: 700; color: #7a5a9a; }
+.actRow .aSub { font-size: 12px; color: #b8a8c8; font-weight: 400; display: block; }
+.actRow .aGo { font-size: 20px; color: #e5a0c8; }
+
+/* ---- 学单词 ---- */
+#learnCard { text-align: center; padding: 30px 16px; }
+#lcEmoji { font-size: 96px; }
+#lcWord { font-size: 34px; font-weight: 800; color: #6a4a8a; margin-top: 8px; letter-spacing: 1px; }
+#lcZh { font-size: 18px; color: #b08ac0; margin-top: 4px; }
+#lcSpeak { margin-top: 14px; font-size: 30px; border: none; background: #fff0f7; border-radius: 50%; width: 64px; height: 64px; box-shadow: 0 3px 10px rgba(230,120,180,.25); }
+#learnProg { text-align: center; font-size: 13px; color: #c0a8d0; margin-bottom: 8px; }
+
+/* ---- 游戏区通用 ---- */
+#playHead { text-align: center; margin-bottom: 10px; }
+#playProg { font-size: 13px; color: #c0a8d0; }
+#playQ { text-align: center; padding: 22px 14px; }
+#playQ .qEmoji { font-size: 72px; }
+#playQ .qText { font-size: 24px; font-weight: 800; color: #6a4a8a; margin-top: 6px; }
+#playQ .qSub { font-size: 15px; color: #b08ac0; margin-top: 4px; }
+.optGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.optBtn {
+  border: 3px solid transparent; border-radius: 20px; background: #fff;
+  padding: 14px 6px; text-align: center; font-size: 15px; font-weight: 700; color: #6a4a8a;
+  box-shadow: 0 3px 10px rgba(180,140,200,.18);
+}
+.optBtn .oEmoji { font-size: 40px; display: block; }
+.optBtn.right { border-color: #7cc576; background: #eefae8; }
+.optBtn.wrong { border-color: #f08080; background: #ffecec; animation: shake .35s; }
+@keyframes shake { 0%,100% { transform: none; } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+/* 配对 */
+.matchCols { display: flex; gap: 12px; }
+.matchCol { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+.mItem {
+  border: 3px solid transparent; border-radius: 16px; background: #fff;
+  padding: 12px 4px; text-align: center; font-size: 15px; font-weight: 700; color: #6a4a8a;
+  box-shadow: 0 3px 8px rgba(180,140,200,.18); transition: .15s;
+}
+.mItem .me { font-size: 28px; }
+.mItem.sel { border-color: #b98ff0; background: #f3ecff; transform: scale(1.04); }
+.mItem.ok { opacity: 0; pointer-events: none; transform: scale(.5); }
+.mItem.bad { border-color: #f08080; animation: shake .35s; }
+
+/* 拼写 */
+#spellSlots { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; min-height: 46px; margin: 14px 0; }
+.slot { width: 38px; height: 44px; border-radius: 10px; background: #fff; box-shadow: inset 0 -3px 0 #eadcf2; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 800; color: #6a4a8a; }
+.slot.fill { background: #f3ecff; }
+#spellKeys { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
+.key { width: 44px; height: 50px; border: none; border-radius: 12px; background: #fff; font-size: 20px; font-weight: 800; color: #8a5aaa; box-shadow: 0 3px 8px rgba(180,140,200,.22); }
+.key:disabled { opacity: .25; }
+#spellDel { background: #ffe8ee; color: #e56ba0; width: auto; padding: 0 16px; }
+
+/* 句子 */
+#sentAns { min-height: 52px; background: rgba(255,255,255,.7); border-radius: 16px; padding: 8px; display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+#sentPool { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.chip { border: none; border-radius: 12px; background: #fff; padding: 9px 13px; font-size: 16px; font-weight: 700; color: #6a4a8a; box-shadow: 0 3px 8px rgba(180,140,200,.22); }
+#sentAns .chip { background: #f3ecff; }
+#sentAns.good { background: #eefae8; }
+#sentAns.bad { animation: shake .35s; }
+
+/* ---- 结算页 ---- */
+#scr-result { text-align: center; padding-top: 30px; }
+#resStars { font-size: 46px; letter-spacing: 6px; }
+#resTitle { font-size: 24px; font-weight: 800; color: #9b59b6; margin: 8px 0 4px; }
+#resDetail { font-size: 15px; color: #b08ac0; margin-bottom: 6px; }
+#resCoins { font-size: 20px; font-weight: 800; color: #e8a33d; margin-bottom: 20px; }
+
+/* ---- 扭蛋 ---- */
+#gachaBox { text-align: center; padding: 26px 16px; }
+#gachaEgg { font-size: 100px; display: inline-block; }
+#gachaEgg.shake { animation: eggshake .8s; }
+@keyframes eggshake { 0%,100% { transform: none; } 15% { transform: rotate(-14deg); } 30% { transform: rotate(12deg); } 45% { transform: rotate(-10deg); } 60% { transform: rotate(8deg); } 75% { transform: rotate(-5deg); } }
+#gachaResult { min-height: 120px; margin-top: 8px; }
+.stickerCard { display: inline-block; border-radius: 20px; padding: 14px 26px; animation: popIn .4s; }
+@keyframes popIn { from { transform: scale(.3); opacity: 0; } to { transform: none; opacity: 1; } }
+.stickerCard .se { font-size: 60px; }
+.stickerCard .sn { font-size: 15px; font-weight: 700; margin-top: 4px; }
+.r1 { background: #f0f6ff; color: #6a90c0; } .r2 { background: #f3ecff; color: #9b59b6; }
+.r3 { background: linear-gradient(135deg, #fff3d6, #ffe0ef); color: #e8842d; box-shadow: 0 0 18px rgba(255,200,80,.7); }
+.albumGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.albumCell { background: #fff; border-radius: 16px; text-align: center; padding: 10px 2px 8px; box-shadow: 0 2px 8px rgba(180,140,200,.15); }
+.albumCell .ae { font-size: 32px; }
+.albumCell .an { font-size: 10px; color: #b8a8c8; margin-top: 2px; }
+.albumCell.no .ae { filter: grayscale(1); opacity: .25; }
+.albumCell.rr3 { background: #fff8e8; }
+
+/* ---- 浮动反馈 ---- */
+#toast {
+  position: fixed; left: 50%; top: 18%; transform: translateX(-50%);
+  background: rgba(90,60,110,.9); color: #fff; border-radius: 18px;
+  padding: 10px 20px; font-size: 15px; font-weight: 700; z-index: 99;
+  opacity: 0; pointer-events: none; transition: opacity .25s;
+}
+#toast.show { opacity: 1; }
+.confetti { position: fixed; top: -40px; font-size: 26px; z-index: 98; pointer-events: none; animation: fall linear forwards; }
+@keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
+.coinFly { position: fixed; font-size: 22px; font-weight: 800; color: #e8a33d; z-index: 98; pointer-events: none; animation: flyUp 1s ease-out forwards; }
+@keyframes flyUp { to { transform: translateY(-70px); opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <button id="backBtn">←</button>
+    <div id="barTitle">魔法英语乐园</div>
+    <div id="coinBox">🪙 <span id="coinNum">0</span></div>
+  </header>
+
+  <main id="screens">
+    <section id="scr-home" class="screen"></section>
+    <section id="scr-map" class="screen"></section>
+    <section id="scr-unit" class="screen"></section>
+    <section id="scr-learn" class="screen"></section>
+    <section id="scr-play" class="screen"></section>
+    <section id="scr-result" class="screen"></section>
+    <section id="scr-reward" class="screen"></section>
+    <section id="scr-album" class="screen"></section>
+    <section id="scr-arcade" class="screen"></section>
+  </main>
+
+  <nav id="tabbar">
+    <button class="tab on" data-tab="home"><span class="ti">🏠</span><span class="tn">首页</span></button>
+    <button class="tab" data-tab="map"><span class="ti">🗺️</span><span class="tn">闯关</span></button>
+    <button class="tab" data-tab="arcade"><span class="ti">🎮</span><span class="tn">游戏厅</span></button>
+    <button class="tab" data-tab="reward"><span class="ti">🎁</span><span class="tn">奖励屋</span></button>
+  </nav>
+</div>
+<div id="toast"></div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
