@@ -233,6 +233,60 @@ body {
 .pInput:focus { border-color: #b98ff0; }
 #parentLink { text-align: center; font-size: 12px; color: #c0b0d0; padding: 10px; text-decoration: underline; }
 
+/* ---- 主题换装屋 ---- */
+.themeCard { display: flex; align-items: center; gap: 12px; }
+.themeSwatch { width: 56px; height: 56px; border-radius: 16px; box-shadow: 0 3px 8px rgba(0,0,0,.15); flex: none; }
+.themeName { flex: 1; font-size: 15px; font-weight: 700; color: #7a5a9a; }
+.themeSub { font-size: 11px; color: #b8a8c8; font-weight: 400; display: block; margin-top: 2px; }
+.themeBtn { border: none; border-radius: 14px; padding: 9px 14px; font-size: 13px; font-weight: 700; color: #fff; background: linear-gradient(135deg,#ff9ec6,#b98ff0); white-space: nowrap; }
+.themeBtn.cur { background: #7cc576; }
+.themeBtn.lock { background: #d8cce8; }
+
+/* ===== 皮肤：薄荷仙子 ===== */
+body.th-mint { background: linear-gradient(160deg,#dff7e8 0%,#e0f0ff 55%,#eafff5 100%); }
+body.th-mint .btn:not(.ghost) { background: linear-gradient(135deg,#5ec99a,#7db8f0); box-shadow: 0 4px 12px rgba(90,190,150,.35); }
+body.th-mint #barTitle, body.th-mint .sectionTitle, body.th-mint #petStage, body.th-mint #resTitle, body.th-mint .bookLabel, body.th-mint .btn.ghost, body.th-mint #backBtn { color: #2f9e6e; }
+body.th-mint .tab.on { background: #dff5ea; }
+body.th-mint .tab.on .tn { color: #2f9e6e; }
+
+/* ===== 皮肤：美人鱼之海 ===== */
+body.th-ocean { background: linear-gradient(160deg,#d5f0ff 0%,#e0e5ff 55%,#e5faff 100%); }
+body.th-ocean .btn:not(.ghost) { background: linear-gradient(135deg,#5eb8e8,#8a9af0); box-shadow: 0 4px 12px rgba(90,150,220,.35); }
+body.th-ocean #barTitle, body.th-ocean .sectionTitle, body.th-ocean #petStage, body.th-ocean #resTitle, body.th-ocean .bookLabel, body.th-ocean .btn.ghost, body.th-ocean #backBtn { color: #2f7ec0; }
+body.th-ocean .tab.on { background: #ddf0fb; }
+body.th-ocean .tab.on .tn { color: #2f7ec0; }
+
+/* ===== 皮肤：蜜桃汽水 ===== */
+body.th-peach { background: linear-gradient(160deg,#ffe8d5 0%,#ffd9e2 55%,#fff3d9 100%); }
+body.th-peach .btn:not(.ghost) { background: linear-gradient(135deg,#ffab5e,#ff8fab); box-shadow: 0 4px 12px rgba(240,150,90,.4); }
+body.th-peach #barTitle, body.th-peach .sectionTitle, body.th-peach #petStage, body.th-peach #resTitle, body.th-peach .bookLabel, body.th-peach .btn.ghost, body.th-peach #backBtn { color: #e0742d; }
+body.th-peach .tab.on { background: #ffeedd; }
+body.th-peach .tab.on .tn { color: #e0742d; }
+
+/* ===== 皮肤：星空魔法（夜间） ===== */
+body.th-night { background: linear-gradient(160deg,#252040 0%,#352a55 55%,#1f2a48 100%); color: #cfc4e8; }
+body.th-night .card, body.th-night #tabbar { background: rgba(56,47,88,.94); box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+body.th-night #coinBox, body.th-night #backBtn, body.th-night .optBtn, body.th-night .mItem, body.th-night .key, body.th-night .slot, body.th-night .chip, body.th-night .albumCell, body.th-night .pInput { background: #473a6e; color: #e8dff8; box-shadow: 0 3px 8px rgba(0,0,0,.3); }
+body.th-night .btn:not(.ghost) { background: linear-gradient(135deg,#8a6ad0,#5a7ae0); box-shadow: 0 4px 12px rgba(60,40,120,.5); }
+body.th-night .btn.ghost { background: #473a6e; color: #cfc4e8; }
+body.th-night #barTitle, body.th-night .sectionTitle, body.th-night #petStage, body.th-night #resTitle, body.th-night .bookLabel, body.th-night .unitName, body.th-night .actRow .aName, body.th-night .themeName, body.th-night .vName, body.th-night .pName { color: #cfc0ee; }
+body.th-night #lcWord, body.th-night #playQ .qText, body.th-night #resStars { color: #e8dff8; }
+body.th-night #lcZh, body.th-night #playQ .qSub, body.th-night .unitZh, body.th-night .unitProg, body.th-night .actRow .aSub, body.th-night #petTip, body.th-night #xpText, body.th-night .homeGrid .hSub, body.th-night #learnProg, body.th-night #playProg, body.th-night #resDetail, body.th-night .taskRow .tName, body.th-night .themeSub, body.th-night .vDate, body.th-night .albumCell .an, body.th-night #parentLink { color: #9a8cc0; }
+body.th-night .taskRow, body.th-night .vRow, body.th-night .pRow { border-color: #4a3d70; }
+body.th-night .xpbarWrap { background: #2a2348; }
+body.th-night .tab .tn { color: #8a7ab0; }
+body.th-night .tab.on { background: #473a6e; }
+body.th-night .tab.on .tn { color: #cfc0ee; }
+body.th-night #sentAns { background: rgba(70,58,110,.6); }
+body.th-night #sentAns .chip { background: #5a4a8a; }
+body.th-night .slot { box-shadow: inset 0 -3px 0 #352a55; }
+body.th-night .slot.fill { background: #5a4a8a; }
+body.th-night .mItem.sel { background: #5a4a8a; border-color: #8a6ad0; }
+body.th-night #lcSpeak { background: #473a6e; }
+body.th-night .wLabel span { color: #4a3a6a; }
+body.th-night .albumCell.rr3 { background: #5a4a30; }
+body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
+
 /* ---- 浮动反馈 ---- */
 #toast {
   position: fixed; left: 50%; top: 18%; transform: translateX(-50%);
@@ -268,6 +322,7 @@ body {
     <section id="scr-wheel" class="screen"></section>
     <section id="scr-voucher" class="screen"></section>
     <section id="scr-parent" class="screen"></section>
+    <section id="scr-theme" class="screen"></section>
   </main>
 
   <nav id="tabbar">

@@ -25,7 +25,10 @@ function defState() {
     tickets: 0,   // 转盘券
     wheel: null,  // 家长自定义转盘奖品，null=用默认
     vouchers: [], // 转盘中的实物奖励券 {n, d, used}
-    wheelTouched: todayStr() // 上次更换转盘奖品的日期，驱动14天上新提醒
+    wheelTouched: todayStr(), // 上次更换转盘奖品的日期，驱动14天上新提醒
+    theme: "candy",
+    themesOwned: ["candy"],
+    sound: true
   };
 }
 let S = defState();
@@ -58,6 +61,7 @@ function speak(text, rate) {
 /* ---------------- 音效 ---------------- */
 let AC = null;
 function tone(freq, dur, type, when, vol) {
+  if (S.sound === false) return;
   try {
     if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
     const o = AC.createOscillator(), g = AC.createGain();
@@ -126,10 +130,11 @@ function bumpDaily(key, n) {
   S.daily[key] += (n || 1);
   checkTasks();
 }
+/* 每日任务量按约15分钟设计：学5词≈4分钟 + 3局游戏≈8分钟 + 3错词≈2分钟 */
 function taskDone() {
   return {
     t1: S.daily.w >= 5,
-    t2: S.daily.g >= 2,
+    t2: S.daily.g >= 3,
     t3: S.daily.r >= 3 || (wrongCount() === 0 && S.daily.g >= 1)
   };
 }
@@ -215,16 +220,17 @@ function renderHome() {
   $("#scr-home").innerHTML = `
     <div class="card" id="petCard">
       <div id="streakChip">🔥 连续 ${S.streak} 天</div>
+      <button id="themeQuick" style="position:absolute;top:10px;right:10px;border:none;background:none;font-size:22px">🎨</button>
       <div id="petEmoji">${st.e}</div>
       <div id="petStage">${st.n}</div>
       <div id="petTip">点我一下，给你惊喜～</div>
       <div class="xpbarWrap"><div class="xpbar" style="width:${pct}%"></div></div>
       <div id="xpText">${nx ? "距离进化【" + nx.n + "】还差 " + (nx.xp - S.xp) + " 魔法值" : "已经是最终形态啦！"}</div>
     </div>
-    <div class="sectionTitle">📋 今日任务（全部完成 +20🪙）</div>
+    <div class="sectionTitle">📋 今日任务 · 约15分钟（全完成 +20🪙+🎟️）</div>
     <div class="card">
       <div class="taskRow ${d.t1 ? "done" : ""}"><span class="tIcon">📖</span><span class="tName">学会 5 个新单词</span><span class="tProg">${Math.min(S.daily.w, 5)}/5</span></div>
-      <div class="taskRow ${d.t2 ? "done" : ""}"><span class="tIcon">🎮</span><span class="tName">完成 2 局小游戏</span><span class="tProg">${Math.min(S.daily.g, 2)}/2</span></div>
+      <div class="taskRow ${d.t2 ? "done" : ""}"><span class="tIcon">🎮</span><span class="tName">完成 3 局小游戏</span><span class="tProg">${Math.min(S.daily.g, 3)}/3</span></div>
       <div class="taskRow ${d.t3 ? "done" : ""}"><span class="tIcon">📕</span><span class="tName">消灭 3 个错词</span><span class="tProg">${wc === 0 ? "无错词" : Math.min(S.daily.r, 3) + "/3"}</span></div>
     </div>
     <button class="btn" id="homeGo">✨ 继续闯关：${cu.num} ${cu.zh} →</button>
@@ -245,6 +251,7 @@ function renderHome() {
   $("#homeAlbum").onclick = () => go(renderAlbum);
   $("#homeWheel").onclick = () => go(renderWheel);
   $("#homeVoucher").onclick = () => go(renderVoucher);
+  $("#themeQuick").onclick = () => go(renderTheme);
   show("home", "魔法英语乐园");
   updateCoinBox();
 }
@@ -903,6 +910,61 @@ function renderParent() {
   show("parent", "🔐 家长设置");
 }
 
+/* ================= 主题换装屋 ================= */
+const THEMES = [
+  { id: "candy", n: "🍭 糖果粉粉", sub: "甜甜的经典配色", cost: 0, g: "linear-gradient(135deg,#ffe5f1,#e8e5ff)" },
+  { id: "mint", n: "🌿 薄荷仙子", sub: "清清爽爽的绿色森林", cost: 60, g: "linear-gradient(135deg,#dff7e8,#7db8f0)" },
+  { id: "ocean", n: "🧜‍♀️ 美人鱼之海", sub: "潜入蓝色的海底世界", cost: 60, g: "linear-gradient(135deg,#d5f0ff,#8a9af0)" },
+  { id: "peach", n: "🍑 蜜桃汽水", sub: "元气满满的橙色泡泡", cost: 60, g: "linear-gradient(135deg,#ffe8d5,#ff8fab)" },
+  { id: "night", n: "🌌 星空魔法", sub: "晚上学习不刺眼的夜空", cost: 100, g: "linear-gradient(135deg,#252040,#5a4a8a)" }
+];
+function applyTheme() {
+  document.body.className = S.theme && S.theme !== "candy" ? "th-" + S.theme : "";
+}
+function renderTheme() {
+  $("#scr-theme").innerHTML = `
+    <div class="card" style="text-align:center;padding:12px">
+      <div style="font-size:15px;font-weight:700;color:#9b59b6">🎨 给乐园换新装！</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">用金币解锁新皮肤，解锁后随时切换</div>
+    </div>
+    ${THEMES.map((t, i) => {
+      const owned = S.themesOwned.includes(t.id), cur = S.theme === t.id;
+      return `<div class="card themeCard">
+        <div class="themeSwatch" style="background:${t.g}"></div>
+        <span class="themeName">${t.n}<span class="themeSub">${t.sub}</span></span>
+        <button class="themeBtn ${cur ? "cur" : owned ? "" : "lock"}" data-i="${i}">${cur ? "使用中 ✓" : owned ? "穿上" : "🪙" + t.cost + " 解锁"}</button>
+      </div>`;
+    }).join("")}
+    <div class="card actRow" id="soundRow">
+      <span class="aIcon">${S.sound !== false ? "🔊" : "🔇"}</span>
+      <span class="aName">游戏音效<span class="aSub">单词发音不受影响</span></span>
+      <button class="themeBtn ${S.sound !== false ? "cur" : "lock"}" id="soundBtn">${S.sound !== false ? "开着呢" : "已关闭"}</button>
+    </div>`;
+  document.querySelectorAll("#scr-theme .themeCard .themeBtn").forEach(b => {
+    b.onclick = () => {
+      const t = THEMES[+b.dataset.i];
+      if (S.theme === t.id) return;
+      if (S.themesOwned.includes(t.id)) {
+        S.theme = t.id; save(); applyTheme(); sndCoin();
+        toast("换上【" + t.n + "】啦！✨"); renderTheme();
+      } else if (S.coins >= t.cost) {
+        S.coins -= t.cost; S.themesOwned.push(t.id); S.theme = t.id;
+        save(); updateCoinBox(); applyTheme(); confetti(); sndWin();
+        toast("🎊 解锁新皮肤【" + t.n + "】！"); renderTheme();
+      } else {
+        sndWrong(); toast("还差 " + (t.cost - S.coins) + " 金币，去闯关赚吧！💪");
+      }
+    };
+  });
+  $("#soundBtn").onclick = () => {
+    S.sound = S.sound === false; save();
+    if (S.sound) sndCoin();
+    toast(S.sound ? "音效已打开 🔊" : "音效已关闭 🔇");
+    renderTheme();
+  };
+  show("theme", "🎨 主题换装屋");
+}
+
 /* ================= 奖励屋（扭蛋） ================= */
 const GACHA_COST = 20;
 function drawSticker() {
@@ -937,7 +999,13 @@ function renderReward() {
       <span class="aName">我的贴纸册<span class="aSub">已收集 ${got}/${STICKERS.length}</span></span>
       <span class="aGo">▶</span>
     </div>
+    <div class="card actRow" id="toTheme">
+      <span class="aIcon">🎨</span>
+      <span class="aName">主题换装屋<span class="aSub">已拥有 ${S.themesOwned.length}/${THEMES.length} 套皮肤</span></span>
+      <span class="aGo">▶</span>
+    </div>
     <div id="parentLink">家长设置</div>`;
+  $("#toTheme").onclick = () => go(renderTheme);
   $("#toWheel").onclick = () => go(renderWheel);
   $("#toVoucher").onclick = () => go(renderVoucher);
   $("#parentLink").onclick = () => go(renderParent);
@@ -990,7 +1058,16 @@ function renderAlbum() {
 }
 
 /* ================= 启动 ================= */
+applyTheme();
 updateCoinBox();
+/* 连续玩30分钟提醒休息眼睛 */
+let restAt = Date.now();
+setInterval(() => {
+  if (Date.now() - restAt >= 30 * 60 * 1000) {
+    restAt = Date.now();
+    toast("👀 已经玩了30分钟啦，休息一下眼睛，看看远处再回来～", 4000);
+  }
+}, 60000);
 navStack = [renderHome];
 renderHome();
 if (!localStorage.getItem(LS_KEY + "_hi")) {
