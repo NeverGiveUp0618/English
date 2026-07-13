@@ -25,6 +25,8 @@ function defState() {
     buddy: null,  // 挂在宠物身边的贴纸（小伙伴）
     hat: null,    // 戴在宠物头上的贴纸
     setDone: {},  // 已领过的集齐奖励：r1/r2/r3
+    checkins: {},  // 打卡成功的日期（完成当天全部任务才算）
+    cyclesPaid: 0, // 已发过奖励的学习周期数（每满 7 天一个周期）
     tickets: 0,   // 转盘券
     wheel: null,  // 家长自定义转盘奖品，null=用默认
     vouchers: [], // 转盘中的实物奖励券 {n, d, used}
@@ -51,6 +53,15 @@ function unitS(id) { if (!S.units[id]) S.units[id] = { learned: [], stars: 0 }; 
 /* 跨天重置每日任务 */
 function ensureDaily() { if (S.daily.date !== todayStr()) S.daily = defState().daily; }
 ensureDaily();
+
+/* 老存档迁移：打卡日历上线前已完成过任务的，把最后一次打卡补进日历 */
+function migrateCheckins() {
+  if (!Object.keys(S.checkins).length && S.lastDaily) {
+    S.checkins[S.lastDaily] = 1;
+    S.cyclesPaid = Math.floor(Object.keys(S.checkins).length / CYCLE_DAYS);
+    save();
+  }
+}
 
 /* 老存档迁移：SRS 上线前学会的词还没有复习排程，全部安排成今天到期 */
 function migrateSRS() {
@@ -319,12 +330,34 @@ function checkTasks() {
     S.daily.bonus = true;
     S.streak = (S.lastDaily === yesterdayStr()) ? S.streak + 1 : 1;
     S.lastDaily = todayStr();
+    S.checkins[todayStr()] = 1;          // 打卡成功
     addCoins(20); confetti(); sndWin();
     setTimeout(() => toast("🔥 今日全部任务完成！奖励20金币，连续 " + S.streak + " 天！", 2800), 400);
     addTicket(1, "完成今日全部任务");
     if (S.streak > 0 && S.streak % 3 === 0) setTimeout(() => addTicket(1, "连续学习" + S.streak + "天"), 1600);
+    checkCycle();
   }
   save();
+}
+
+/* ---------------- 学习周期：累计打卡满 7 天 = 一个周期，奖励 2 张转盘券 ----------------
+ * 用「累计」而不是「必须连续」：孩子偶尔漏一天不至于前功尽弃，
+ * 连续性另有 🔥连续天数 在激励，两者互补。
+ */
+const CYCLE_DAYS = 7;
+function checkinCount() { return Object.keys(S.checkins).length; }
+function cycleProgress() { return checkinCount() % CYCLE_DAYS; }   // 本周期已打卡天数
+function checkCycle() {
+  const cycles = Math.floor(checkinCount() / CYCLE_DAYS);
+  if (cycles > S.cyclesPaid) {
+    const gain = (cycles - S.cyclesPaid) * 2;
+    S.cyclesPaid = cycles; save();
+    setTimeout(() => {
+      confetti(); sndWin();
+      toast("🎊 完成第 " + cycles + " 个学习周期！奖励 " + gain + " 张转盘券！", 3200);
+    }, 2400);
+    addTicket(gain, "坚持满 " + CYCLE_DAYS + " 天学习周期");
+  }
 }
 
 /* ---------------- 错词本 + 答题统计 ---------------- */
@@ -508,7 +541,8 @@ function renderHome() {
       <div class="card" id="homeAlbum"><div class="hIcon">📔</div><div class="hName">贴纸册</div><div class="hSub">已收集 ${Object.keys(S.stickers).length}/${STICKERS.length}</div></div>
       <div class="card" id="homeWheel"><div class="hIcon">🎡</div><div class="hName">幸运大转盘</div><div class="hSub">${S.tickets ? "有 " + S.tickets + " 张转盘券！" : "完成任务赢转盘券"}</div></div>
       <div class="card" id="homeVoucher"><div class="hIcon">🎟️</div><div class="hName">我的奖励券</div><div class="hSub">${(() => { const p = S.vouchers.filter(v => !v.used).length; return p ? p + " 张待兑换" : "转转盘赢真奖励"; })()}</div></div>
-    </div>`;
+    </div>
+    ${renderCalendar()}`;
   $("#petEmoji").onclick = () => {
     const p = PRAISES[Math.floor(Math.random() * PRAISES.length)];
     const el = $("#petEmoji"); el.classList.remove("bounce"); void el.offsetWidth; el.classList.add("bounce");
@@ -526,6 +560,64 @@ function renderHome() {
   };
   show("home", "魔法英语乐园");
   updateCoinBox();
+}
+
+/* ================= 打卡日历（首页底部） ================= */
+function renderCalendar() {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  const first = new Date(y, m, 1).getDay();          // 本月1号是周几（0=周日）
+  const days = new Date(y, m + 1, 0).getDate();      // 本月天数
+  const today = todayStr();
+  const key = d => y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+
+  let cells = "";
+  for (let i = 0; i < first; i++) cells += `<div class="calCell blank"></div>`;
+  for (let d = 1; d <= days; d++) {
+    const k = key(d);
+    const done = !!S.checkins[k];
+    const isToday = k === today;
+    const future = k > today;
+    cells += `<div class="calCell ${done ? "done" : ""} ${isToday ? "today" : ""} ${future ? "future" : ""}">
+      ${done ? "🔥" : d}
+    </div>`;
+  }
+  const monthDone = Object.keys(S.checkins).filter(k => k.startsWith(y + "-" + String(m + 1).padStart(2, "0"))).length;
+  const prog = cycleProgress();
+  const left = CYCLE_DAYS - prog;
+  const total = checkinCount();
+
+  return `
+    <div class="sectionTitle">📆 打卡日历</div>
+    <div class="card" style="padding:14px 12px">
+      <div class="calHead">
+        <span>${y} 年 ${m + 1} 月</span>
+        <span style="font-size:12px;color:#b8a8c8;font-weight:400">本月打卡 ${monthDone} 天 · 累计 ${total} 天</span>
+      </div>
+      <div class="calGrid calWeek">
+        ${["日", "一", "二", "三", "四", "五", "六"].map(w => `<div class="calW">${w}</div>`).join("")}
+      </div>
+      <div class="calGrid">${cells}</div>
+
+      <div class="cycleBox">
+        <div class="cycleTop">
+          <span>🎯 本学习周期（${CYCLE_DAYS} 天）</span>
+          <span style="color:#e8842d;font-weight:800">${prog} / ${CYCLE_DAYS}</span>
+        </div>
+        <div class="cycleBarWrap">
+          <div class="cycleBar" style="width:${prog / CYCLE_DAYS * 100}%"></div>
+        </div>
+        <div class="cycleTip">
+          ${prog === 0 && total > 0
+            ? "🎊 上个周期已完成，新周期开始啦！"
+            : "再坚持 <b>" + left + "</b> 天打卡，奖励 <b>2 张转盘券</b> 🎟️🎟️"}
+          ${S.cyclesPaid ? `<span style="color:#c0a8d0">　已完成 ${S.cyclesPaid} 个周期</span>` : ""}
+        </div>
+      </div>
+      <div style="font-size:11px;color:#c0b0d0;margin-top:8px;text-align:center">
+        完成当天全部任务才算打卡成功 🔥
+      </div>
+    </div>`;
 }
 
 /* ================= 闯关地图 ================= */
@@ -1492,6 +1584,7 @@ function renderParent() {
         <button class="btn small ghost" id="tWords">📖 标记全部单词已学</button>
         <button class="btn small ghost" id="tWrong">📕 造 5 个错词</button>
         <button class="btn small ghost" id="tDue">📅 让 10 个词今天到期</button>
+        <button class="btn small ghost" id="tCheck">📆 补 6 天打卡（测周期奖励）</button>
         <button class="btn small ghost" id="tReset" style="color:#e05a5a">🗑️ 清空全部进度</button>
       </div>
       <div style="font-size:11px;color:#c0a8d0;margin-top:8px;line-height:1.7">
@@ -1568,6 +1661,12 @@ function renderParent() {
     $("#tWrong").onclick = () => {
       sample(unlockedWords(), 5).forEach(w => { S.wrong[w.w] = 2; });
       save(); toast("已造 5 个错词，可以去测错词本了", 2200);
+    };
+    $("#tCheck").onclick = () => {
+      for (let i = 1; i <= 6; i++) S.checkins[dateAdd(-i)] = 1;   // 补前6天
+      save();
+      toast("已补 6 天打卡，再完成今天的任务就满一个周期了", 3000);
+      renderParent();
     };
     $("#tDue").onclick = () => {
       const learned = Object.keys(S.learnedAt);
@@ -2426,6 +2525,7 @@ function pickDeco(s) {
 
 /* ================= 启动 ================= */
 migrateSRS();
+migrateCheckins();
 applyTheme();
 updateCoinBox();
 /* 连续玩30分钟提醒休息眼睛 */

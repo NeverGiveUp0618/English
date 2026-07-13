@@ -100,6 +100,36 @@ body {
 .homeGrid .hName { font-size: 14px; font-weight: 700; margin-top: 4px; }
 .homeGrid .hSub { font-size: 11px; color: #c0a8d0; margin-top: 2px; }
 
+/* ---- 打卡日历 ---- */
+.calHead { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; font-weight: 700; color: #9b59b6; margin-bottom: 8px; }
+.calGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.calWeek { margin-bottom: 4px; }
+.calW { text-align: center; font-size: 11px; color: #c0a8d0; font-weight: 700; }
+.calCell {
+  aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; background: #f7f2fb; font-size: 12px; color: #a898b8;
+  font-variant-numeric: tabular-nums;
+}
+.calCell.blank { background: none; }
+.calCell.future { opacity: .45; }
+.calCell.done { background: #fff3d6; font-size: 15px; box-shadow: inset 0 0 0 1.5px #ffd9a0; }
+.calCell.today { box-shadow: inset 0 0 0 2px #e56ba0; color: #e56ba0; font-weight: 800; }
+.calCell.done.today { box-shadow: inset 0 0 0 2px #e56ba0, inset 0 0 0 4px #fff3d6; }
+
+.cycleBox { margin-top: 12px; background: #fff8ec; border-radius: 14px; padding: 10px 12px; }
+.cycleTop { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; color: #7a5a9a; }
+.cycleBarWrap { height: 10px; background: #f0e4d4; border-radius: 8px; margin: 7px 0 5px; overflow: hidden; }
+.cycleBar { height: 100%; border-radius: 8px; background: linear-gradient(90deg, #ffd166, #ff9ec6); transition: width .5s; }
+.cycleTip { font-size: 12px; color: #a08ab0; }
+.cycleTip b { color: #e8842d; }
+
+body.th-night .calCell { background: #3d3360; color: #9a8cc0; }
+body.th-night .calCell.blank { background: none; }
+body.th-night .calCell.done { background: #5a4a30; box-shadow: inset 0 0 0 1.5px #8a7040; }
+body.th-night .cycleBox { background: #3d3360; }
+body.th-night .cycleBarWrap { background: #2a2348; }
+body.th-night .calW { color: #8a7ab0; }
+
 /* ---- 地图 ---- */
 .bookLabel { text-align: center; font-size: 14px; font-weight: 700; color: #b98ff0; margin: 10px 0 8px; }
 .unitCard { display: flex; align-items: center; gap: 12px; }
