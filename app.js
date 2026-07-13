@@ -169,38 +169,56 @@ function ttsFail() {
   ttsWarned = true;
   toast("🔇 听不到发音？去「奖励屋→家长设置→发音自检」看看", 4000);
 }
-/* 主通道：播放预合成 mp3 */
-function speak(text, rate) {
+/* 主通道：播放预合成 mp3。onEnd 在音频真正播完时回调 */
+function speak(text, rate, onEnd) {
   unlockAudio();
   const f = audioFile(text);
   if (AUD && f) {
     try {
       AUD.pause();
+      AUD.onended = null;
       AUD.src = "audio/" + f;
       AUD.playbackRate = Math.min(1, Math.max(0.6, rate || 0.95));
       AUD.currentTime = 0;
+      if (onEnd) AUD.onended = () => { AUD.onended = null; onEnd(); };
       const p = AUD.play();
-      if (p && p.catch) p.catch(() => speakTTS(text, rate));   // 被浏览器拦截 → 退回系统TTS
+      if (p && p.catch) p.catch(() => speakTTS(text, rate, onEnd));   // 被浏览器拦截 → 退回系统TTS
       return;
     } catch (e) { /* 落到 TTS */ }
   }
-  speakTTS(text, rate);
+  speakTTS(text, rate, onEnd);
 }
 /* 兜底通道：系统语音合成 */
-function speakTTS(text, rate) {
-  if (!("speechSynthesis" in window)) { ttsFail(); return; }
+function speakTTS(text, rate, onEnd) {
+  if (!("speechSynthesis" in window)) { ttsFail(); if (onEnd) onEnd(); return; }
   try {
     if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "en-US"; u.rate = rate || 0.8; u.volume = 1; u.pitch = 1.1;
     if (!enVoice) pickVoice();
     if (enVoice) u.voice = enVoice;
-    u.onerror = e => { if (e && e.error !== "interrupted" && e.error !== "canceled") ttsFail(); };
+    if (onEnd) u.onend = onEnd;
+    u.onerror = e => {
+      if (e && e.error !== "interrupted" && e.error !== "canceled") ttsFail();
+      if (onEnd) onEnd();
+    };
     /* cancel() 之后立刻 speak 在 iOS 上常常不出声，隔一帧更稳 */
     setTimeout(() => {
-      try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch (e) { ttsFail(); }
+      try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch (e) { ttsFail(); if (onEnd) onEnd(); }
     }, 50);
-  } catch (e) { ttsFail(); }
+  } catch (e) { ttsFail(); if (onEnd) onEnd(); }
+}
+/* 读完这句再往下走：等音频真正结束（带兜底超时，避免卡死） */
+function speakThen(text, rate, cb, pauseMs) {
+  let fired = false;
+  const go = () => {
+    if (fired) return;
+    fired = true;
+    clearTimeout(guard);
+    setTimeout(cb, pauseMs === undefined ? 500 : pauseMs);
+  };
+  const guard = setTimeout(go, 8000);   // 音频没能触发结束事件时的兜底
+  speak(text, rate, go);
 }
 
 /* ---------------- 音效 ---------------- */
@@ -401,6 +419,7 @@ function goTab(render) { navStack = [render]; render(); }
 function goBack() {
   if (window.speechSynthesis) speechSynthesis.cancel();
   clearTimer();
+  if (echoCleanup) { echoCleanup(); echoCleanup = null; }   // 关掉麦克风
   if (navStack.length > 1) navStack.pop();
   navStack[navStack.length - 1]();
 }
@@ -408,6 +427,7 @@ $("#backBtn").onclick = goBack;
 document.querySelectorAll(".tab").forEach(t => {
   t.onclick = () => {
     clearTimer();
+    if (echoCleanup) { echoCleanup(); echoCleanup = null; }
     if (window.speechSynthesis) speechSynthesis.cancel();
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
     t.classList.add("on");
@@ -1101,15 +1121,18 @@ function startSentence(sents, u) {
     draw();
     checkBtn.onclick = () => {
       const built = ans.map(c => c.w).join(" ");
+      checkBtn.disabled = true;
       if (built === s.en) {
-        ansBox.classList.add("good"); sndRight(); right++; speak(s.en, 0.85);
-        setTimeout(() => { qi++; q(); }, 1400);
+        ansBox.classList.add("good"); sndRight(); right++;
+        checkBtn.textContent = "✅ 正确！听一遍…";
+        /* 等整句读完再翻页，不能话没说完就跳走 */
+        speakThen(s.en, 0.9, () => { qi++; q(); }, 600);
       } else {
         ansBox.classList.add("bad"); sndWrong();
-        toast("再想想～正确是：" + s.en, 2200); speak(s.en, 0.85);
+        checkBtn.textContent = "正确答案：" + s.en;
+        toast("再想想～正确是：" + s.en, 2600);
         setTimeout(() => ansBox.classList.remove("bad"), 500);
-        checkBtn.disabled = true;
-        setTimeout(() => { qi++; q(); }, 2400);
+        speakThen(s.en, 0.9, () => { qi++; q(); }, 900);
       }
     };
     show("play", "🚂 句子小火车");
@@ -1302,7 +1325,7 @@ function renderArcade() {
   const dc = dueCount();
   const games = [
     { icon: "📅", name: "今日复习", sub: dc ? "有 " + dc + " 个词到期了，趁还记得快复习！" : "今天没有到期的词，很棒！", fn: () => startDueReview() },
-    { icon: "🎙️", name: "魔法回声（跟读）", sub: "对着手机大声读，看看能拿几颗星", fn: () => startEcho(unlockedSents().concat(ECHO_EXTRA)) },
+    { icon: "🎙️", name: "魔法回声（跟读）", sub: echoMode() === "sr" ? "对着手机大声读，自动给你打分" : echoMode() === "record" ? "录下自己的声音，和标准发音比一比" : "跟着标准发音大声读出来", fn: () => startEcho(unlockedSents().concat(ECHO_EXTRA)) },
     { icon: "🏆", name: "魔法大考", sub: learnedN < 8 ? "学会8个词后解锁" : "跨单元综合复习 · 最高 " + (S.bestExam || 0) + " 分", fn: () => startExam() },
     { icon: "🔗", name: "词语配对", sub: "已解锁单词随机出题", fn: () => startMatch(priorityPick(pool, 20)) },
     { icon: "👂", name: "听音选图", sub: "练出小小顺风耳", fn: () => startListen(priorityPick(pool, 20)) },
@@ -1718,22 +1741,36 @@ function scoreSay(target, heard) {
   a.forEach(w => { const i = pool.indexOf(w); if (i >= 0) { hit++; pool.splice(i, 1); } });
   return hit / a.length;
 }
+/* 三种模式：
+ *  sr     —— 浏览器支持语音识别（安卓 Chrome 等）：自动打分
+ *  record —— 不支持识别但能录音（iPhone 就是这种）：录下来回放，跟标准音对比后自评
+ *  shadow —— 连麦克风都用不了：只做影子跟读，读完自己确认
+ * iPhone 的 Safari / Chrome 都不支持 Web 语音识别，所以必须有 record 模式兜底。
+ */
+const CAN_RECORD = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+function echoMode() { return SR ? "sr" : CAN_RECORD ? "record" : "shadow"; }
+
+let echoCleanup = null;   // 离开页面时要关掉麦克风
 function startEcho(items) {
-  if (!SR) {
-    $("#scr-echo").innerHTML = `
-      <div class="card" style="text-align:center;padding:30px 16px">
-        <div style="font-size:44px">🎙️</div>
-        <div style="font-size:15px;font-weight:700;color:#9b59b6;margin:8px 0">这个浏览器不支持语音识别</div>
-        <div style="font-size:13px;color:#b8a8c8;line-height:1.7">请用 <b>Chrome</b> 或 <b>Safari</b> 打开本网站，<br>就可以玩「魔法回声」跟读游戏啦～</div>
-      </div>`;
-    show("echo", "🎙️ 魔法回声");
-    return;
-  }
+  const mode = echoMode();
   const qs = sample(items, Math.min(6, items.length));
-  let qi = 0, total = 0, listening = false, rec = null;
-  function q() {
-    if (qi >= qs.length) {
-      bumpDaily("g");
+  let qi = 0, total = 0, doneN = 0;
+  let listening = false, rec = null;          // sr 模式
+  let mediaRec = null, myURL = null, stream = null;   // record 模式
+
+  function cleanup() {
+    try { if (rec) rec.stop(); } catch (e) {}
+    try { if (mediaRec && mediaRec.state === "recording") mediaRec.stop(); } catch (e) {}
+    try { if (stream) stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+    if (myURL) { URL.revokeObjectURL(myURL); myURL = null; }
+    mediaRec = null; stream = null; listening = false;
+  }
+  echoCleanup = cleanup;
+
+  function finish() {
+    cleanup();
+    bumpDaily("g");
+    if (mode === "sr") {
       const avg = total / qs.length;
       const stars = avg >= 0.9 ? 3 : avg >= 0.7 ? 2 : avg >= 0.4 ? 1 : 0;
       return renderResult({
@@ -1743,22 +1780,52 @@ function startEcho(items) {
         replay: () => startEcho(items)
       });
     }
+    /* 录音 / 影子模式：按完成的句数给奖励，自评只做反馈不换钱，避免乱点刷币 */
+    const avg = doneN ? total / doneN : 0;
+    return renderResult({
+      stars: doneN === qs.length ? 3 : doneN >= qs.length - 2 ? 2 : 1,
+      title: "跟读完成，开口就是胜利！",
+      detail: `读了 ${doneN}/${qs.length} 句${doneN ? "　自评平均 " + "⭐".repeat(Math.max(1, Math.round(avg))) : ""}`,
+      coins: doneN * 4,
+      replay: () => startEcho(items)
+    });
+  }
+
+  function q() {
+    cleanup();
+    if (qi >= qs.length) return finish();
     const it = qs[qi];
+    const tipByMode = {
+      sr: "先听标准发音，再点下面的按钮大声读出来，我来给你打分！",
+      record: "先听标准发音，再录下自己的声音，回放对比一下像不像～",
+      shadow: "先听标准发音，然后大声跟着读一遍～"
+    };
     $("#scr-echo").innerHTML = `
       <div id="playHead"><div id="playProg">🎙️ 第 ${qi + 1} / ${qs.length} 句</div></div>
       <div class="card" style="text-align:center;padding:22px 14px">
         <div style="font-size:22px;font-weight:800;color:#6a4a8a;line-height:1.4">${esc(it.en)}</div>
         <div style="font-size:14px;color:#b08ac0;margin-top:4px">${it.zh}</div>
         <button id="echoPlay" style="margin-top:12px;font-size:26px;border:none;background:#fff0f7;border-radius:50%;width:56px;height:56px;box-shadow:0 3px 10px rgba(230,120,180,.25)">🔊</button>
-        <div id="echoState" style="font-size:13px;color:#c0a8d0;margin-top:10px">先听一听，再按住下面的按钮大声读出来～</div>
-        <div id="echoScore" style="min-height:56px;margin-top:6px"></div>
+        <div id="echoState" style="font-size:13px;color:#c0a8d0;margin-top:10px">${tipByMode[mode]}</div>
+        <div id="echoScore" style="min-height:40px;margin-top:6px"></div>
       </div>
-      <button class="btn" id="echoMic">🎙️ 点我开始读</button>
+      <div id="echoBtns"></div>
       <div style="height:10px"></div>
       <button class="btn ghost" id="echoSkip">跳过这句 →</button>`;
-    speak(it.en, 0.8);
-    $("#echoPlay").onclick = () => speak(it.en, 0.8);
-    $("#echoSkip").onclick = () => { if (rec) try { rec.stop(); } catch (e) {} qi++; q(); };
+    speak(it.en, 0.9);
+    $("#echoPlay").onclick = () => speak(it.en, 0.9);
+    $("#echoSkip").onclick = () => { qi++; q(); };
+
+    if (mode === "sr") renderSR(it);
+    else if (mode === "record") renderRecord(it);
+    else renderShadow(it);
+
+    show("echo", "🎙️ 魔法回声");
+  }
+
+  /* ---- 模式1：自动识别打分 ---- */
+  function renderSR(it) {
+    $("#echoBtns").innerHTML = `<button class="btn" id="echoMic">🎙️ 点我开始读</button>`;
     $("#echoMic").onclick = () => {
       if (listening) return;
       listening = true;
@@ -1770,10 +1837,10 @@ function startEcho(items) {
         rec.onresult = ev => {
           let best = 0, heard = "";
           for (let i = 0; i < ev.results[0].length; i++) {
-            const s = scoreSay(it.en, ev.results[0][i].transcript);
-            if (s > best) { best = s; heard = ev.results[0][i].transcript; }
+            const sc = scoreSay(it.en, ev.results[0][i].transcript);
+            if (sc > best) { best = sc; heard = ev.results[0][i].transcript; }
           }
-          total += best; listening = false;
+          total += best; doneN++; listening = false;
           const pc = Math.round(best * 100);
           const stars = best >= 0.9 ? "⭐⭐⭐" : best >= 0.7 ? "⭐⭐" : best >= 0.4 ? "⭐" : "💪";
           logAnswer(best >= 0.7);
@@ -1788,7 +1855,7 @@ function startEcho(items) {
           listening = false;
           $("#echoMic").textContent = "🎙️ 再试一次";
           $("#echoState").textContent = ev.error === "not-allowed"
-            ? "需要允许使用麦克风才能玩哦，请在浏览器里点「允许」"
+            ? "需要允许使用麦克风才能玩哦，请在弹窗里点「允许」"
             : "没听清楚，靠近一点再读一遍～";
         };
         rec.onend = () => {
@@ -1797,11 +1864,85 @@ function startEcho(items) {
         rec.start();
       } catch (e) {
         listening = false;
-        $("#echoState").textContent = "麦克风打不开，换 Chrome 或 Safari 试试";
+        $("#echoState").textContent = "麦克风打不开，试试下面的「跳过」换一句";
       }
     };
-    show("echo", "🎙️ 魔法回声");
   }
+
+  /* ---- 模式2：录音 + 回放对比 + 自评（iPhone 走这条） ---- */
+  function renderRecord(it) {
+    $("#echoBtns").innerHTML = `<button class="btn" id="echoMic">🔴 按一下开始录音</button>`;
+    const mic = $("#echoMic");
+    mic.onclick = async () => {
+      if (mediaRec && mediaRec.state === "recording") { mediaRec.stop(); return; }   // 再点一次＝停止
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e) {
+        $("#echoState").innerHTML = '需要<b>麦克风权限</b>才能录音。请在弹窗里点「允许」；如果没弹窗，去手机设置里给浏览器开麦克风权限。';
+        sndWrong();
+        return;
+      }
+      const chunks = [];
+      try {
+        mediaRec = new MediaRecorder(stream);
+      } catch (e) {
+        $("#echoState").textContent = "这个浏览器录不了音，直接大声跟读也可以～";
+        renderShadow(it);
+        return;
+      }
+      mediaRec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      mediaRec.onstop = () => {
+        try { stream.getTracks().forEach(t => t.stop()); } catch (e) {}
+        stream = null;
+        const blob = new Blob(chunks, { type: mediaRec.mimeType || "audio/webm" });
+        if (myURL) URL.revokeObjectURL(myURL);
+        myURL = URL.createObjectURL(blob);
+        sndCoin();
+        $("#echoState").textContent = "录好啦！听听自己读的，和标准发音对比一下～";
+        $("#echoScore").innerHTML = `
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:4px">
+            <button class="btn small ghost" id="playMine">▶ 我读的</button>
+            <button class="btn small ghost" id="playStd">🔊 标准发音</button>
+          </div>
+          <div style="font-size:12px;color:#c0a8d0;margin-top:10px">觉得自己读得像吗？</div>
+          <div style="display:flex;gap:6px;justify-content:center;margin-top:6px">
+            <button class="btn small" data-self="3">⭐⭐⭐ 很像</button>
+            <button class="btn small ghost" data-self="2">⭐⭐ 还行</button>
+            <button class="btn small ghost" data-self="1">⭐ 再练练</button>
+          </div>`;
+        const myAudio = new Audio(myURL);
+        $("#playMine").onclick = () => { myAudio.currentTime = 0; myAudio.play().catch(() => toast("回放失败，再录一次试试")); };
+        $("#playStd").onclick = () => speak(it.en, 0.9);
+        myAudio.play().catch(() => {});   // 录完自动回放一次
+        document.querySelectorAll("#echoScore [data-self]").forEach(b => {
+          b.onclick = () => {
+            total += +b.dataset.self; doneN++;
+            logAnswer(+b.dataset.self >= 2);
+            if (+b.dataset.self === 3) { confettiSmall(8); sndWin(); } else sndCoin();
+            qi++; q();
+          };
+        });
+        mic.textContent = "🔴 重录一次";
+        mic.disabled = false;
+      };
+      mediaRec.start();
+      mic.textContent = "⏹ 正在录音……再点一下结束";
+      $("#echoState").textContent = "🔴 录音中，大声读出来！";
+      /* 保险：最长录 10 秒自动停 */
+      setTimeout(() => { if (mediaRec && mediaRec.state === "recording") mediaRec.stop(); }, 10000);
+    };
+  }
+
+  /* ---- 模式3：影子跟读（连录音都不行时） ---- */
+  function renderShadow(it) {
+    $("#echoBtns").innerHTML = `
+      <button class="btn" id="echoAgain">🔊 再听一遍</button>
+      <div style="height:10px"></div>
+      <button class="btn ghost" id="echoDone">✅ 我大声读完啦，下一句</button>`;
+    $("#echoAgain").onclick = () => speak(it.en, 0.9);
+    $("#echoDone").onclick = () => { total += 2; doneN++; sndCoin(); qi++; q(); };
+  }
+
   q();
 }
 
