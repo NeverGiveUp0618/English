@@ -1600,23 +1600,32 @@ function renderVoucher() {
 }
 
 /* ================= 家长设置 ================= */
+const PARENT_PIN = "223826";
 let parentOK = false;
 function renderParent() {
   if (!parentOK) {
-    const a = 12 + Math.floor(Math.random() * 78), b = 12 + Math.floor(Math.random() * 78);
     $("#scr-parent").innerHTML = `
       <div class="card" style="text-align:center;padding:24px 16px">
         <div style="font-size:34px">🔐</div>
         <div style="font-size:15px;font-weight:700;color:#9b59b6;margin:8px 0">家长验证</div>
-        <div style="font-size:14px;color:#7a5a9a;margin-bottom:12px">请计算：<b style="font-size:18px">${a} × ${b} = ?</b></div>
-        <input class="pInput" id="pGate" type="number" inputmode="numeric" placeholder="输入答案" style="text-align:center;max-width:180px">
+        <div style="font-size:13px;color:#b8a8c8;margin-bottom:12px">请输入家长密码</div>
+        <input class="pInput" id="pGate" type="password" inputmode="numeric" autocomplete="off"
+               placeholder="● ● ● ● ● ●" maxlength="12"
+               style="text-align:center;max-width:200px;letter-spacing:4px;font-size:18px">
         <div style="height:12px"></div>
-        <button class="btn small" id="pGateBtn">确认</button>
+        <button class="btn small" id="pGateBtn">进入</button>
+        <div id="pGateMsg" style="font-size:12px;color:#c0a8d0;margin-top:10px">这里是爸爸妈妈的设置，小朋友先去玩吧～</div>
       </div>`;
-    $("#pGateBtn").onclick = () => {
-      if (+$("#pGate").value === a * b) { parentOK = true; renderParent(); }
-      else { sndWrong(); toast("答案不对哦～"); $("#pGate").value = ""; }
+    const tryIn = () => {
+      if ($("#pGate").value.trim() === PARENT_PIN) { parentOK = true; sndCoin(); renderParent(); }
+      else {
+        sndWrong();
+        $("#pGateMsg").textContent = "密码不对哦～";
+        $("#pGate").value = "";
+      }
     };
+    $("#pGateBtn").onclick = tryIn;
+    $("#pGate").onkeydown = e => { if (e.key === "Enter") tryIn(); };
     show("parent", "🔐 家长设置");
     return;
   }
