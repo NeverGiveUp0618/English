@@ -22,6 +22,9 @@ function defState() {
     units: {},    // id -> {learned:[], stars:0, s3:false}
     wrong: {},    // word -> 次数
     stickers: {}, // 贴纸名 -> 数量
+    buddy: null,  // 挂在宠物身边的贴纸（小伙伴）
+    hat: null,    // 戴在宠物头上的贴纸
+    setDone: {},  // 已领过的集齐奖励：r1/r2/r3
     tickets: 0,   // 转盘券
     wheel: null,  // 家长自定义转盘奖品，null=用默认
     vouchers: [], // 转盘中的实物奖励券 {n, d, used}
@@ -455,9 +458,13 @@ function renderHome() {
     <div class="card" id="petCard">
       <div id="streakChip">🔥 连续 ${S.streak} 天</div>
       <button id="themeQuick" style="position:absolute;top:10px;right:10px;border:none;background:none;font-size:22px">🎨</button>
-      <div id="petEmoji">${st.e}</div>
+      <div class="petShow" id="petShow">
+        <span class="petHat">${S.hat ? stickerOf(S.hat).e : ""}</span>
+        <span id="petEmoji">${st.e}</span>
+        <span class="petBuddy">${S.buddy ? stickerOf(S.buddy).e : ""}</span>
+      </div>
       <div id="petStage">${st.n}</div>
-      <div id="petTip">点我一下，给你惊喜～</div>
+      <div id="petTip">${(S.hat || S.buddy) ? "点宠物有惊喜　·　贴纸册可换装扮" : Object.keys(S.stickers).length ? "去贴纸册，给宠物戴上贴纸！" : "点我一下，给你惊喜～"}</div>
       <div class="xpbarWrap"><div class="xpbar" style="width:${pct}%"></div></div>
       <div id="xpText">${nx ? "距离进化【" + nx.n + "】还差 " + (nx.xp - S.xp) + " 魔法值" : "已经是最终形态啦！"}</div>
       <div id="rankChip">${df.rank}　<span style="font-weight:400;color:#c0a8d0">${rankTip}</span></div>
@@ -2163,9 +2170,12 @@ function renderReward() {
         <div class="stickerCard r${st.r}">
           <div class="se">${st.e}</div>
           <div class="sn">${st.n} · ${rarTxt}</div>
-          ${dup ? '<div style="font-size:11px;margin-top:2px">重复啦，返还5金币</div>' : '<div style="font-size:11px;margin-top:2px">🎊 新贴纸！</div>'}
+          ${dup
+            ? '<div style="font-size:11px;margin-top:2px">重复啦，返还5金币</div>'
+            : '<div style="font-size:11px;margin-top:2px">🎊 新贴纸！可以去贴纸册给宠物戴上</div>'}
         </div>`;
       if (dup) { S.coins += 5; save(); updateCoinBox(); }
+      if (!dup) checkStickerSets();          // 可能刚好集齐某个稀有度 → 送转盘券
       $("#toAlbum .aSub").textContent = `已收集 ${Object.keys(S.stickers).length}/${STICKERS.length}`;
       btn.disabled = false;
     }, 900);
@@ -2173,24 +2183,104 @@ function renderReward() {
   show("reward", "🎁 奖励屋");
 }
 
-/* ================= 贴纸册 ================= */
+/* ================= 贴纸册（可给宠物装扮 + 集齐奖励） ================= */
+const RARITY = { 1: "普通", 2: "稀有", 3: "传说" };
+/* 某个稀有度是否已集齐 */
+function setComplete(r) {
+  return STICKERS.filter(s => s.r === r).every(s => S.stickers[s.n]);
+}
+/* 集齐一个稀有度 → 送转盘券（每档只送一次） */
+function checkStickerSets() {
+  [1, 2, 3].forEach(r => {
+    if (setComplete(r) && !S.setDone["r" + r]) {
+      S.setDone["r" + r] = true; save();
+      confetti(); sndWin();
+      setTimeout(() => toast("🏆 集齐全部【" + RARITY[r] + "】贴纸！", 2600), 300);
+      addTicket(r === 3 ? 2 : 1, "集齐" + RARITY[r] + "贴纸");
+    }
+  });
+}
+
 function renderAlbum() {
   const got = Object.keys(S.stickers).length;
+  const owned = STICKERS.filter(s => S.stickers[s.n]);
   $("#scr-album").innerHTML = `
     <div class="card" style="text-align:center;padding:12px">
       <div style="font-size:15px;font-weight:700;color:#9b59b6">📔 已收集 ${got} / ${STICKERS.length}</div>
-      <div style="font-size:12px;color:#b8a8c8">灰色的还没扭到，继续加油！</div>
+      <div style="font-size:12px;color:#b8a8c8">点已收集的贴纸，可以给宠物戴上或当小伙伴！</div>
     </div>
+
+    <div class="card" style="text-align:center;padding:14px">
+      <div style="font-size:13px;font-weight:700;color:#9b59b6;margin-bottom:8px">✨ 我的宠物搭配</div>
+      <div class="petShow">
+        <span class="petHat">${S.hat ? stickerOf(S.hat).e : ""}</span>
+        <span class="petMain">${petStage(S.xp).e}</span>
+        <span class="petBuddy">${S.buddy ? stickerOf(S.buddy).e : ""}</span>
+      </div>
+      <div style="font-size:11px;color:#c0a8d0;margin-top:6px">
+        头顶：${S.hat || "空"}　·　小伙伴：${S.buddy || "空"}
+      </div>
+      ${(S.hat || S.buddy) ? `<button class="btn small ghost" id="clearDeco" style="margin-top:8px">取下装扮</button>` : ""}
+    </div>
+
+    <div class="card" style="padding:12px">
+      <div style="font-size:13px;font-weight:700;color:#9b59b6;margin-bottom:6px">🏆 集齐奖励</div>
+      ${[1, 2, 3].map(r => {
+        const all = STICKERS.filter(s => s.r === r);
+        const have = all.filter(s => S.stickers[s.n]).length;
+        const done = setComplete(r);
+        return `<div class="vRow">
+          <span style="font-size:18px">${done ? "🏆" : "🎯"}</span>
+          <span class="vName">集齐全部【${RARITY[r]}】贴纸<span class="vDate">${have}/${all.length}　奖励 ${r === 3 ? 2 : 1} 张转盘券</span></span>
+          <span style="font-size:12px;font-weight:700;color:${done ? "#7cc576" : "#c0a8d0"}">${done ? "已达成" : "进行中"}</span>
+        </div>`;
+      }).join("")}
+    </div>
+
     <div class="albumGrid">
-      ${STICKERS.map(s => {
+      ${STICKERS.map((s, i) => {
         const have = !!S.stickers[s.n];
-        return `<div class="albumCell ${have ? "" : "no"} ${s.r === 3 ? "rr3" : ""}">
+        const on = S.hat === s.n || S.buddy === s.n;
+        return `<div class="albumCell ${have ? "" : "no"} ${s.r === 3 ? "rr3" : ""} ${on ? "using" : ""}" data-i="${i}">
           <div class="ae">${s.e}</div>
           <div class="an">${have ? s.n + (S.stickers[s.n] > 1 ? " ×" + S.stickers[s.n] : "") : "？？？"}</div>
         </div>`;
       }).join("")}
     </div>`;
+  document.querySelectorAll("#scr-album .albumCell").forEach(c => {
+    c.onclick = () => {
+      const s = STICKERS[+c.dataset.i];
+      if (!S.stickers[s.n]) { toast("这张还没扭到哦，去扭蛋机试试！"); sndWrong(); return; }
+      pickDeco(s);
+    };
+  });
+  if (S.hat || S.buddy) $("#clearDeco").onclick = () => {
+    S.hat = null; S.buddy = null; save(); sndCoin(); toast("装扮已取下"); renderAlbum();
+  };
   show("album", "📔 贴纸册");
+}
+function stickerOf(name) { return STICKERS.find(s => s.n === name) || { e: "", n: "" }; }
+
+/* 选择把贴纸戴在头上 / 当小伙伴 */
+function pickDeco(s) {
+  const box = document.createElement("div");
+  box.id = "decoPick";
+  box.innerHTML = `
+    <div class="decoCard">
+      <div style="font-size:44px">${s.e}</div>
+      <div style="font-size:15px;font-weight:700;color:#7a5a9a;margin:4px 0 10px">${s.n}　<span style="font-size:12px;color:#b8a8c8">${RARITY[s.r]}</span></div>
+      <button class="btn small" id="asHat">👑 戴在头顶</button>
+      <div style="height:8px"></div>
+      <button class="btn small" id="asBuddy">🫶 当小伙伴</button>
+      <div style="height:8px"></div>
+      <button class="btn small ghost" id="decoCancel">取消</button>
+    </div>`;
+  document.body.appendChild(box);
+  const close = () => box.remove();
+  box.onclick = e => { if (e.target === box) close(); };
+  $("#asHat").onclick = () => { S.hat = s.n; save(); sndCoin(); confettiSmall(6); close(); toast(s.n + " 戴上啦！"); renderAlbum(); };
+  $("#asBuddy").onclick = () => { S.buddy = s.n; save(); sndCoin(); confettiSmall(6); close(); toast(s.n + " 成为小伙伴啦！"); renderAlbum(); };
+  $("#decoCancel").onclick = close;
 }
 
 /* ================= 启动 ================= */
