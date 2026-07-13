@@ -666,17 +666,32 @@ function renderMap() {
   show("map", "🗺️ 闯关地图");
 }
 
-/* ================= 单元页 ================= */
+/* ================= 单元页 =================
+ * 只留三步：学 → 练 → 挑战。
+ * 原来把 4 个游戏平铺在这里，和游戏厅看起来一模一样，孩子会困惑「该点哪个」。
+ * 现在折叠成「本单元练习」：随机混合题型，题目只出本单元（集中练习，刚学完最有效）；
+ * 游戏厅则是跨单元混合 + 优先出到期词（交错练习，抗遗忘）。
+ */
 function renderUnit(u) {
   const us = unitS(u.id);
   const stars = "★".repeat(us.stars) + "☆".repeat(3 - us.stars);
+  const fresh = u.words.filter(w => !us.learned.includes(w.w)).length;
   const acts = [
-    { icon: "📖", name: "学单词", sub: `已学 ${us.learned.length}/${u.words.length}`, fn: () => startLearn(u) },
-    { icon: "🔗", name: "词语配对", sub: "单词和图片手拉手", fn: () => startMatch(u.words, u) },
-    { icon: "👂", name: "听音选图", sub: "耳朵灵不灵？", fn: () => startListen(u.words, u) },
-    { icon: "🔤", name: "拼写工坊", sub: "拼出魔法单词", fn: () => startSpell(u.words, u) },
-    { icon: "🚂", name: "句子小火车", sub: "把句子排排队", fn: () => startSentence(u.sents, u) },
-    { icon: "⭐", name: "单元挑战", sub: "当前星星：" + stars, fn: () => startBoss(u) }
+    {
+      icon: "📖", name: "学单词",
+      sub: fresh ? `还有 ${fresh} 个新词没学（已学 ${us.learned.length}/${u.words.length}）` : `本单元 ${u.words.length} 个词都学过了，可温故知新`,
+      fn: () => startLearn(u)
+    },
+    {
+      icon: "🎯", name: "本单元练习",
+      sub: "配对 / 听音 / 拼写 / 句子，随机来一局",
+      fn: () => startUnitDrill(u)
+    },
+    {
+      icon: "⭐", name: "单元挑战",
+      sub: "拿到 ⭐ 解锁下一单元　当前：" + stars,
+      fn: () => startBoss(u)
+    }
   ];
   $("#scr-unit").innerHTML = `
     <div class="card" style="text-align:center">
@@ -689,11 +704,32 @@ function renderUnit(u) {
         <span class="aIcon">${a.icon}</span>
         <span class="aName">${a.name}<span class="aSub">${a.sub}</span></span>
         <span class="aGo">▶</span>
-      </div>`).join("")}`;
+      </div>`).join("")}
+    <div style="font-size:11px;color:#c0b0d0;text-align:center;line-height:1.7;margin-top:4px">
+      这里的题目<b>只出本单元</b>的内容，跟着学校进度走。<br>
+      想混着复习学过的所有单元，去 🎮 游戏厅。
+    </div>`;
   document.querySelectorAll("#scr-unit .actRow").forEach(c => {
     c.onclick = () => go(() => acts[+c.dataset.i].fn());
   });
   show("unit", u.zh);
+}
+
+/* 本单元练习：随机挑一种题型，题目只出本单元。
+ * 随机而不是让孩子自己挑，是为了避免她永远只玩最轻松的配对、逃避拼写。 */
+function startUnitDrill(u) {
+  const us = unitS(u.id);
+  const learned = u.words.filter(w => us.learned.includes(w.w));
+  const pool = learned.length >= 4 ? learned : u.words;   // 学过的词优先，不够就用整个单元
+  const kinds = [
+    { n: "🔗 词语配对", f: () => startMatch(pool, u) },
+    { n: "👂 听音选图", f: () => startListen(pool, u) },
+    { n: "🔤 拼写工坊", f: () => startSpell(pool, u) },
+    { n: "🚂 句子小火车", f: () => startSentence(u.sents, u) }
+  ];
+  const pick = kinds[Math.floor(Math.random() * kinds.length)];
+  toast("本轮玩：" + pick.n, 1400);
+  pick.f();
 }
 
 /* ================= 学单词：魔法孵化（翻卡 → 每词三连击 → 闪电轮） =================
@@ -1434,16 +1470,18 @@ function renderArcade() {
     { icon: "📅", name: "今日复习", sub: dc ? "有 " + dc + " 个词到期了，趁还记得快复习！" : "今天没有到期的词，很棒！", fn: () => startDueReview() },
     { icon: "🎙️", name: "魔法回声（跟读）", sub: echoMode() === "sr" ? "对着手机大声读，自动给你打分" : echoMode() === "record" ? "录下自己的声音，和标准发音比一比" : "跟着标准发音大声读出来", fn: () => startEcho(unlockedSents().concat(ECHO_EXTRA)) },
     { icon: "🏆", name: "魔法大考", sub: learnedN < 8 ? "学会8个词后解锁" : "跨单元综合复习 · 最高 " + (S.bestExam || 0) + " 分", fn: () => startExam() },
-    { icon: "🔗", name: "词语配对", sub: "已解锁单词随机出题", fn: () => startMatch(priorityPick(pool, 20)) },
-    { icon: "👂", name: "听音选图", sub: "练出小小顺风耳", fn: () => startListen(priorityPick(pool, 20)) },
-    { icon: "🔤", name: "拼写工坊", sub: "字母积木拼拼拼", fn: () => startSpell(priorityPick(pool, 20)) },
-    { icon: "🚂", name: "句子小火车", sub: "重点句型排排队", fn: () => startSentence(sents) },
+    { icon: "🔗", name: "词语配对", sub: "跨单元混合 · 单词和图片手拉手", fn: () => startMatch(priorityPick(pool, 20)) },
+    { icon: "👂", name: "听音选图", sub: "跨单元混合 · 练出小小顺风耳", fn: () => startListen(priorityPick(pool, 20)) },
+    { icon: "🔤", name: "拼写工坊", sub: "跨单元混合 · 字母积木拼拼拼", fn: () => startSpell(priorityPick(pool, 20)) },
+    { icon: "🚂", name: "句子小火车", sub: "跨单元混合 · 重点句型排排队", fn: () => startSentence(sents) },
     { icon: "📕", name: "错词大扫除", sub: wrongCount() ? "还有 " + wrongCount() + " 个错词" : "错词本是空的", fn: () => startReview() }
   ];
   $("#scr-arcade").innerHTML = `
     <div class="card" style="text-align:center;padding:12px">
       <div style="font-size:15px;font-weight:700;color:#9b59b6">🎮 想玩什么随便挑！</div>
-      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">题目来自已解锁的 ${UNITS.filter(isUnlocked).length} 个单元，昨天学的词和错词会优先出现</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">
+        这里是<b>混合练习</b>：题目来自已学过的 ${UNITS.filter(isUnlocked).length} 个单元，<b>该复习的词和错词会优先出现</b>
+      </div>
     </div>
     ${games.map((g, i) => `
       <div class="card actRow" data-i="${i}">
