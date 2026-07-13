@@ -1050,12 +1050,15 @@ function startMatch(pool, u) {
   const pairs = sample(pool, Math.min(D().pairs, pool.length));
   let selL = null, selR = null, done = 0, miss = 0;
   const left = shuffle(pairs), rightC = shuffle(pairs);
+  /* 左右交错排进同一个网格：同一行的两个框自动等高，不会左边矮右边高 */
+  let cells = "";
+  for (let i = 0; i < pairs.length; i++) {
+    cells += `<button class="mItem mL" data-w="${esc(left[i].w)}"><span class="mw">${esc(left[i].w)}</span></button>`;
+    cells += `<button class="mItem mR" data-w="${esc(rightC[i].w)}"><span class="me">${rightC[i].e}</span><span class="mz">${rightC[i].zh}</span></button>`;
+  }
   $("#scr-play").innerHTML = `
     <div id="playHead"><div id="playProg">把单词和图片配成对！</div></div>
-    <div class="matchCols">
-      <div class="matchCol">${left.map((w, i) => `<button class="mItem mL" data-w="${esc(w.w)}">${esc(w.w)}</button>`).join("")}</div>
-      <div class="matchCol">${rightC.map((w, i) => `<button class="mItem mR" data-w="${esc(w.w)}"><span class="me">${w.e}</span><br>${w.zh}</button>`).join("")}</div>
-    </div>`;
+    <div class="matchGrid">${cells}</div>`;
   function checkPair() {
     if (!selL || !selR) return;
     const a = selL, b = selR; selL = selR = null;

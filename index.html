@@ -214,15 +214,18 @@ body.th-night .calW { color: #8a7ab0; }
 .optBtn.wrong { border-color: #f08080; background: #ffecec; animation: shake .35s; }
 @keyframes shake { 0%,100% { transform: none; } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
 
-/* 配对 */
-.matchCols { display: flex; gap: 12px; }
-.matchCol { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+/* 配对：左右交错排进同一网格，同一行两个框自动等高 */
+.matchGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: stretch; }
 .mItem {
   border: 3px solid transparent; border-radius: 16px; background: #fff;
-  padding: 12px 4px; text-align: center; font-size: 15px; font-weight: 700; color: #6a4a8a;
+  padding: 10px 6px; min-height: 74px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  text-align: center; font-weight: 700; color: #6a4a8a;
   box-shadow: 0 3px 8px rgba(180,140,200,.18); transition: .15s;
 }
-.mItem .me { font-size: 28px; }
+.mItem .mw { font-size: 14px; line-height: 1.25; word-break: break-word; hyphens: auto; }
+.mItem .me { font-size: 28px; line-height: 1.1; }
+.mItem .mz { font-size: 13px; line-height: 1.25; }
 .mItem.sel { border-color: #b98ff0; background: #f3ecff; transform: scale(1.04); }
 .mItem.ok { opacity: 0; pointer-events: none; transform: scale(.5); }
 .mItem.bad { border-color: #f08080; animation: shake .35s; }
