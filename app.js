@@ -1209,13 +1209,18 @@ function renderParent() {
       </div>
       ${S.testMode ? `
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn small ghost" id="tDaily">🔄 重置今日任务</button>
         <button class="btn small ghost" id="tCoin">🪙 +1000 金币</button>
         <button class="btn small ghost" id="tTicket">🎟️ +5 转盘券</button>
         <button class="btn small ghost" id="tSkin">🎨 解锁全部皮肤</button>
         <button class="btn small ghost" id="tWords">📖 标记全部单词已学</button>
+        <button class="btn small ghost" id="tWrong">📕 造 5 个错词</button>
         <button class="btn small ghost" id="tReset" style="color:#e05a5a">🗑️ 清空全部进度</button>
       </div>
-      <div style="font-size:11px;color:#c0a8d0;margin-top:8px">试玩完记得：先「清空全部进度」再关掉测试模式，孩子就是全新的档</div>` : ""}
+      <div style="font-size:11px;color:#c0a8d0;margin-top:8px;line-height:1.7">
+        「重置今日任务」＝ 今天的三个任务、金币计数、已领的奖励券全部归零，可以反复测试每日流程（连续天数不变）<br>
+        试玩完记得：先「清空全部进度」再关掉测试模式，孩子拿到的就是全新的档
+      </div>` : ""}
     </div>
     <div class="card">
       <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-bottom:4px">🎡 转盘奖品（${prizes.length}项）</div>
@@ -1256,9 +1261,18 @@ function renderParent() {
     sndCoin(); renderParent();
   };
   if (S.testMode) {
+    $("#tDaily").onclick = () => {
+      S.daily = defState().daily; save();
+      sndCoin(); toast("🔄 今日任务已重置，可以重新做一遍", 2200);
+      renderParent();
+    };
     $("#tCoin").onclick = () => { addCoins(1000); toast("已加 1000 金币"); renderParent(); };
     $("#tTicket").onclick = () => { S.tickets += 5; save(); toast("已加 5 张转盘券"); renderParent(); };
     $("#tSkin").onclick = () => { S.themesOwned = THEMES.map(t => t.id); save(); toast("全部皮肤已解锁"); };
+    $("#tWrong").onclick = () => {
+      sample(unlockedWords(), 5).forEach(w => { S.wrong[w.w] = 2; });
+      save(); toast("已造 5 个错词，可以去测错词本了", 2200);
+    };
     $("#tWords").onclick = () => {
       UNITS.forEach(u => { const us = unitS(u.id); u.words.forEach(w => { if (!us.learned.includes(w.w)) us.learned.push(w.w); }); });
       save(); toast("全部单词已标记为学过（大考/游戏厅可直接玩）", 2400);
@@ -1735,16 +1749,24 @@ function applyTheme() {
 }
 function renderTheme() {
   $("#scr-theme").innerHTML = `
+    ${S.testMode ? `<div class="card" style="background:#fff3d6;text-align:center;padding:10px;font-size:13px;font-weight:700;color:#e8842d">🧪 测试模式：全部皮肤免费，点「免费穿上」即可试装</div>` : ""}
     <div class="card" style="text-align:center;padding:12px">
       <div style="font-size:15px;font-weight:700;color:#9b59b6">🎨 给乐园换新装！</div>
-      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">用金币解锁新皮肤，解锁后随时切换</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">${S.testMode ? "测试模式下不扣金币，随便换着玩" : "用金币解锁新皮肤，解锁后随时切换 · 你有 🪙" + S.coins}</div>
     </div>
     ${THEMES.map((t, i) => {
       const owned = S.themesOwned.includes(t.id), cur = S.theme === t.id;
+      const enough = S.coins >= t.cost;
+      let label, cls;
+      if (cur) { label = "使用中 ✓"; cls = "cur"; }
+      else if (owned) { label = "穿上"; cls = ""; }
+      else if (S.testMode) { label = "免费穿上"; cls = ""; }
+      else if (enough) { label = "🪙" + t.cost + " 解锁"; cls = ""; }
+      else { label = "还差 🪙" + (t.cost - S.coins); cls = "lock"; }
       return `<div class="card themeCard">
         <div class="themeSwatch" style="background:${t.g}"></div>
-        <span class="themeName">${t.n}<span class="themeSub">${t.sub}</span></span>
-        <button class="themeBtn ${cur ? "cur" : owned ? "" : "lock"}" data-i="${i}">${cur ? "使用中 ✓" : owned ? "穿上" : "🪙" + t.cost + " 解锁"}</button>
+        <span class="themeName">${t.n}<span class="themeSub">${t.sub}${!owned && !S.testMode ? "　·　需要 🪙" + t.cost : ""}</span></span>
+        <button class="themeBtn ${cls}" data-i="${i}">${label}</button>
       </div>`;
     }).join("")}
     <div class="card actRow" id="soundRow">
