@@ -29,6 +29,7 @@ function defState() {
     theme: "candy",
     themesOwned: ["candy"],
     sound: true,
+    diff: "auto",    // 难度：auto=随掌握词量自动升段，或家长手动锁 1/2/3
     testMode: false, // 家长测试模式：解锁全部内容，给孩子用前记得关掉
     phonics: {},   // 拼读规则id -> {learned:true, stars:0}
     learnedAt: {}, // 单词 -> 首次学会日期
@@ -60,6 +61,56 @@ function migrateSRS() {
     });
   });
   if (n) save();
+}
+
+/* ---------------- 难度成长曲线 ----------------
+ * 刚上四年级的孩子先要的是"我能行"，不是"这好难"。
+ * 一开始题目少、选项少、不催时间、拼写有提示；掌握的词变多后自动升段，难度悄悄加上去。
+ */
+const DIFFS = {
+  1: {
+    rank: "🌱 小小魔法学徒", next: 25,
+    newWords: 3, games: 2, reviews: 2,      // 每日任务量（约10分钟）
+    opts: 3,                                 // 3选1，先建立信心
+    timer: 0,                                // 闪电轮不倒计时
+    blanks: 1,                               // 补字母只挖1个
+    spellMax: 6, spellHint: true,            // 拼写只出短词，并给提示
+    sentMax: 5,                              // 句子小火车只排短句
+    bossQ: 8, examQ: 10, pairs: 4
+  },
+  2: {
+    rank: "✨ 魔法师", next: 60,
+    newWords: 4, games: 3, reviews: 3,
+    opts: 4,
+    timer: 12000,                            // 开始有时间感，但很宽松
+    blanks: 1,
+    spellMax: 8, spellHint: true,
+    sentMax: 7,
+    bossQ: 10, examQ: 12, pairs: 5
+  },
+  3: {
+    rank: "🦄 大魔法师", next: 0,
+    newWords: 5, games: 3, reviews: 3,
+    opts: 4,
+    timer: 8000,                             // 正常的闪电轮
+    blanks: 2,
+    spellMax: 99, spellHint: false,          // 拼写全开，无提示
+    sentMax: 99,
+    bossQ: 10, examQ: 15, pairs: 6
+  }
+};
+function masteredCount() { return UNITS.reduce((a, u) => a + unitS(u.id).learned.length, 0); }
+function levelNum() {
+  if (S.diff && S.diff !== "auto") return +S.diff;
+  const m = masteredCount();
+  if (m >= DIFFS[2].next) return 3;
+  if (m >= DIFFS[1].next) return 2;
+  return 1;
+}
+function D() { return DIFFS[levelNum()]; }
+/* 干扰项数量随难度变化：3选1 / 4选1 */
+function distract(pool, exclude) {
+  return sample(pool.filter(x => x.w !== exclude), D().opts - 1);
 }
 
 /* ---------------- 语音 ---------------- */
@@ -229,12 +280,13 @@ function noFreshWords() {
 }
 function taskDone() {
   const noReview = dueCount() === 0 && wrongCount() === 0;
+  const d = D();
   return {
     /* 已解锁单元的新词全学完时，改为「复习也算数」，否则任务永远无法完成 */
-    t1: S.daily.w >= 5 || (noFreshWords() && S.daily.g >= 2),
-    t2: S.daily.g >= 3,
-    /* 复习任务：做掉3个到期词/错词；今天本来就没有要复习的，玩1局也算完成 */
-    t3: S.daily.r >= 3 || (noReview && S.daily.g >= 1)
+    t1: S.daily.w >= d.newWords || (noFreshWords() && S.daily.g >= 2),
+    t2: S.daily.g >= d.games,
+    /* 复习任务：做掉到期词/错词；今天本来就没有要复习的，玩1局也算完成 */
+    t3: S.daily.r >= d.reviews || (noReview && S.daily.g >= 1)
   };
 }
 function checkTasks() {
@@ -394,6 +446,10 @@ function renderHome() {
   const wc = wrongCount();
   const dc = dueCount();
   const mt = memoryTiers();
+  const lv = levelNum(), df = D(), mc = masteredCount();
+  const rankTip = S.diff !== "auto"
+    ? "（家长已锁定难度）"
+    : df.next ? "再学会 " + Math.max(0, df.next - mc) + " 个单词就能升段！" : "已是最高段位，太厉害了！";
   $("#scr-home").innerHTML = `
     ${S.testMode ? `<div class="card" id="testBanner" style="background:#fff3d6;text-align:center;padding:10px;font-size:13px;font-weight:700;color:#e8842d">🧪 测试模式开启中（全部内容已解锁）· 点我关闭</div>` : ""}
     <div class="card" id="petCard">
@@ -404,12 +460,13 @@ function renderHome() {
       <div id="petTip">点我一下，给你惊喜～</div>
       <div class="xpbarWrap"><div class="xpbar" style="width:${pct}%"></div></div>
       <div id="xpText">${nx ? "距离进化【" + nx.n + "】还差 " + (nx.xp - S.xp) + " 魔法值" : "已经是最终形态啦！"}</div>
+      <div id="rankChip">${df.rank}　<span style="font-weight:400;color:#c0a8d0">${rankTip}</span></div>
     </div>
-    <div class="sectionTitle">📋 今日任务 · 约15分钟（全完成 +20🪙+🎟️）</div>
+    <div class="sectionTitle">📋 今日任务 · 约${lv === 1 ? "10" : "15"}分钟（全完成 +20🪙+🎟️）</div>
     <div class="card">
-      <div class="taskRow ${d.t1 ? "done" : ""}"><span class="tIcon">📖</span><span class="tName">${noFreshWords() ? "复习巩固（新词已学完）" : "学会 5 个新单词"}</span><span class="tProg">${noFreshWords() ? Math.min(S.daily.g, 2) + "/2" : Math.min(S.daily.w, 5) + "/5"}</span></div>
-      <div class="taskRow ${d.t2 ? "done" : ""}"><span class="tIcon">🎮</span><span class="tName">完成 3 局小游戏</span><span class="tProg">${Math.min(S.daily.g, 3)}/3</span></div>
-      <div class="taskRow ${d.t3 ? "done" : ""}"><span class="tIcon">📅</span><span class="tName">复习 3 个到期单词</span><span class="tProg">${(dc === 0 && wc === 0) ? "无需复习" : Math.min(S.daily.r, 3) + "/3"}</span></div>
+      <div class="taskRow ${d.t1 ? "done" : ""}"><span class="tIcon">📖</span><span class="tName">${noFreshWords() ? "复习巩固（新词已学完）" : "学会 " + df.newWords + " 个新单词"}</span><span class="tProg">${noFreshWords() ? Math.min(S.daily.g, 2) + "/2" : Math.min(S.daily.w, df.newWords) + "/" + df.newWords}</span></div>
+      <div class="taskRow ${d.t2 ? "done" : ""}"><span class="tIcon">🎮</span><span class="tName">完成 ${df.games} 局小游戏</span><span class="tProg">${Math.min(S.daily.g, df.games)}/${df.games}</span></div>
+      <div class="taskRow ${d.t3 ? "done" : ""}"><span class="tIcon">📅</span><span class="tName">复习 ${df.reviews} 个到期单词</span><span class="tProg">${(dc === 0 && wc === 0) ? "无需复习" : Math.min(S.daily.r, df.reviews) + "/" + df.reviews}</span></div>
     </div>
     ${dc ? `<button class="btn" id="homeDue" style="background:linear-gradient(135deg,#ffd166,#ff9ec6)">📅 今天有 ${dc} 个词该复习了！（点我）</button><div style="height:12px"></div>` : ""}
     <button class="btn ${dc ? "ghost" : ""}" id="homeGo">✨ 继续闯关：${cu.num} ${cu.zh} →</button>
@@ -514,9 +571,10 @@ function clearTimer() { if (liveTimer) { clearInterval(liveTimer); liveTimer = n
 
 function startLearn(u) {
   const us = unitS(u.id);
+  const df = D();
   const fresh = u.words.filter(w => !us.learned.includes(w.w));
   const reviewMode = fresh.length === 0;
-  const batch = reviewMode ? sample(u.words, 5) : fresh.slice(0, 5);
+  const batch = reviewMode ? sample(u.words, df.newWords) : fresh.slice(0, df.newWords);
   const lit = [];           // 已点亮的词下标
   let idx = 0, coins = 0, combo = 0, maxCombo = 0;
 
@@ -578,7 +636,7 @@ function startLearn(u) {
   function drill(step, retried) {
     const w = batch[idx];
     if (step >= 3) return litUp();
-    const others = sample(u.words.filter(x => x.w !== w.w), 3);
+    const others = distract(u.words, w.w);
     const stepName = ["🔊 听音选图", "🖼️ 看图选词", "🔤 补出字母"][step];
     let head = "", body = "";
 
@@ -595,10 +653,11 @@ function startLearn(u) {
       body = `<div class="optGrid">${opts.map((o, i) => `<button class="optBtn dOpt" data-i="${i}">${esc(o.w)}</button>`).join("")}</div>`;
       renderDrill(head, body, opts, w, step, retried);
     } else {
-      /* 补字母：挖掉 1~2 个字母，用字母键补回 */
+      /* 补字母：按难度挖掉 1~2 个字母，用字母键补回 */
       const letters = [];
       [...w.w].forEach((c, i) => { if (/[a-z]/i.test(c)) letters.push(i); });
-      const holes = sample(letters, Math.min(w.w.length <= 4 ? 1 : 2, letters.length)).sort((a, b) => a - b);
+      const nHoles = Math.min(w.w.length <= 4 ? 1 : df.blanks, letters.length);
+      const holes = sample(letters, nHoles).sort((a, b) => a - b);
       const shown = [...w.w].map((c, i) => holes.includes(i) ? "▢" : c).join("");
       const need = holes.map(i => w.w[i].toLowerCase());
       const extra = "abcdefghijklmnopqrstuvwxyz".split("").filter(c => !need.includes(c));
@@ -678,6 +737,7 @@ function startLearn(u) {
   /* —— 第3步：点亮这个词 —— */
   function litUp() {
     const w = batch[idx];
+    const rankBefore = levelNum();
     if (!us.learned.includes(w.w)) {
       us.learned.push(w.w);
       S.learnedAt[w.w] = todayStr();
@@ -686,6 +746,10 @@ function startLearn(u) {
       bumpDaily("w");
     }
     save();
+    if (levelNum() > rankBefore) {
+      confetti(); sndWin();
+      setTimeout(() => toast("🎉 升段啦！你现在是【" + D().rank + "】", 3000), 600);
+    }
     lit.push(idx);
     confettiSmall(10); sndCoin();
     $("#scr-learn").innerHTML = `
@@ -715,25 +779,26 @@ function startLearn(u) {
       if (qi >= qs.length) return finish();
       const w = qs[qi];
       const type = qi % 2 === 0 ? "listen" : "zhen";
-      const opts = shuffle([w].concat(sample(batch.filter(x => x.w !== w.w), 3)));
+      const opts = shuffle([w].concat(distract(batch, w.w)));
+      const rush = df.timer > 0;   // 新手段位不倒计时，先建立信心
       const head = type === "listen"
-        ? `<button id="lcSpeak" style="margin-top:0">🔊</button><div class="qSub">快！听音选图</div>`
-        : `<div class="qEmoji" style="font-size:52px">${w.e}</div><div class="qSub">快！${w.zh} 的英文</div>`;
+        ? `<button id="lcSpeak" style="margin-top:0">🔊</button><div class="qSub">${rush ? "快！" : ""}听音选图</div>`
+        : `<div class="qEmoji" style="font-size:52px">${w.e}</div><div class="qSub">${rush ? "快！" : ""}${w.zh} 的英文</div>`;
       const optHtml = type === "listen"
         ? opts.map((o, i) => `<button class="optBtn lOpt" data-i="${i}"><span class="oEmoji">${o.e}</span>${o.zh}</button>`).join("")
         : opts.map((o, i) => `<button class="optBtn lOpt" data-i="${i}">${esc(o.w)}</button>`).join("");
       $("#scr-learn").innerHTML = `
-        <div id="learnProg">⚡ 闪电轮 ${qi + 1} / ${qs.length}　已答对 ${right}</div>
-        <div class="timerWrap"><div class="timerBar" id="tBar"></div></div>
+        <div id="learnProg">⚡ ${rush ? "闪电轮" : "连击轮"} ${qi + 1} / ${qs.length}　已答对 ${right}</div>
+        ${rush ? `<div class="timerWrap"><div class="timerBar" id="tBar"></div></div>` : `<div style="text-align:center;font-size:11px;color:#c0a8d0;margin-bottom:8px">慢慢想，答对就有连击 🔥</div>`}
         ${comboTag()}
         <div class="card" id="playQ">${head}</div>
         <div class="optGrid">${optHtml}</div>`;
       if (type === "listen") { speak(w.w); setTimeout(() => { const s = $("#lcSpeak"); if (s) s.onclick = () => speak(w.w); }, 0); }
-      let locked = false, left = 8000;
+      let locked = false, left = df.timer;
       const bar = $("#tBar");
-      liveTimer = setInterval(() => {
+      if (rush) liveTimer = setInterval(() => {
         left -= 100;
-        if (bar) bar.style.width = Math.max(0, left / 8000 * 100) + "%";
+        if (bar) bar.style.width = Math.max(0, left / df.timer * 100) + "%";
         if (left <= 2000 && bar) bar.style.background = "#ff8fab";
         if (left <= 0) {
           clearTimer();
@@ -812,7 +877,7 @@ function renderResult(r) {
 
 /* ================= 游戏1：词语配对 ================= */
 function startMatch(pool, u) {
-  const pairs = sample(pool, Math.min(5, pool.length));
+  const pairs = sample(pool, Math.min(D().pairs, pool.length));
   let selL = null, selR = null, done = 0, miss = 0;
   const left = shuffle(pairs), rightC = shuffle(pairs);
   $("#scr-play").innerHTML = `
@@ -858,7 +923,7 @@ function startMatch(pool, u) {
 
 /* ================= 游戏2：听音选图 ================= */
 function startListen(pool, u) {
-  const qs = sample(pool, Math.min(8, pool.length));
+  const qs = sample(pool, Math.min(D().opts === 3 ? 6 : 8, pool.length));
   let qi = 0, right = 0;
   function q() {
     if (qi >= qs.length) {
@@ -871,7 +936,7 @@ function startListen(pool, u) {
       });
     }
     const w = qs[qi];
-    const opts = shuffle([w].concat(sample(pool.filter(x => x.w !== w.w), 3)));
+    const opts = shuffle([w].concat(distract(pool, w.w)));
     $("#scr-play").innerHTML = `
       <div id="playHead"><div id="playProg">第 ${qi + 1} / ${qs.length} 题</div></div>
       <div class="card" id="playQ">
@@ -901,9 +966,11 @@ function startListen(pool, u) {
 
 /* ================= 游戏3：拼写工坊 ================= */
 function startSpell(pool, u) {
-  const cands = pool.filter(w => /^[a-zA-Z]+$/.test(w.w) && w.w.length >= 3 && w.w.length <= 9);
-  const fallback = pool.filter(w => /^[a-zA-Z]+$/.test(w.w));
-  const src = cands.length >= 5 ? cands : fallback;
+  const df = D();
+  /* 新手段位只出短词（≤6个字母），别一上来就让她拼 blackboard */
+  const cands = pool.filter(w => /^[a-zA-Z]+$/.test(w.w) && w.w.length >= 3 && w.w.length <= Math.min(9, df.spellMax));
+  const fallback = pool.filter(w => /^[a-zA-Z]+$/.test(w.w) && w.w.length <= 9);
+  const src = cands.length >= 3 ? cands : fallback;
   if (!src.length) { toast("这里还没有适合拼写的单词，换个游戏试试～"); goBack(); return; }
   const qs = sample(src, Math.min(5, src.length));
   let qi = 0, right = 0;
@@ -919,7 +986,8 @@ function startSpell(pool, u) {
     }
     const w = qs[qi], target = w.w.toLowerCase();
     const extra = "abcdefghijklmnopqrstuvwxyz".split("").filter(c => !target.includes(c));
-    const keys = shuffle(target.split("").concat(sample(extra, 3)));
+    /* 新手段位少放干扰字母 */
+    const keys = shuffle(target.split("").concat(sample(extra, df.spellHint ? 2 : 3)));
     let typed = [];
     $("#scr-play").innerHTML = `
       <div id="playHead"><div id="playProg">第 ${qi + 1} / ${qs.length} 题</div></div>
@@ -927,6 +995,7 @@ function startSpell(pool, u) {
         <div class="qEmoji" style="font-size:56px">${w.e}</div>
         <div class="qSub">${w.zh}　<button id="lcSpeak" style="width:44px;height:44px;font-size:20px;margin-top:0;vertical-align:middle">🔊</button></div>
         <div id="spellSlots">${target.split("").map(() => `<div class="slot"></div>`).join("")}</div>
+        ${df.spellHint ? `<button class="btn small ghost" id="spellPeek" style="margin-top:8px">💡 偷看一眼（3秒）</button>` : ""}
       </div>
       <div id="spellKeys">
         ${keys.map((k, i) => `<button class="key" data-i="${i}">${k}</button>`).join("")}
@@ -935,6 +1004,25 @@ function startSpell(pool, u) {
     speak(w.w);
     $("#lcSpeak").onclick = () => speak(w.w);
     const slots = document.querySelectorAll("#scr-play .slot");
+    if (df.spellHint) {
+      let peeked = false;
+      $("#spellPeek").onclick = () => {
+        if (peeked) return;
+        peeked = true;
+        const btn = $("#spellPeek");
+        btn.disabled = true;
+        slots.forEach((s, i) => { if (!typed[i]) { s.textContent = target[i]; s.style.color = "#c0a8d0"; } });
+        let n = 3;
+        btn.textContent = "记住了吗？" + n + "…";
+        const t = setInterval(() => {
+          n--;
+          if (n > 0) { btn.textContent = "记住了吗？" + n + "…"; return; }
+          clearInterval(t);
+          slots.forEach((s, i) => { if (!typed[i]) { s.textContent = ""; s.style.color = ""; } });
+          btn.textContent = "💡 已经看过啦";
+        }, 1000);
+      };
+    }
     function refresh() {
       slots.forEach((s, i) => { s.textContent = typed[i] ? typed[i].ch : ""; s.classList.toggle("fill", !!typed[i]); });
     }
@@ -967,7 +1055,11 @@ function startSpell(pool, u) {
 
 /* ================= 游戏4：句子小火车 ================= */
 function startSentence(sents, u) {
-  const qs = sample(sents, Math.min(5, sents.length));
+  const df = D();
+  /* 新手段位只排短句（≤5个词），长句子留到升段后 */
+  const short = sents.filter(s => s.en.split(" ").length <= df.sentMax);
+  const src = short.length >= 3 ? short : sents;
+  const qs = sample(src, Math.min(5, src.length));
   let qi = 0, right = 0;
   function q() {
     if (qi >= qs.length) {
@@ -1020,14 +1112,14 @@ function startSentence(sents, u) {
 
 /* ================= 单元挑战（Boss战） ================= */
 function startBoss(u) {
-  const n = 10;
-  const types = shuffle(["enzh", "listen", "zhen", "enzh", "listen", "zhen", "enzh", "listen", "zhen", "enzh"]);
+  const n = D().bossQ;
+  const types = shuffle(Array.from({ length: n }, (_, i) => ["enzh", "listen", "zhen"][i % 3]));
   const ws = shuffle(u.words);
   let qi = 0, right = 0;
   function q() {
     if (qi >= n) return finish();
     const w = ws[qi % ws.length], type = types[qi];
-    const others = sample(u.words.filter(x => x.w !== w.w), 3);
+    const others = distract(u.words, w.w);
     const opts = shuffle([w].concat(others));
     let head = "", optHtml = "";
     if (type === "enzh") {
@@ -1063,12 +1155,13 @@ function startBoss(u) {
   }
   function finish() {
     bumpDaily("g");
-    const stars = right >= 9 ? 3 : right >= 7 ? 2 : right >= 5 ? 1 : 0;
+    const pc = right / n;
+    const stars = pc >= 0.9 ? 3 : pc >= 0.7 ? 2 : pc >= 0.5 ? 1 : 0;
     const us = unitS(u.id);
     let bonus = 0;
     if (stars > us.stars) { bonus = (stars - us.stars) * 15; us.stars = stars; save(); }
     if (stars === 3 && !us.s3) { us.s3 = true; save(); addTicket(1, u.num + " 首次满星"); }
-    const nextTip = stars >= 1 ? "🎉 下一单元已解锁！" : "答对5题以上才能拿星星，再试一次！";
+    const nextTip = stars >= 1 ? "🎉 下一单元已解锁！" : "答对一半以上才能拿星星，再试一次！";
     renderResult({
       stars, title: stars >= 3 ? "满星通关，超级学霸！" : stars >= 1 ? "挑战成功！" : "差一点点，别放弃！",
       detail: `答对 ${right}/${n}　${nextTip}`,
@@ -1100,7 +1193,7 @@ function startDueReview() {
     const w = qs[qi];
     const lv = (S.srs[w.w] || { lv: 1 }).lv;
     const type = ["enzh", "listen", "zhen"][qi % 3];
-    const opts = shuffle([w].concat(sample(pool.filter(x => x.w !== w.w), 3)));
+    const opts = shuffle([w].concat(distract(pool, w.w)));
     let head, optHtml;
     if (type === "enzh") {
       head = `<div class="qText">${esc(w.w)}</div><div class="qSub">还记得是什么意思吗？</div>`;
@@ -1167,7 +1260,7 @@ function startReview() {
       });
     }
     const w = qs[qi];
-    const opts = shuffle([w].concat(sample(pool.filter(x => x.w !== w.w), 3)));
+    const opts = shuffle([w].concat(distract(pool, w.w)));
     $("#scr-play").innerHTML = `
       <div id="playHead"><div id="playProg">📕 错词 ${qi + 1} / ${qs.length}</div></div>
       <div class="card" id="playQ">
@@ -1377,6 +1470,17 @@ function renderParent() {
       </div>` : ""}
     </div>
     <div class="card">
+      <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-bottom:4px">🎚️ 难度</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">
+        默认「自动升段」：孩子刚开始题目少、3选1、不倒计时、拼写有提示；掌握 25 个词升到魔法师，60 个词升到大魔法师，难度逐步加上去。<br>
+        当前：<b style="color:#9b59b6">${D().rank}</b>（已掌握 ${masteredCount()} 词）${S.diff === "auto" ? "" : " · 已被你锁定"}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${[["auto", "自动升段（推荐）"], ["1", "🌱 一直简单"], ["2", "✨ 中等"], ["3", "🦄 挑战"]].map(([v, n]) =>
+          `<button class="themeBtn ${String(S.diff) === v ? "cur" : "lock"}" data-diff="${v}">${n}</button>`).join("")}
+      </div>
+    </div>
+    <div class="card">
       <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-bottom:4px">🎡 转盘奖品（${prizes.length}项）</div>
       <div style="font-size:12px;margin-bottom:4px;font-weight:700;color:${wheelStale() ? "#e8842d" : "#b8a8c8"}">${wheelAgeDays() === 0 ? "✅ 今天刚更换过奖品" : "距上次更换奖品已 " + wheelAgeDays() + " 天" + (wheelStale() ? "，建议换1~2个孩子当下最想要的，保持新鲜感！" : "（建议每14天上新）")}</div>
       <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">奖品里写「XX金币」会自动发金币，写「再转一次」会返还转盘券，其余都会变成孩子的实物奖励券。建议2~12项，保留「50金币」和「再转一次」两格可以让实物大奖更有期待感。</div>
@@ -1406,6 +1510,14 @@ function renderParent() {
       <span class="aGo">▶</span>
     </div>
     <div style="font-size:11px;color:#c0b0d0;text-align:center">改完直接生效，孩子下次打开转盘就是新奖品</div>`;
+  document.querySelectorAll("#scr-parent [data-diff]").forEach(b => {
+    b.onclick = () => {
+      S.diff = b.dataset.diff === "auto" ? "auto" : +b.dataset.diff;
+      save(); sndCoin();
+      toast(b.dataset.diff === "auto" ? "已设为自动升段" : "难度已锁定为 " + DIFFS[+b.dataset.diff].rank, 2000);
+      renderParent();
+    };
+  });
   $("#pReport").onclick = () => go(renderReport);
   $("#pBackup").onclick = () => go(renderBackup);
   $("#pAudio").onclick = () => go(renderAudioCheck);
@@ -1550,13 +1662,13 @@ function startPhonicGame(p) {
     let opts, head;
     if (isFill) {
       /* 补全：这个词缺的字母组合是哪个？ */
-      opts = shuffle([p].concat(sample(others, 3)));
+      opts = shuffle([p].concat(sample(others, D().opts - 1)));
       head = `<div class="qEmoji" style="font-size:56px">${w.e}</div>
         <div class="qText" style="letter-spacing:3px">${esc(blankWord(w.w, p.re)).replace(/▢/g, '<b style="color:#e56ba0">▢</b>')}</div>
         <div class="qSub">${w.zh} —— 空格里填哪个字母组合？</div>`;
     } else {
       /* 听音归类：这个词属于哪个发音家族？ */
-      opts = shuffle([p].concat(sample(others, 3)));
+      opts = shuffle([p].concat(sample(others, D().opts - 1)));
       head = `<button id="lcSpeak" style="margin-top:0">🔊</button>
         <div class="qSub">听一听「${esc(w.w)}」，它属于哪个发音家族？</div>`;
     }
@@ -1692,14 +1804,14 @@ function startExam() {
   UNITS.forEach(u => { const us = unitS(u.id); u.words.forEach(w => { if (us.learned.includes(w.w)) learned.push(w); }); });
   if (S.testMode && learned.length < 8) learned = unlockedWords();   // 测试模式：直接用全部单词
   if (learned.length < 8) { toast("先去学更多单词，学会8个词就能参加大考啦！", 2400); goBack(); return; }
-  const n = Math.min(15, learned.length);
+  const n = Math.min(D().examQ, learned.length);
   const qs = priorityPick(learned, n);
   const types = shuffle(qs.map((_, i) => ["enzh", "listen", "zhen"][i % 3]));
   let qi = 0, right = 0;
   function q() {
     if (qi >= qs.length) return finish();
     const w = qs[qi], type = types[qi];
-    const opts = shuffle([w].concat(sample(learned.filter(x => x.w !== w.w), 3)));
+    const opts = shuffle([w].concat(distract(learned, w.w)));
     let head, optHtml;
     if (type === "enzh") {
       head = `<div class="qText">${esc(w.w)}</div><div class="qSub">选出正确的意思</div>`;
