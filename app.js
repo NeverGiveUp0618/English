@@ -1632,6 +1632,11 @@ function renderParent() {
       <span class="aName">发音自检<span class="aSub">听不到单词发音时点这里</span></span>
       <span class="aGo">▶</span>
     </div>
+    <div class="card actRow" id="pMic">
+      <span class="aIcon">🎙️</span>
+      <span class="aName">跟读自检<span class="aSub">「魔法回声」用不了时点这里</span></span>
+      <span class="aGo">▶</span>
+    </div>
     <div style="font-size:11px;color:#c0b0d0;text-align:center">改完直接生效，孩子下次打开转盘就是新奖品</div>`;
   document.querySelectorAll("#scr-parent [data-diff]").forEach(b => {
     b.onclick = () => {
@@ -1644,6 +1649,7 @@ function renderParent() {
   $("#pReport").onclick = () => go(renderReport);
   $("#pBackup").onclick = () => go(renderBackup);
   $("#pAudio").onclick = () => go(renderAudioCheck);
+  $("#pMic").onclick = () => go(renderMicCheck);
   $("#pTest").onclick = () => {
     S.testMode = !S.testMode; save();
     toast(S.testMode ? "🧪 测试模式已开启，全部内容解锁" : "✅ 测试模式已关闭，恢复正常闯关", 2200);
@@ -1847,11 +1853,28 @@ function scoreSay(target, heard) {
  * iPhone 的 Safari / Chrome 都不支持 Web 语音识别，所以必须有 record 模式兜底。
  */
 const CAN_RECORD = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder);
+/* iPhone「添加到主屏幕」后从桌面图标打开时，苹果常常不给麦克风权限 */
+const IS_IOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+const IS_STANDALONE = !!(window.navigator.standalone || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches));
+const IS_WECHAT = /MicroMessenger/i.test(navigator.userAgent);
 function echoMode() { return SR ? "sr" : CAN_RECORD ? "record" : "shadow"; }
+/* 麦克风失败的原因翻译成人话 */
+function micWhy(err) {
+  const n = err && (err.name || err.message) || "";
+  if (/NotAllowed|Permission|SecurityError/i.test(n)) {
+    return IS_STANDALONE
+      ? "从桌面图标打开时，手机不允许用麦克风。<b>请改用 Safari / Chrome 打开网址</b>再玩跟读。"
+      : "麦克风权限被拒绝了。请在弹窗里点「允许」；如果没弹窗，去手机<b>设置 → 浏览器 → 麦克风</b>里打开权限。";
+  }
+  if (/NotFound|DevicesNotFound/i.test(n)) return "没找到麦克风设备。";
+  if (/NotReadable|TrackStart/i.test(n)) return "麦克风被别的 App 占用了，先关掉微信语音、录音机之类的再试。";
+  if (IS_WECHAT) return "微信内置浏览器通常不给麦克风权限，<b>请点右上角「···」→「在浏览器中打开」</b>。";
+  return "麦克风打不开（" + esc(String(n) || "未知原因") + "）。";
+}
 
 let echoCleanup = null;   // 离开页面时要关掉麦克风
 function startEcho(items) {
-  const mode = echoMode();
+  let mode = echoMode();   // 可降级：麦克风一旦失败就切到 shadow，绝不让孩子卡死
   const qs = sample(items, Math.min(6, items.length));
   let qi = 0, total = 0, doneN = 0;
   let listening = false, rec = null;          // sr 模式
@@ -1918,6 +1941,12 @@ function startEcho(items) {
     if (mode === "sr") renderSR(it);
     else if (mode === "record") renderRecord(it);
     else renderShadow(it);
+    /* 录音/识别不可用时，明确告诉孩子还能怎么练，而不是一句"不支持"了事 */
+    if (mode === "shadow" && !CAN_RECORD) {
+      $("#echoState").innerHTML = IS_WECHAT
+        ? '微信里用不了麦克风。<b>可以先听完大声跟读</b>；想要录音对比，点右上角「···」→「在浏览器中打开」。'
+        : '这台设备用不了麦克风。<b>听完大声跟读一样有效！</b>';
+    }
 
     show("echo", "🎙️ 魔法回声");
   }
@@ -1977,15 +2006,21 @@ function startEcho(items) {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       } catch (e) {
-        $("#echoState").innerHTML = '需要<b>麦克风权限</b>才能录音。请在弹窗里点「允许」；如果没弹窗，去手机设置里给浏览器开麦克风权限。';
+        /* 录不了音就立刻降级成影子跟读，保证还能继续练，绝不卡死在这一屏 */
         sndWrong();
+        mode = "shadow";
+        $("#echoState").innerHTML = micWhy(e) + '<br><b style="color:#7cc576">没关系，先用「听 → 大声跟读」的方式练也一样有效！</b>';
+        renderShadow(it);
         return;
       }
       const chunks = [];
       try {
         mediaRec = new MediaRecorder(stream);
       } catch (e) {
-        $("#echoState").textContent = "这个浏览器录不了音，直接大声跟读也可以～";
+        try { stream.getTracks().forEach(t => t.stop()); } catch (e2) {}
+        stream = null;
+        mode = "shadow";
+        $("#echoState").innerHTML = '这个浏览器录不了音。<b style="color:#7cc576">直接听完大声跟读，一样有效！</b>';
         renderShadow(it);
         return;
       }
@@ -2282,6 +2317,57 @@ function renderAudioCheck() {
   };
   $("#acTest2").onclick = () => { unlockAudio(); sndWin(); };
   show("audio", "🔊 发音自检");
+}
+
+/* ================= 跟读自检（麦克风） ================= */
+function renderMicCheck() {
+  const mode = echoMode();
+  const modeName = { sr: "自动打分（最完整）", record: "录音对比", shadow: "影子跟读（无麦克风）" }[mode];
+  const row = (k, v, ok) => `<div class="vRow"><span style="font-size:18px">${ok ? "✅" : "⚠️"}</span><span class="vName">${k}<span class="vDate">${v}</span></span></div>`;
+  $("#scr-mic").innerHTML = `
+    <div class="card">
+      <div class="sectionTitle" style="margin:0 0 6px">🎙️ 跟读功能自检</div>
+      ${row("当前模式", modeName, mode !== "shadow")}
+      ${row("安全连接 (HTTPS)", location.protocol === "https:" ? "是" : "否 —— 麦克风只能在 https 下用", location.protocol === "https:")}
+      ${row("浏览器能调用麦克风", (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) ? "支持" : "不支持", !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia))}
+      ${row("能录音 (MediaRecorder)", window.MediaRecorder ? "支持" : "不支持", !!window.MediaRecorder)}
+      ${row("语音识别（自动打分）", SR ? "支持" : "不支持（iPhone 一律不支持，属正常）", !!SR)}
+      ${row("打开方式", IS_WECHAT ? "微信内置浏览器（麦克风通常被禁）" : IS_STANDALONE ? "桌面图标 / 独立窗口（iPhone 常禁麦克风）" : "普通浏览器（最好）", !IS_WECHAT && !IS_STANDALONE)}
+    </div>
+    <div class="card" style="text-align:center">
+      <button class="btn" id="micTest">🎙️ 点我测试麦克风</button>
+      <div id="micMsg" style="font-size:12.5px;color:#b8a8c8;margin-top:10px;line-height:1.7">点一下，看看能不能拿到麦克风权限</div>
+    </div>
+    <div class="card" style="font-size:12px;color:#7a5a9a;line-height:1.9">
+      <b style="color:#9b59b6">跟读用不了？按这个顺序试：</b><br>
+      1️⃣ <b>不要从桌面图标打开</b>——iPhone 在"添加到主屏幕"的独立窗口里<b>不给麦克风权限</b>。请用 <b>Safari</b> 直接打开网址再玩跟读。<br>
+      2️⃣ <b>不要在微信里打开</b>——微信内置浏览器禁麦克风。点右上角「···」→「在浏览器中打开」。<br>
+      3️⃣ 弹出"是否允许使用麦克风"时点<b>「允许」</b>（如果之前点了"不允许"，去 设置 → Safari → 麦克风 里改回来）。<br>
+      4️⃣ 关掉正在占用麦克风的 App（微信语音、录音机等）。<br><br>
+      <b style="color:#9b59b6">实在不行也没关系：</b>影子跟读模式（听标准音 → 大声跟读 → 点"我读完啦"）<b>照样能练发音</b>，只是没有录音回放而已。
+    </div>
+    <div class="card" style="font-size:10px;color:#c0b0d0;word-break:break-all">
+      设备信息（反馈问题时可以截图给开发者）：<br>${esc(navigator.userAgent)}
+    </div>`;
+  $("#micTest").onclick = async () => {
+    const msg = $("#micMsg");
+    msg.innerHTML = "正在请求麦克风权限……";
+    if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+      msg.innerHTML = '<b style="color:#e05a5a">这个浏览器不支持麦克风</b><br>' + micWhy({ name: "NotSupported" });
+      sndWrong(); return;
+    }
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({ audio: true });
+      st.getTracks().forEach(t => t.stop());
+      sndWin(); confettiSmall(8);
+      msg.innerHTML = '<b style="color:#7cc576">✅ 麦克风可以用！跟读功能没问题。</b><br>如果游戏里还是不行，把 App 彻底关掉重开一次。';
+    } catch (e) {
+      sndWrong();
+      msg.innerHTML = '<b style="color:#e05a5a">❌ 拿不到麦克风</b><br>' + micWhy(e) +
+        '<br><span style="color:#c0b0d0;font-size:11px">错误码：' + esc(String(e && e.name || e)) + '</span>';
+    }
+  };
+  show("mic", "🎙️ 跟读自检");
 }
 
 /* ================= 主题换装屋 ================= */
