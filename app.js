@@ -170,6 +170,9 @@ function unlockAudio() {
 }
 document.addEventListener("touchend", unlockAudio, { passive: true });
 document.addEventListener("click", unlockAudio);
+/* 切到后台 / 锁屏时闭嘴，别在口袋里继续念单词 */
+document.addEventListener("visibilitychange", () => { if (document.hidden) stopSpeak(); });
+
 /* Chrome 长时间不说话会自己暂停，定时唤醒 */
 setInterval(() => {
   try { if (window.speechSynthesis && speechSynthesis.paused) speechSynthesis.resume(); } catch (e) {}
@@ -219,14 +222,26 @@ function speakTTS(text, rate, onEnd) {
     }, 50);
   } catch (e) { ttsFail(); if (onEnd) onEnd(); }
 }
+/* 立刻闭嘴：停 mp3、停系统TTS，并作废所有等待中的"读完再继续"回调
+ * （离开游戏后声音还在读、题目还在后台推进，就是漏了这一步）
+ */
+let speakGen = 0;
+function stopSpeak() {
+  speakGen++;
+  try { if (AUD) { AUD.onended = null; AUD.pause(); } } catch (e) {}
+  try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
+}
+
 /* 读完这句再往下走：等音频真正结束（带兜底超时，避免卡死） */
 function speakThen(text, rate, cb, pauseMs) {
+  const gen = speakGen;
   let fired = false;
   const go = () => {
     if (fired) return;
     fired = true;
     clearTimeout(guard);
-    setTimeout(cb, pauseMs === undefined ? 500 : pauseMs);
+    if (gen !== speakGen) return;      // 期间已离开页面 → 不再推进题目
+    setTimeout(() => { if (gen === speakGen) cb(); }, pauseMs === undefined ? 500 : pauseMs);
   };
   const guard = setTimeout(go, 8000);   // 音频没能触发结束事件时的兜底
   speak(text, rate, go);
@@ -450,7 +465,7 @@ function show(id, title) {
 function go(render) { navStack.push(render); render(); }
 function goTab(render) { navStack = [render]; render(); }
 function goBack() {
-  if (window.speechSynthesis) speechSynthesis.cancel();
+  stopSpeak();                                              // 停掉正在播的发音
   clearTimer();
   if (echoCleanup) { echoCleanup(); echoCleanup = null; }   // 关掉麦克风
   if (navStack.length > 1) navStack.pop();
@@ -461,7 +476,7 @@ document.querySelectorAll(".tab").forEach(t => {
   t.onclick = () => {
     clearTimer();
     if (echoCleanup) { echoCleanup(); echoCleanup = null; }
-    if (window.speechSynthesis) speechSynthesis.cancel();
+    stopSpeak();
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
     t.classList.add("on");
     ({ home: () => goTab(renderHome), map: () => goTab(renderMap), phonics: () => goTab(renderPhonicsList), arcade: () => goTab(renderArcade), reward: () => goTab(renderReward) })[t.dataset.tab]();
