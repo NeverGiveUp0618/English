@@ -31,7 +31,8 @@ function defState() {
     sound: true,
     testMode: false, // 家长测试模式：解锁全部内容，给孩子用前记得关掉
     phonics: {},   // 拼读规则id -> {learned:true, stars:0}
-    learnedAt: {}, // 单词 -> 首次学会日期（驱动隔日复现）
+    learnedAt: {}, // 单词 -> 首次学会日期
+    srs: {},       // 单词 -> {lv:1..6, due:"YYYY-MM-DD"}  间隔重复调度器
     history: {},   // 日期 -> {right, total, w, g, mins}
     bestExam: 0    // 魔法大考最高分
   };
@@ -46,6 +47,20 @@ function unitS(id) { if (!S.units[id]) S.units[id] = { learned: [], stars: 0 }; 
 /* 跨天重置每日任务 */
 function ensureDaily() { if (S.daily.date !== todayStr()) S.daily = defState().daily; }
 ensureDaily();
+
+/* 老存档迁移：SRS 上线前学会的词还没有复习排程，全部安排成今天到期 */
+function migrateSRS() {
+  let n = 0;
+  UNITS.forEach(u => {
+    const us = S.units[u.id];
+    if (!us || !us.learned) return;
+    us.learned.forEach(word => {
+      if (!S.learnedAt[word]) S.learnedAt[word] = todayStr();
+      if (!S.srs[word]) { S.srs[word] = { lv: 1, due: todayStr() }; n++; }
+    });
+  });
+  if (n) save();
+}
 
 /* ---------------- 语音 ---------------- */
 let enVoice = null;
@@ -213,11 +228,13 @@ function noFreshWords() {
   return UNITS.filter(isUnlocked).every(u => unitS(u.id).learned.length >= u.words.length);
 }
 function taskDone() {
+  const noReview = dueCount() === 0 && wrongCount() === 0;
   return {
     /* 已解锁单元的新词全学完时，改为「复习也算数」，否则任务永远无法完成 */
     t1: S.daily.w >= 5 || (noFreshWords() && S.daily.g >= 2),
     t2: S.daily.g >= 3,
-    t3: S.daily.r >= 3 || (wrongCount() === 0 && S.daily.g >= 1)
+    /* 复习任务：做掉3个到期词/错词；今天本来就没有要复习的，玩1局也算完成 */
+    t3: S.daily.r >= 3 || (noReview && S.daily.g >= 1)
   };
 }
 function checkTasks() {
@@ -246,17 +263,71 @@ function hToday() {
 function logAnswer(isRight) {
   const h = hToday(); h.total++; if (isRight) h.right++; save();
 }
-function recordWrong(w) { S.wrong[w] = (S.wrong[w] || 0) + 2; logAnswer(false); save(); }
+function recordWrong(w) {
+  S.wrong[w] = (S.wrong[w] || 0) + 2;
+  logAnswer(false);
+  srsGrade(w, false);          // 答错＝没记住，记忆等级打回1级，明天重练
+  save();
+}
 function recordRight(w) {
   logAnswer(true);
   if (S.wrong[w]) { S.wrong[w]--; if (S.wrong[w] <= 0) delete S.wrong[w]; }
+  srsGrade(w, true);           // 只有"到期的词"答对才升级（见 srsGrade）
   save();
 }
-/* 隔日复现：昨天学的词 + 错词优先出题 */
+/* ---------------- 间隔重复调度器（SRS） ----------------
+ * 每个学会的词有记忆等级 lv(1~6) 和到期日 due。
+ * 复习答对 → 升一级，间隔按 1/2/4/7/15/30 天拉长；答错 → 打回 1 级，明天再练。
+ * 这样"当时学会但没进错词本"的词也会被系统主动召回，不会悄悄忘掉。
+ */
+const SRS_STEPS = [1, 2, 4, 7, 15, 30];   // 各等级的复习间隔（天）
+const SRS_MAX = SRS_STEPS.length;         // 6 级＝已进入长期记忆
+
+function dateAdd(days) {
+  const d = new Date(Date.now() + days * 864e5);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function srsInit(word) {
+  if (!S.srs[word]) S.srs[word] = { lv: 1, due: dateAdd(SRS_STEPS[0]) };
+  return S.srs[word];
+}
+/* 复习结果驱动等级升降 */
+function srsGrade(word, right) {
+  if (!S.learnedAt[word]) return;              // 还没正式学过的词不排程
+  const s = srsInit(word);
+  if (right) {
+    /* 只有到期的词答对才升级：防止同一天反复刷同一个词就冲到长期记忆 */
+    if (s.due > todayStr()) return;
+    s.lv = Math.min(SRS_MAX, s.lv + 1);
+  } else {
+    s.lv = 1;                                  // 答错一律打回重练
+  }
+  s.due = dateAdd(SRS_STEPS[s.lv - 1]);
+  save();
+}
+/* 今天到期（含逾期）的词 */
+function dueWords() {
+  const t = todayStr();
+  return Object.keys(S.srs)
+    .filter(w => S.srs[w].due <= t && WORD_INDEX[w])
+    .sort((a, b) => (S.srs[a].due < S.srs[b].due ? -1 : 1))   // 逾期最久的排前面
+    .map(w => WORD_INDEX[w]);
+}
+function dueCount() { return dueWords().length; }
+/* 记忆分层：1-2级=刚学 3-4级=熟悉 5-6级=长期记忆 */
+function memoryTiers() {
+  const t = { fresh: 0, familiar: 0, solid: 0 };
+  Object.values(S.srs).forEach(s => {
+    if (s.lv <= 2) t.fresh++; else if (s.lv <= 4) t.familiar++; else t.solid++;
+  });
+  return t;
+}
+
+/* 出题优先级：到期复习词 + 错词 优先 */
 function priorityPick(pool, n) {
-  const y = yesterdayStr();
-  const hot = pool.filter(w => S.wrong[w.w] || S.learnedAt[w.w] === y);
-  const cold = pool.filter(w => !S.wrong[w.w] && S.learnedAt[w.w] !== y);
+  const t = todayStr();
+  const hot = pool.filter(w => S.wrong[w.w] || (S.srs[w.w] && S.srs[w.w].due <= t));
+  const cold = pool.filter(w => !(S.wrong[w.w] || (S.srs[w.w] && S.srs[w.w].due <= t)));
   const picked = shuffle(hot).slice(0, n);
   return shuffle(picked.concat(shuffle(cold).slice(0, n - picked.length)));
 }
@@ -321,6 +392,8 @@ function renderHome() {
   const d = taskDone();
   const cu = currentUnit();
   const wc = wrongCount();
+  const dc = dueCount();
+  const mt = memoryTiers();
   $("#scr-home").innerHTML = `
     ${S.testMode ? `<div class="card" id="testBanner" style="background:#fff3d6;text-align:center;padding:10px;font-size:13px;font-weight:700;color:#e8842d">🧪 测试模式开启中（全部内容已解锁）· 点我关闭</div>` : ""}
     <div class="card" id="petCard">
@@ -336,10 +409,16 @@ function renderHome() {
     <div class="card">
       <div class="taskRow ${d.t1 ? "done" : ""}"><span class="tIcon">📖</span><span class="tName">${noFreshWords() ? "复习巩固（新词已学完）" : "学会 5 个新单词"}</span><span class="tProg">${noFreshWords() ? Math.min(S.daily.g, 2) + "/2" : Math.min(S.daily.w, 5) + "/5"}</span></div>
       <div class="taskRow ${d.t2 ? "done" : ""}"><span class="tIcon">🎮</span><span class="tName">完成 3 局小游戏</span><span class="tProg">${Math.min(S.daily.g, 3)}/3</span></div>
-      <div class="taskRow ${d.t3 ? "done" : ""}"><span class="tIcon">📕</span><span class="tName">消灭 3 个错词</span><span class="tProg">${wc === 0 ? "无错词" : Math.min(S.daily.r, 3) + "/3"}</span></div>
+      <div class="taskRow ${d.t3 ? "done" : ""}"><span class="tIcon">📅</span><span class="tName">复习 3 个到期单词</span><span class="tProg">${(dc === 0 && wc === 0) ? "无需复习" : Math.min(S.daily.r, 3) + "/3"}</span></div>
     </div>
-    <button class="btn" id="homeGo">✨ 继续闯关：${cu.num} ${cu.zh} →</button>
+    ${dc ? `<button class="btn" id="homeDue" style="background:linear-gradient(135deg,#ffd166,#ff9ec6)">📅 今天有 ${dc} 个词该复习了！（点我）</button><div style="height:12px"></div>` : ""}
+    <button class="btn ${dc ? "ghost" : ""}" id="homeGo">✨ 继续闯关：${cu.num} ${cu.zh} →</button>
     <div style="height:12px"></div>
+    <div class="card" style="display:flex;text-align:center;padding:12px">
+      <div style="flex:1"><div style="font-size:19px;font-weight:800;color:#e8a33d">${mt.fresh}</div><div style="font-size:11px;color:#b8a8c8">刚学会</div></div>
+      <div style="flex:1"><div style="font-size:19px;font-weight:800;color:#b98ff0">${mt.familiar}</div><div style="font-size:11px;color:#b8a8c8">越来越熟</div></div>
+      <div style="flex:1"><div style="font-size:19px;font-weight:800;color:#7cc576">${mt.solid}</div><div style="font-size:11px;color:#b8a8c8">🏆 记牢了</div></div>
+    </div>
     <div class="homeGrid">
       <div class="card" id="homeReview"><div class="hIcon">📕</div><div class="hName">错词本</div><div class="hSub">${wc ? wc + " 个词等你消灭" : "干干净净，真棒！"}</div></div>
       <div class="card" id="homeAlbum"><div class="hIcon">📔</div><div class="hName">贴纸册</div><div class="hSub">已收集 ${Object.keys(S.stickers).length}/${STICKERS.length}</div></div>
@@ -352,6 +431,7 @@ function renderHome() {
     speak(p.en, 0.9); toast(p.en + "  " + p.zh);
   };
   $("#homeGo").onclick = () => go(() => renderUnit(cu));
+  if (dc) $("#homeDue").onclick = () => go(() => startDueReview());
   $("#homeReview").onclick = () => { if (wrongCount()) go(() => startReview()); else toast("错词本是空的，去玩游戏吧！"); };
   $("#homeAlbum").onclick = () => go(renderAlbum);
   $("#homeWheel").onclick = () => go(renderWheel);
@@ -601,6 +681,7 @@ function startLearn(u) {
     if (!us.learned.includes(w.w)) {
       us.learned.push(w.w);
       S.learnedAt[w.w] = todayStr();
+      srsInit(w.w);            // 排进复习计划：明天第一次复习
       hToday().w++;
       bumpDaily("w");
     }
@@ -998,6 +1079,76 @@ function startBoss(u) {
   q();
 }
 
+/* ================= 今日复习（SRS 到期词） ================= */
+function startDueReview() {
+  const due = dueWords();
+  if (!due.length) { toast("今天没有到期的词，去学新单词吧！🌟", 2200); goBack(); return; }
+  const qs = due.slice(0, 12);                       // 一次最多12个，控制在几分钟内
+  const pool = unlockedWords();
+  let qi = 0, right = 0, ups = 0;
+  function q() {
+    if (qi >= qs.length) {
+      const rest = dueCount();
+      return renderResult({
+        stars: right === qs.length ? 3 : right >= qs.length - 2 ? 2 : 1,
+        title: right === qs.length ? "复习全对，记得真牢！" : "今日复习完成！",
+        detail: `答对 ${right}/${qs.length}　${ups} 个词记得更牢了${rest ? "　还剩 " + rest + " 个到期词" : "　🎉 今天的复习全部清空！"}`,
+        coins: right * 3 + (right === qs.length ? 8 : 0),
+        replay: () => dueCount() ? startDueReview() : (toast("今天的复习已全部完成！"), goBack())
+      });
+    }
+    const w = qs[qi];
+    const lv = (S.srs[w.w] || { lv: 1 }).lv;
+    const type = ["enzh", "listen", "zhen"][qi % 3];
+    const opts = shuffle([w].concat(sample(pool.filter(x => x.w !== w.w), 3)));
+    let head, optHtml;
+    if (type === "enzh") {
+      head = `<div class="qText">${esc(w.w)}</div><div class="qSub">还记得是什么意思吗？</div>`;
+      optHtml = opts.map((o, i) => `<button class="optBtn" data-i="${i}"><span class="oEmoji">${o.e}</span>${o.zh}</button>`).join("");
+    } else if (type === "listen") {
+      head = `<button id="lcSpeak" style="margin-top:0">🔊</button><div class="qSub">听一听，是哪个词？</div>`;
+      optHtml = opts.map((o, i) => `<button class="optBtn" data-i="${i}"><span class="oEmoji">${o.e}</span>${o.zh}</button>`).join("");
+    } else {
+      head = `<div class="qEmoji" style="font-size:56px">${w.e}</div><div class="qSub">${w.zh} —— 英文是哪个？</div>`;
+      optHtml = opts.map((o, i) => `<button class="optBtn" data-i="${i}">${esc(o.w)}</button>`).join("");
+    }
+    $("#scr-play").innerHTML = `
+      <div id="playHead">
+        <div id="playProg">📅 今日复习 ${qi + 1} / ${qs.length}</div>
+        <div style="font-size:11px;color:#c0a8d0">记忆等级 ${"🔒".repeat(0)}${"●".repeat(lv)}${"○".repeat(SRS_MAX - lv)}　答对就更牢固一级</div>
+      </div>
+      <div class="card" id="playQ">${head}</div>
+      <div class="optGrid">${optHtml}</div>`;
+    if (type !== "zhen") speak(w.w);
+    if (type === "listen") setTimeout(() => { const s = $("#lcSpeak"); if (s) s.onclick = () => speak(w.w); }, 0);
+    let locked = false;
+    document.querySelectorAll("#scr-play .optBtn").forEach(b => {
+      b.onclick = () => {
+        if (locked) return; locked = true;
+        const o = opts[+b.dataset.i];
+        const before = (S.srs[w.w] || { lv: 1 }).lv;
+        if (o.w === w.w) {
+          b.classList.add("right"); sndRight(); right++;
+          recordRight(w.w); bumpDaily("r");
+          const after = (S.srs[w.w] || { lv: 1 }).lv;
+          if (after > before) {
+            ups++;
+            if (after === SRS_MAX) { confettiSmall(10); toast("🏆 " + w.w + " 已进入长期记忆！", 1600); }
+          }
+          if (type === "zhen") speak(w.w);
+        } else {
+          b.classList.add("wrong"); sndWrong(); recordWrong(w.w);
+          document.querySelectorAll("#scr-play .optBtn").forEach(x => { if (opts[+x.dataset.i].w === w.w) x.classList.add("right"); });
+          speak(w.w, 0.8);
+        }
+        setTimeout(() => { qi++; q(); }, 950);
+      };
+    });
+    show("play", "📅 今日复习");
+  }
+  q();
+}
+
 /* ================= 错词复习 ================= */
 function startReview() {
   const wrongWs = Object.keys(S.wrong).map(w => WORD_INDEX[w]).filter(Boolean);
@@ -1048,7 +1199,9 @@ function startReview() {
 function renderArcade() {
   const pool = unlockedWords(), sents = unlockedSents();
   const learnedN = UNITS.reduce((a, u) => a + unitS(u.id).learned.length, 0);
+  const dc = dueCount();
   const games = [
+    { icon: "📅", name: "今日复习", sub: dc ? "有 " + dc + " 个词到期了，趁还记得快复习！" : "今天没有到期的词，很棒！", fn: () => startDueReview() },
     { icon: "🎙️", name: "魔法回声（跟读）", sub: "对着手机大声读，看看能拿几颗星", fn: () => startEcho(unlockedSents().concat(ECHO_EXTRA)) },
     { icon: "🏆", name: "魔法大考", sub: learnedN < 8 ? "学会8个词后解锁" : "跨单元综合复习 · 最高 " + (S.bestExam || 0) + " 分", fn: () => startExam() },
     { icon: "🔗", name: "词语配对", sub: "已解锁单词随机出题", fn: () => startMatch(priorityPick(pool, 20)) },
@@ -1215,6 +1368,7 @@ function renderParent() {
         <button class="btn small ghost" id="tSkin">🎨 解锁全部皮肤</button>
         <button class="btn small ghost" id="tWords">📖 标记全部单词已学</button>
         <button class="btn small ghost" id="tWrong">📕 造 5 个错词</button>
+        <button class="btn small ghost" id="tDue">📅 让 10 个词今天到期</button>
         <button class="btn small ghost" id="tReset" style="color:#e05a5a">🗑️ 清空全部进度</button>
       </div>
       <div style="font-size:11px;color:#c0a8d0;margin-top:8px;line-height:1.7">
@@ -1273,8 +1427,23 @@ function renderParent() {
       sample(unlockedWords(), 5).forEach(w => { S.wrong[w.w] = 2; });
       save(); toast("已造 5 个错词，可以去测错词本了", 2200);
     };
+    $("#tDue").onclick = () => {
+      const learned = Object.keys(S.learnedAt);
+      if (!learned.length) { toast("先「标记全部单词已学」再用这个"); return; }
+      sample(learned, Math.min(10, learned.length)).forEach(w => {
+        S.srs[w] = { lv: (S.srs[w] && S.srs[w].lv) || 1, due: todayStr() };
+      });
+      save(); toast("已让 " + Math.min(10, learned.length) + " 个词今天到期，回首页看「今日复习」", 2600);
+    };
     $("#tWords").onclick = () => {
-      UNITS.forEach(u => { const us = unitS(u.id); u.words.forEach(w => { if (!us.learned.includes(w.w)) us.learned.push(w.w); }); });
+      UNITS.forEach(u => {
+        const us = unitS(u.id);
+        u.words.forEach(w => {
+          if (!us.learned.includes(w.w)) us.learned.push(w.w);
+          if (!S.learnedAt[w.w]) S.learnedAt[w.w] = todayStr();
+          srsInit(w.w);
+        });
+      });
       save(); toast("全部单词已标记为学过（大考/游戏厅可直接玩）", 2400);
     };
     let armed = false;
@@ -1625,6 +1794,26 @@ function renderReport() {
       </div>
     </div>
     <div class="card">
+      <div class="sectionTitle" style="margin:0 0 8px">🧠 记忆保有量（间隔重复）</div>
+      <div style="display:flex;height:16px;border-radius:8px;overflow:hidden;background:#f0e8f8">
+        ${(() => {
+          const t = memoryTiers(), sum = t.fresh + t.familiar + t.solid || 1;
+          return `<div style="width:${t.fresh / sum * 100}%;background:#ffd166"></div>
+                  <div style="width:${t.familiar / sum * 100}%;background:#b98ff0"></div>
+                  <div style="width:${t.solid / sum * 100}%;background:#7cc576"></div>`;
+        })()}
+      </div>
+      <div style="display:flex;text-align:center;margin-top:8px">
+        <div style="flex:1"><div style="font-size:18px;font-weight:800;color:#e8a33d">${memoryTiers().fresh}</div><div style="font-size:11px;color:#b8a8c8">刚学会 (1-2级)</div></div>
+        <div style="flex:1"><div style="font-size:18px;font-weight:800;color:#b98ff0">${memoryTiers().familiar}</div><div style="font-size:11px;color:#b8a8c8">越来越熟 (3-4级)</div></div>
+        <div style="flex:1"><div style="font-size:18px;font-weight:800;color:#7cc576">${memoryTiers().solid}</div><div style="font-size:11px;color:#b8a8c8">长期记忆 (5-6级)</div></div>
+      </div>
+      <div style="font-size:11px;color:#c0a8d0;margin-top:8px;line-height:1.7">
+        每个学会的词按 1→2→4→7→15→30 天的间隔自动安排复习：按时复习答对就升一级、间隔拉长；答错打回1级重练。
+        今天到期 <b style="color:#e8842d">${dueCount()}</b> 个词。
+      </div>
+    </div>
+    <div class="card">
       <div class="sectionTitle" style="margin:0 0 6px">📕 最常出错的词（Top 5）</div>
       ${top.length ? top.map(([w, c]) => {
         const info = WORD_INDEX[w];
@@ -1651,7 +1840,7 @@ function importCode(code) {
     const obj = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
     if (!obj || typeof obj.coins !== "number" || !obj.units) return false;
     S = Object.assign(defState(), obj);
-    ensureDaily(); save(); applyTheme(); updateCoinBox();
+    ensureDaily(); migrateSRS(); save(); applyTheme(); updateCoinBox();
     return true;
   } catch (e) { return false; }
 }
@@ -1893,6 +2082,7 @@ function renderAlbum() {
 }
 
 /* ================= 启动 ================= */
+migrateSRS();
 applyTheme();
 updateCoinBox();
 /* 连续玩30分钟提醒休息眼睛 */
