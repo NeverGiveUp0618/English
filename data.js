@@ -303,10 +303,10 @@ const PHONICS = [
     tip: "单词末尾有个不发音的「魔法 e」，它会让前面的 a 读出字母本来的名字 /eɪ/。",
     re: "a([b-df-hj-np-tv-z]+)e$",
     words: [
-      { w: "cake", zh: "蛋糕", e: "🎂" }, { w: "name", zh: "名字", e: "📛" },
-      { w: "face", zh: "脸", e: "😊" }, { w: "lake", zh: "湖", e: "🏞️" },
-      { w: "game", zh: "游戏", e: "🎮" }, { w: "gate", zh: "大门", e: "🚧" },
-      { w: "plane", zh: "飞机", e: "✈️" }, { w: "grape", zh: "葡萄", e: "🍇" }
+      { w: "cake", zh: "蛋糕", e: "🎂", ipa: "/keɪk/", syl: ["cake"] }, { w: "name", zh: "名字", e: "📛", ipa: "/neɪm/", syl: ["name"] },
+      { w: "face", zh: "脸", e: "😊", ipa: "/feɪs/", syl: ["face"] }, { w: "lake", zh: "湖", e: "🏞️", ipa: "/leɪk/", syl: ["lake"] },
+      { w: "game", zh: "游戏", e: "🎮", ipa: "/ɡeɪm/", syl: ["game"] }, { w: "gate", zh: "大门", e: "🚧", ipa: "/ɡeɪt/", syl: ["gate"] },
+      { w: "plane", zh: "飞机", e: "✈️", ipa: "/pleɪn/", syl: ["plane"] }, { w: "grape", zh: "葡萄", e: "🍇", ipa: "/ɡreɪp/", syl: ["grape"] }
     ]
   },
   {
@@ -314,10 +314,10 @@ const PHONICS = [
     tip: "魔法 e 在末尾，前面的 i 就读 /aɪ/，像「爱」的音。",
     re: "i([b-df-hj-np-tv-z]+)e$",
     words: [
-      { w: "five", zh: "五", e: "5️⃣" }, { w: "nine", zh: "九", e: "9️⃣" },
-      { w: "kite", zh: "风筝", e: "🪁" }, { w: "rice", zh: "米饭", e: "🍚" },
-      { w: "bike", zh: "自行车", e: "🚲" }, { w: "time", zh: "时间", e: "⏰" },
-      { w: "smile", zh: "微笑", e: "😄" }, { w: "ice", zh: "冰", e: "🧊" }
+      { w: "five", zh: "五", e: "5️⃣", ipa: "/faɪv/", syl: ["five"] }, { w: "nine", zh: "九", e: "9️⃣", ipa: "/naɪn/", syl: ["nine"] },
+      { w: "kite", zh: "风筝", e: "🪁", ipa: "/kaɪt/", syl: ["kite"] }, { w: "rice", zh: "米饭", e: "🍚", ipa: "/raɪs/", syl: ["rice"] },
+      { w: "bike", zh: "自行车", e: "🚲", ipa: "/baɪk/", syl: ["bike"] }, { w: "time", zh: "时间", e: "⏰", ipa: "/taɪm/", syl: ["time"] },
+      { w: "smile", zh: "微笑", e: "😄", ipa: "/smaɪl/", syl: ["smile"] }, { w: "ice", zh: "冰", e: "🧊", ipa: "/aɪs/", syl: ["ice"] }
     ]
   },
   {
@@ -325,10 +325,10 @@ const PHONICS = [
     tip: "魔法 e 在末尾，前面的 o 读 /əʊ/，嘴巴要圆圆的。",
     re: "o([b-df-hj-np-tv-z]+)e$",
     words: [
-      { w: "nose", zh: "鼻子", e: "👃" }, { w: "home", zh: "家", e: "🏠" },
-      { w: "rose", zh: "玫瑰", e: "🌹" }, { w: "note", zh: "便条", e: "🎵" },
-      { w: "hole", zh: "洞", e: "🕳️" }, { w: "bone", zh: "骨头", e: "🦴" },
-      { w: "phone", zh: "电话", e: "📱" }, { w: "stone", zh: "石头", e: "🪨" }
+      { w: "nose", zh: "鼻子", e: "👃", ipa: "/nəʊz/", syl: ["nose"] }, { w: "home", zh: "家", e: "🏠", ipa: "/həʊm/", syl: ["home"] },
+      { w: "rose", zh: "玫瑰", e: "🌹", ipa: "/rəʊz/", syl: ["rose"] }, { w: "note", zh: "便条", e: "🎵", ipa: "/nəʊt/", syl: ["note"] },
+      { w: "hole", zh: "洞", e: "🕳️", ipa: "/həʊl/", syl: ["hole"] }, { w: "bone", zh: "骨头", e: "🦴", ipa: "/bəʊn/", syl: ["bone"] },
+      { w: "phone", zh: "电话", e: "📱", ipa: "/fəʊn/", syl: ["phone"] }, { w: "stone", zh: "石头", e: "🪨", ipa: "/stəʊn/", syl: ["stone"] }
     ]
   },
   {
@@ -336,10 +336,10 @@ const PHONICS = [
     tip: "魔法 e 在末尾，前面的 u 读 /juː/，就像在说「You」。",
     re: "u([b-df-hj-np-tv-z]+)e$",
     words: [
-      { w: "cute", zh: "可爱的", e: "🐱" }, { w: "huge", zh: "巨大的", e: "🐘" },
-      { w: "tube", zh: "管子", e: "🧪" }, { w: "cube", zh: "方块", e: "🎲" },
-      { w: "mule", zh: "骡子", e: "🐎" }, { w: "use", zh: "使用", e: "♻️" },
-      { w: "excuse", zh: "原谅", e: "🙏" }, { w: "June", zh: "六月", e: "📅" }
+      { w: "cute", zh: "可爱的", e: "🐱", ipa: "/kjuːt/", syl: ["cute"] }, { w: "huge", zh: "巨大的", e: "🐘", ipa: "/hjuːdʒ/", syl: ["huge"] },
+      { w: "tube", zh: "管子", e: "🧪", ipa: "/tjuːb/", syl: ["tube"] }, { w: "cube", zh: "方块", e: "🎲", ipa: "/kjuːb/", syl: ["cube"] },
+      { w: "mule", zh: "骡子", e: "🐎", ipa: "/mjuːl/", syl: ["mule"] }, { w: "use", zh: "使用", e: "♻️", ipa: "/juːz/", syl: ["use"] },
+      { w: "excuse", zh: "原谅", e: "🙏", ipa: "/ɪkˈskjuːz/", syl: ["ex", "cuse"] }, { w: "June", zh: "六月", e: "📅", ipa: "/dʒuːn/", syl: ["June"] }
     ]
   },
   {
@@ -347,10 +347,10 @@ const PHONICS = [
     tip: "两个 e 手拉手，读长长的 /iː/，像笑着说「衣——」。",
     re: "ee",
     words: [
-      { w: "bee", zh: "蜜蜂", e: "🐝" }, { w: "tree", zh: "树", e: "🌳" },
-      { w: "sleep", zh: "睡觉", e: "😴" }, { w: "green", zh: "绿色", e: "🟢" },
-      { w: "feet", zh: "脚", e: "🦶" }, { w: "meet", zh: "见面", e: "🤝" },
-      { w: "week", zh: "星期", e: "📆" }, { w: "sweet", zh: "甜的", e: "🍬" }
+      { w: "bee", zh: "蜜蜂", e: "🐝", ipa: "/biː/", syl: ["bee"] }, { w: "tree", zh: "树", e: "🌳", ipa: "/triː/", syl: ["tree"] },
+      { w: "sleep", zh: "睡觉", e: "😴", ipa: "/sliːp/", syl: ["sleep"] }, { w: "green", zh: "绿色", e: "🟢", ipa: "/ɡriːn/", syl: ["green"] },
+      { w: "feet", zh: "脚", e: "🦶", ipa: "/fiːt/", syl: ["feet"] }, { w: "meet", zh: "见面", e: "🤝", ipa: "/miːt/", syl: ["meet"] },
+      { w: "week", zh: "星期", e: "📆", ipa: "/wiːk/", syl: ["week"] }, { w: "sweet", zh: "甜的", e: "🍬", ipa: "/swiːt/", syl: ["sweet"] }
     ]
   },
   {
@@ -358,10 +358,10 @@ const PHONICS = [
     tip: "e 和 a 在一起，常常也读 /iː/，和 ee 是好朋友。",
     re: "ea",
     words: [
-      { w: "tea", zh: "茶", e: "🍵" }, { w: "eat", zh: "吃", e: "🍽️" },
-      { w: "meat", zh: "肉", e: "🥩" }, { w: "read", zh: "读", e: "📖" },
-      { w: "seat", zh: "座位", e: "💺" }, { w: "clean", zh: "干净的", e: "🧹" },
-      { w: "bean", zh: "豆子", e: "🫘" }, { w: "teacher", zh: "老师", e: "🧑‍🏫" }
+      { w: "tea", zh: "茶", e: "🍵", ipa: "/tiː/", syl: ["tea"] }, { w: "eat", zh: "吃", e: "🍽️", ipa: "/iːt/", syl: ["eat"] },
+      { w: "meat", zh: "肉", e: "🥩", ipa: "/miːt/", syl: ["meat"] }, { w: "read", zh: "读", e: "📖", ipa: "/riːd/", syl: ["read"] },
+      { w: "seat", zh: "座位", e: "💺", ipa: "/siːt/", syl: ["seat"] }, { w: "clean", zh: "干净的", e: "🧹", ipa: "/kliːn/", syl: ["clean"] },
+      { w: "bean", zh: "豆子", e: "🫘", ipa: "/biːn/", syl: ["bean"] }, { w: "teacher", zh: "老师", e: "🧑‍🏫", ipa: "/ˈtiːtʃə(r)/", syl: ["tea", "cher"] }
     ]
   },
   {
@@ -369,10 +369,10 @@ const PHONICS = [
     tip: "ai 常在词中间，ay 常在词尾，都读 /eɪ/。",
     re: "(?:ai|ay)",
     words: [
-      { w: "rain", zh: "雨", e: "🌧️" }, { w: "tail", zh: "尾巴", e: "🐕" },
-      { w: "wait", zh: "等待", e: "⏳" }, { w: "paint", zh: "画画", e: "🎨" },
-      { w: "day", zh: "白天", e: "☀️" }, { w: "play", zh: "玩", e: "⚽" },
-      { w: "say", zh: "说", e: "💬" }, { w: "way", zh: "路", e: "🛣️" }
+      { w: "rain", zh: "雨", e: "🌧️", ipa: "/reɪn/", syl: ["rain"] }, { w: "tail", zh: "尾巴", e: "🐕", ipa: "/teɪl/", syl: ["tail"] },
+      { w: "wait", zh: "等待", e: "⏳", ipa: "/weɪt/", syl: ["wait"] }, { w: "paint", zh: "画画", e: "🎨", ipa: "/peɪnt/", syl: ["paint"] },
+      { w: "day", zh: "白天", e: "☀️", ipa: "/deɪ/", syl: ["day"] }, { w: "play", zh: "玩", e: "⚽", ipa: "/pleɪ/", syl: ["play"] },
+      { w: "say", zh: "说", e: "💬", ipa: "/seɪ/", syl: ["say"] }, { w: "way", zh: "路", e: "🛣️", ipa: "/weɪ/", syl: ["way"] }
     ]
   },
   {
@@ -380,10 +380,10 @@ const PHONICS = [
     tip: "两个 o 手拉手，多数读长音 /uː/（moon），少数读短音 /ʊ/（book）。",
     re: "oo",
     words: [
-      { w: "moon", zh: "月亮", e: "🌙" }, { w: "food", zh: "食物", e: "🍔" },
-      { w: "zoo", zh: "动物园", e: "🦁" }, { w: "room", zh: "房间", e: "🚪" },
-      { w: "book", zh: "书", e: "📕" }, { w: "cook", zh: "烹饪", e: "👨‍🍳" },
-      { w: "foot", zh: "脚", e: "👣" }, { w: "school", zh: "学校", e: "🏫" }
+      { w: "moon", zh: "月亮", e: "🌙", ipa: "/muːn/", syl: ["moon"] }, { w: "food", zh: "食物", e: "🍔", ipa: "/fuːd/", syl: ["food"] },
+      { w: "zoo", zh: "动物园", e: "🦁", ipa: "/zuː/", syl: ["zoo"] }, { w: "room", zh: "房间", e: "🚪", ipa: "/ruːm/", syl: ["room"] },
+      { w: "book", zh: "书", e: "📕", ipa: "/bʊk/", syl: ["book"] }, { w: "cook", zh: "烹饪", e: "👨‍🍳", ipa: "/kʊk/", syl: ["cook"] },
+      { w: "foot", zh: "脚", e: "👣", ipa: "/fʊt/", syl: ["foot"] }, { w: "school", zh: "学校", e: "🏫", ipa: "/skuːl/", syl: ["school"] }
     ]
   }
 ];
@@ -420,7 +420,7 @@ const STICKERS = [
   { n: "星光宝石", e: "💠", r: 3 }, { n: "超新星", e: "🌟", r: 3 }
 ];
 
-/* 宠物成长线：xp达到阈值即进化 */
+/* 宠物成长线：xp达到阈值即进化（老存档默认用这条线，见 PETS.classic） */
 const PET_STAGES = [
   { xp: 0, e: "🥚", n: "神秘蛋" },
   { xp: 30, e: "🐣", n: "破壳小啾" },
@@ -428,6 +428,76 @@ const PET_STAGES = [
   { xp: 300, e: "🦢", n: "优雅天鹅" },
   { xp: 700, e: "🦩", n: "火烈鸟公主" },
   { xp: 1500, e: "🦄", n: "彩虹独角兽" }
+];
+
+/* ------------------------------------------------------------
+ * 可选伙伴（多角色）
+ * 注意：孩子提到的猫小九/迈克狐/猴子警长都是有版权的商业IP，不能直接用。
+ * 所以这里是「同类型的原创角色」，并且——**让孩子自己给它起名字**，
+ * 归属感比用现成IP更强（她想叫它什么都行，那是她的私人称呼）。
+ * ------------------------------------------------------------ */
+const PETS = [
+  {
+    id: "cat", n: "神探猫", tag: "戴礼帽的侦探猫", cost: 0,
+    stages: [
+      { xp: 0, e: "🥚", n: "神秘蛋" },
+      { xp: 30, e: "🐱", n: "小猫崽" },
+      { xp: 100, e: "😺", n: "见习探员" },
+      { xp: 300, e: "😼", n: "机灵神探" },
+      { xp: 700, e: "🐈‍⬛", n: "黑猫大侦探" },
+      { xp: 1500, e: "🦁", n: "传奇猫警长" }
+    ]
+  },
+  {
+    id: "fox", n: "狐博士", tag: "戴眼镜的狐狸侦探", cost: 150,
+    stages: [
+      { xp: 0, e: "🥚", n: "神秘蛋" },
+      { xp: 30, e: "🦊", n: "小狐狸" },
+      { xp: 100, e: "🦊", n: "见习助手" },
+      { xp: 300, e: "🦊", n: "推理小能手" },
+      { xp: 700, e: "🐺", n: "狐博士" },
+      { xp: 1500, e: "🐉", n: "传说中的狐仙" }
+    ]
+  },
+  {
+    id: "monkey", n: "警长猴", tag: "戴警帽的机灵猴", cost: 150,
+    stages: [
+      { xp: 0, e: "🥚", n: "神秘蛋" },
+      { xp: 30, e: "🐒", n: "小猴子" },
+      { xp: 100, e: "🙈", n: "见习警员" },
+      { xp: 300, e: "🐵", n: "机灵警官" },
+      { xp: 700, e: "🦍", n: "森林警长" },
+      { xp: 1500, e: "🐲", n: "齐天大圣" }
+    ]
+  },
+  {
+    id: "classic", n: "彩虹独角兽", tag: "从蛋孵化的梦幻伙伴", cost: 0,
+    stages: PET_STAGES
+  }
+];
+
+/* 喂养道具：金币的日常出口，也是每天回来看它的理由 */
+const CARE = [
+  { id: "food", n: "喂食", e: "🍖", cost: 5, up: "hunger", bond: 2, say: "呜姆呜姆……好吃！" },
+  { id: "bath", n: "洗澡", e: "🛁", cost: 5, up: "clean", bond: 2, say: "搓搓搓——香喷喷的！" },
+  { id: "play", n: "陪玩", e: "🎾", cost: 8, up: "mood", bond: 3, say: "再来一次！再来一次！" },
+  { id: "snack", n: "小零食", e: "🍰", cost: 12, up: "mood", bond: 4, say: "这个我最喜欢啦！" }
+];
+
+/* 装扮：戴在伙伴身上（帽子 / 脸上 / 手里） */
+const OUTFITS = [
+  { id: "hat1", slot: "hat", n: "侦探帽", e: "🎩", cost: 40 },
+  { id: "hat2", slot: "hat", n: "警帽", e: "🧢", cost: 40 },
+  { id: "hat3", slot: "hat", n: "皇冠", e: "👑", cost: 90 },
+  { id: "hat4", slot: "hat", n: "小花", e: "🌸", cost: 30 },
+  { id: "face1", slot: "face", n: "圆框眼镜", e: "👓", cost: 35 },
+  { id: "face2", slot: "face", n: "墨镜", e: "🕶️", cost: 45 },
+  { id: "face3", slot: "face", n: "口罩", e: "😷", cost: 25 },
+  { id: "item1", slot: "item", n: "放大镜", e: "🔍", cost: 50 },
+  { id: "item2", slot: "item", n: "小背包", e: "🎒", cost: 45 },
+  { id: "item3", slot: "item", n: "手提包", e: "👜", cost: 55 },
+  { id: "item4", slot: "item", n: "魔法棒", e: "🪄", cost: 70 },
+  { id: "item5", slot: "item", n: "小雨伞", e: "☂️", cost: 35 }
 ];
 
 /* 点宠物时的英语鼓励（顺带磨耳朵） */

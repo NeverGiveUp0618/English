@@ -387,6 +387,46 @@ body.th-night .wLabel span { color: #4a3a6a; }
 body.th-night .albumCell.rr3 { background: #5a4a30; }
 body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
 
+/* ---- 伙伴：喂养状态条 ---- */
+.careBars { margin-top: 10px; }
+.careRow { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.careLb { font-size: 11px; color: #b8a8c8; width: 54px; text-align: left; flex: none; }
+.careBarWrap { flex: 1; height: 9px; background: #f0e8f8; border-radius: 8px; overflow: hidden; }
+.careBar { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, #7cc576, #a8d88a); transition: width .4s; }
+.careBar.low { background: linear-gradient(90deg, #ffb86b, #ff8fab); }
+
+/* 装扮的位置 */
+.petShow .petFace { position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%); font-size: 26px; z-index: 2; pointer-events: none; }
+.petShow .petItem { position: absolute; left: -20px; bottom: 6px; font-size: 30px; z-index: 2; pointer-events: none; animation: floatY 2.8s ease-in-out infinite; }
+
+.outfitGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.outfitCell { background: #fff; border-radius: 14px; text-align: center; padding: 10px 4px; box-shadow: 0 2px 8px rgba(180,140,200,.15); }
+.outfitCell .oe { font-size: 30px; }
+.outfitCell .on2 { font-size: 11px; color: #7a5a9a; font-weight: 700; margin-top: 2px; }
+.outfitCell .oc { font-size: 10px; color: #c0a8d0; margin-top: 1px; }
+.outfitCell.lock .oe { filter: grayscale(1); opacity: .4; }
+.outfitCell.on { box-shadow: 0 0 0 2.5px #7cc576; }
+
+/* ---- 自然拼读：音节 + 音标 + 颜色 ---- */
+.phRow { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 14px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(180,140,200,.15); }
+.phEmoji { font-size: 30px; flex: none; }
+.phMid { flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.phWord { font-size: 21px; font-weight: 800; color: #6a4a8a; letter-spacing: .5px; display: flex; align-items: center; flex-wrap: wrap; }
+.sylBlock { background: #f3ecff; border-radius: 7px; padding: 1px 6px; }
+.sylDot { color: #c0a8d0; margin: 0 3px; font-weight: 700; }
+.phKey { color: #e5426b; font-weight: 900; }
+.phMute { color: #c8bcd6; text-decoration: line-through; }
+.phIpa { font-size: 13px; color: #7a9ad0; font-family: "Times New Roman", serif; }
+.phZh { font-size: 12px; color: #b08ac0; }
+.phSpeak { font-size: 20px; color: #e5a0c8; flex: none; }
+.phLegend { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; font-size: 11px; color: #b8a8c8; margin-top: 8px; }
+.phLegend b { font-size: 11px; }
+
+body.th-night .phRow, body.th-night .outfitCell { background: #473a6e; }
+body.th-night .sylBlock { background: #5a4a8a; }
+body.th-night .phWord { color: #e8dff8; }
+body.th-night .careBarWrap { background: #2a2348; }
+
 /* ---- 浮动反馈 ---- */
 #toast {
   position: fixed; left: 50%; top: 18%; transform: translateX(-50%);
@@ -430,6 +470,9 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
     <section id="scr-backup" class="screen"></section>
     <section id="scr-audio" class="screen"></section>
     <section id="scr-mic" class="screen"></section>
+    <section id="scr-care" class="screen"></section>
+    <section id="scr-outfit" class="screen"></section>
+    <section id="scr-swap" class="screen"></section>
   </main>
 
   <nav id="tabbar">

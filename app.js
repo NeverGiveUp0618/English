@@ -4,6 +4,7 @@
 
 /* ---------------- 工具 ---------------- */
 const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
 function shuffle(a) { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
 function sample(a, n) { return shuffle(a).slice(0, n); }
 function todayStr() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
@@ -21,13 +22,24 @@ const WALLET_KEY = "sharedWallet_v1";
 function defState() {
   return {
     coins: 0, xp: 0, streak: 0, lastDaily: "",
-    daily: { date: todayStr(), w: 0, g: 0, r: 0, earn: 0, t1: false, t2: false, t3: false, t4: false, bonus: false },
+    daily: { date: todayStr(), w: 0, g: 0, r: 0, earn: 0, t1: false, t2: false, t3: false, t4: false, bonus: false, spun: false },
     units: {},    // id -> {learned:[], stars:0, s3:false}
     wrong: {},    // word -> 次数
     stickers: {}, // 贴纸名 -> 数量
     buddy: null,  // 挂在宠物身边的贴纸（小伙伴）
     hat: null,    // 戴在宠物头上的贴纸
     setDone: {},  // 已领过的集齐奖励：r1/r2/r3
+    /* 伙伴：多角色 + 喂养 + 装扮 */
+    pet: {
+      id: "classic",          // 当前伙伴（老存档默认独角兽那条线）
+      name: "",               // 孩子自己起的名字（比用现成IP更有归属感）
+      owned: ["classic"],     // 已拥有的伙伴
+      hunger: 80, clean: 80, mood: 80,   // 三条状态（只会变淡，绝不会「生病/死掉」）
+      bond: 0,                // 亲密度：喂养积累
+      careDay: todayStr(),    // 上次结算状态的日期
+      wear: { hat: "", face: "", item: "" },
+      outfits: []             // 已买的装扮
+    },
     checkins: {},  // 打卡成功的日期（完成当天全部任务才算）
     cyclesPaid: 0, // 已发过奖励的学习周期数（每满 7 天一个周期）
     tickets: 0,   // 转盘券
@@ -62,6 +74,14 @@ function save() {
  */
 function walletOut() {
   try { localStorage.setItem(WALLET_KEY, JSON.stringify({ coins: S.coins || 0, tickets: S.tickets || 0 })); } catch (e) {}
+}
+function loadWallet() {
+  try { const w = JSON.parse(localStorage.getItem(WALLET_KEY) || "null"); if (w && typeof w.coins === "number") return w; } catch (e) {}
+  return { coins: S.coins || 0, tickets: S.tickets || 0 };
+}
+function saveWallet(w) {
+  S.coins = w.coins || 0; S.tickets = w.tickets || 0;
+  try { localStorage.setItem(WALLET_KEY, JSON.stringify({ coins: S.coins, tickets: S.tickets })); } catch (e) {}
 }
 function walletIn() {
   let w = { coins: 0, tickets: 0 };
@@ -321,9 +341,46 @@ function coinFly(n) {
   document.body.appendChild(d); setTimeout(() => d.remove(), 1000);
 }
 
-/* ---------------- 金币 / 经验 / 宠物 ---------------- */
-function petStage(xp) { let st = PET_STAGES[0]; PET_STAGES.forEach(p => { if (xp >= p.xp) st = p; }); return st; }
-function petNext(xp) { return PET_STAGES.find(p => p.xp > xp) || null; }
+/* ---------------- 伙伴：多角色 / 喂养 / 装扮 ----------------
+ * 设计红线：状态只会「变淡」，绝不会生病、死掉、扣分。
+ * 养宠物是为了让她想回来，不是为了制造愧疚和焦虑。
+ */
+function petDef() { return PETS.find(p => p.id === S.pet.id) || PETS[3]; }
+function petStages() { return petDef().stages; }
+function petStage(xp) { let st = petStages()[0]; petStages().forEach(p => { if (xp >= p.xp) st = p; }); return st; }
+function petNext(xp) { return petStages().find(p => p.xp > xp) || null; }
+function petName() { return S.pet.name || petStage(S.xp).n; }
+
+/* 每天状态自然回落一点（不惩罚，只是"它有点想你了"） */
+function decayCare() {
+  const p = S.pet;
+  if (!p.careDay) p.careDay = todayStr();
+  const days = Math.max(0, Math.round((new Date(todayStr()) - new Date(p.careDay)) / 864e5));
+  if (days > 0) {
+    const d = Math.min(days, 5) * 12;                 // 最多掉 5 天的量，不会归零到"惨"
+    p.hunger = Math.max(20, (p.hunger ?? 80) - d);    // 地板 20：永远不会"饿死"
+    p.clean = Math.max(20, (p.clean ?? 80) - d);
+    p.mood = Math.max(20, (p.mood ?? 80) - d);
+    p.careDay = todayStr();
+    save();
+  }
+}
+function careAvg() { const p = S.pet; return Math.round(((p.hunger ?? 80) + (p.clean ?? 80) + (p.mood ?? 80)) / 3); }
+function careMood() {
+  const a = careAvg();
+  if (a >= 85) return { e: "🥰", t: "超级开心" };
+  if (a >= 65) return { e: "😊", t: "心情不错" };
+  if (a >= 45) return { e: "🙂", t: "还行吧" };
+  return { e: "🥺", t: "有点想你了" };
+}
+/* 亲密度等级：1~5 心 */
+function bondLv() { const b = S.pet.bond || 0; return Math.min(5, Math.floor(b / 60) + (b > 0 ? 1 : 0)); }
+/* 伙伴身上的装扮 */
+function wearEmoji(slot) {
+  const id = S.pet.wear && S.pet.wear[slot];
+  const o = OUTFITS.find(x => x.id === id);
+  return o ? o.e : "";
+}
 function addCoins(n) {
   if (n <= 0) return;
   const before = petStage(S.xp).n;
@@ -556,13 +613,25 @@ function renderHome() {
       <div id="streakChip">🔥 连续 ${S.streak} 天</div>
       <button id="themeQuick" style="position:absolute;top:10px;right:10px;border:none;background:none;font-size:22px">🎨</button>
       <div class="petShow" id="petShow">
-        <span class="petHat">${S.hat ? stickerOf(S.hat).e : ""}</span>
+        <span class="petHat">${wearEmoji("hat") || (S.hat ? stickerOf(S.hat).e : "")}</span>
         <span id="petEmoji">${st.e}</span>
+        <span class="petFace">${wearEmoji("face")}</span>
+        <span class="petItem">${wearEmoji("item")}</span>
         <span class="petBuddy">${S.buddy ? stickerOf(S.buddy).e : ""}</span>
       </div>
-      <div id="petStage">${st.n}</div>
-      <div id="petTip">${(S.hat || S.buddy) ? "点宠物有惊喜　·　贴纸册可换装扮" : Object.keys(S.stickers).length ? "去贴纸册，给宠物戴上贴纸！" : "点我一下，给你惊喜～"}</div>
-      <div class="xpbarWrap"><div class="xpbar" style="width:${pct}%"></div></div>
+      <div id="petStage">${esc(petName())}　${careMood().e}</div>
+      <div id="petTip">${"❤️".repeat(bondLv())}${"🤍".repeat(5 - bondLv())}　${careMood().t}</div>
+
+      <div class="careBars">
+        ${[["hunger", "🍖 饱腹"], ["clean", "🛁 干净"], ["mood", "🎾 心情"]].map(([k, lb]) => {
+          const v = S.pet[k] ?? 80;
+          return `<div class="careRow"><span class="careLb">${lb}</span>
+            <span class="careBarWrap"><span class="careBar ${v < 45 ? "low" : ""}" style="width:${v}%"></span></span></div>`;
+        }).join("")}
+      </div>
+      <button class="btn small" id="goCare" style="margin-top:8px">${careAvg() < 65 ? "🍖 快去照顾它！" : "🏠 伙伴屋（喂食 / 洗澡 / 装扮）"}</button>
+
+      <div class="xpbarWrap" style="margin-top:12px"><div class="xpbar" style="width:${pct}%"></div></div>
       <div id="xpText">${nx ? "距离进化【" + nx.n + "】还差 " + (nx.xp - S.xp) + " 魔法值" : "已经是最终形态啦！"}</div>
       <div id="rankChip">${df.rank}　<span style="font-weight:400;color:#c0a8d0">${rankTip}</span></div>
     </div>
@@ -599,6 +668,7 @@ function renderHome() {
   $("#homeWheel").onclick = () => go(renderWheel);
   $("#homeVoucher").onclick = () => go(renderVoucher);
   $("#themeQuick").onclick = () => go(renderTheme);
+  $("#goCare").onclick = () => go(renderCare);
   if (S.testMode) $("#testBanner").onclick = () => {
     S.testMode = false; save(); toast("✅ 测试模式已关闭，恢复正常闯关", 2200); renderHome();
   };
@@ -1537,13 +1607,30 @@ function wheelStale() { return wheelAgeDays() >= WHEEL_STALE_DAYS; }
 function touchWheel() { S.wheelTouched = todayStr(); save(); }
 let spinning = false;
 
+/* 转盘 = 终极奖励，一天只能转一次，而且必须「学完 + 复习完」才解锁。
+ * 之前券的来源太多，转盘变成了随手能转的东西，稀释了它的分量。 */
+function spunToday() { return S.daily.spun === true; }
+function wheelReady() {
+  const d = taskDone();
+  return d.t1 && d.t2 && d.t3;      // 今天的学新词、玩游戏、复习 都完成
+}
 function renderWheel() {
   const prizes = getWheel(), n = prizes.length, seg = 360 / n;
   const stops = prizes.map((p, i) => `${WHEEL_COLORS[i % WHEEL_COLORS.length]} ${i * seg}deg ${(i + 1) * seg}deg`).join(",");
+  const d = taskDone();
+  const ready = wheelReady(), spun = spunToday();
+  const canSpin = ready && !spun && S.tickets >= 1;
+
+  let btnTxt, hint;
+  if (spun) { btnTxt = "今天已经转过啦，明天再来 🌙"; hint = "转盘每天只能转 <b>1 次</b>——这样它才珍贵。"; }
+  else if (!ready) { btnTxt = "🔒 先完成今天的学习和复习"; hint = "转盘是<b>终极奖励</b>：把今天的三个任务全做完，才能转。"; }
+  else if (S.tickets < 1) { btnTxt = "还没有转盘券"; hint = "完成今日任务就会得到转盘券。"; }
+  else { btnTxt = "🎡 开始转！（今天的唯一一次）"; hint = "今天的学习和复习都完成了——<b>这一转是你应得的</b>。"; }
+
   $("#scr-wheel").innerHTML = `
     <div class="card" style="text-align:center;padding:16px 10px">
       <div style="font-size:16px;font-weight:800;color:#9b59b6">🎡 幸运大转盘</div>
-      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">转到什么奖什么，爸爸妈妈说话算话！</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">每天一次的终极奖励 · 转到什么奖什么，爸爸妈妈说话算话！</div>
       <div id="wheelWrap">
         <div id="wheelPtr">🔻</div>
         <div id="wheel" style="background:conic-gradient(${stops})">
@@ -1551,27 +1638,35 @@ function renderWheel() {
         </div>
         <div id="wheelHub">🎀</div>
       </div>
-      <div id="ticketChip">🎟️ 转盘券：${S.tickets} 张</div>
+      <div id="ticketChip">🎟️ 转盘券：${S.tickets} 张${spun ? "　（今天已转过）" : ""}</div>
+
+      <div class="card" style="margin:8px 0;padding:10px;background:${ready ? "#eefae8" : "#fff6fb"}">
+        <div style="font-size:12px;font-weight:700;color:${ready ? "#5a9a4a" : "#b08ac0"};margin-bottom:4px">
+          ${ready ? "✅ 今天的任务全部完成，可以转啦！" : "🔒 完成下面三件事才能转："}
+        </div>
+        <div style="font-size:12px;color:#8a7a9a;text-align:left;line-height:1.9">
+          ${d.t1 ? "✅" : "⬜"} 学会今天的新单词<br>
+          ${d.t2 ? "✅" : "⬜"} 完成今天的小游戏<br>
+          ${d.t3 ? "✅" : "⬜"} <b>做完今天的复习</b>
+        </div>
+      </div>
+
       <div id="wheelWon"></div>
-      <button class="btn" id="spinBtn" ${S.tickets < 1 ? "disabled" : ""}>${S.tickets < 1 ? "先去完成任务赢券吧" : "开始转！（用1张券）"}</button>
-    </div>
-    <div class="card" style="font-size:12px;color:#b8a8c8;line-height:1.8">
-      <b style="color:#9b59b6">怎么获得转盘券？</b><br>
-      ① 每日三任务全部完成 +1 张<br>
-      ② 当天特别勤奋（金币赚满60）再 +1 张<br>
-      ③ 单元挑战第一次拿满3星 +1 张<br>
-      ④ 连续学习每满3天 +1 张
+      <button class="btn" id="spinBtn" ${canSpin ? "" : "disabled"}>${btnTxt}</button>
+      <div style="font-size:11px;color:#c0b0d0;margin-top:8px;line-height:1.6">${hint}</div>
     </div>
     ${wheelStale() ? `<div class="card" style="background:#fff3d6;text-align:center;font-size:13px;color:#e8842d;font-weight:700">🎁 转盘奖品已经 ${wheelAgeDays()} 天没换新啦，快让爸爸妈妈上新奖品！</div>` : ""}`;
-  $("#spinBtn").onclick = doSpin;
+  if (canSpin) $("#spinBtn").onclick = doSpin;
   show("wheel", "🎡 幸运大转盘");
 }
 
 let wheelTurns = 0;
 function doSpin() {
-  if (spinning || S.tickets < 1) return;
+  if (spinning || S.tickets < 1 || !wheelReady() || spunToday()) return;
   spinning = true;
-  S.tickets--; save();
+  S.tickets--;
+  S.daily.spun = true;          // 每天只能转一次
+  save();
   $("#ticketChip").textContent = "🎟️ 转盘券：" + S.tickets + " 张";
   $("#spinBtn").disabled = true;
   $("#wheelWon").innerHTML = "";
@@ -1595,9 +1690,9 @@ function doSpin() {
       note = "已存入「我的奖励券」，拿给爸爸妈妈兑换～";
     }
     $("#wheelWon").innerHTML = `<div class="wonCard"><div class="we">🎉</div><div class="wn">${esc(prize)}</div><div style="font-size:12px;color:#b08ac0;margin-top:4px">${note}</div></div>`;
-    $("#ticketChip").textContent = "🎟️ 转盘券：" + S.tickets + " 张";
+    $("#ticketChip").textContent = "🎟️ 转盘券：" + S.tickets + " 张　（今天已转过）";
     const btn = $("#spinBtn");
-    if (btn) { btn.disabled = S.tickets < 1; btn.textContent = S.tickets < 1 ? "先去完成任务赢券吧" : "开始转！（用1张券）"; }
+    if (btn) { btn.disabled = true; btn.textContent = "今天已经转过啦，明天再来 🌙"; }
   }, 4300);
 }
 
@@ -1843,6 +1938,39 @@ function renderPhonicsList() {
   show("phonics", "🔮 拼读魔法学院");
 }
 
+/* 把单词按「音节」切块，并给规则字母上色：
+ *   规则字母（如 a-e 里的 a）→ 红色加粗（这就是发音的关键）
+ *   魔法 e（不发音的那个 e）→ 灰色 + 删除线（一眼看出它不发音）
+ *   其余字母 → 普通色
+ */
+function colorWord(w, p) {
+  const word = w.w;
+  const low = word.toLowerCase();
+  const re = new RegExp(p.re);
+  const m = low.match(re);
+  const marks = new Array(word.length).fill(0);   // 0普通 1规则字母 2不发音的e
+  if (m) {
+    const start = m.index, whole = m[0], keep = typeof m[1] === "string" ? m[1] : "";
+    for (let i = start; i < start + whole.length; i++) marks[i] = 1;
+    if (keep) {   // 魔法e规则：中间的辅音不是规则字母
+      const kStart = low.indexOf(keep, start);
+      for (let i = kStart; i < kStart + keep.length; i++) marks[i] = 0;
+      marks[start + whole.length - 1] = 2;        // 结尾那个 e 不发音
+    }
+  }
+  const syl = w.syl && w.syl.length ? w.syl : [word];
+  let idx = 0;
+  return syl.map(s => {
+    let html = "";
+    for (const ch of s) {
+      const cls = marks[idx] === 1 ? "phKey" : marks[idx] === 2 ? "phMute" : "";
+      html += `<span class="${cls}">${esc(ch)}</span>`;
+      idx++;
+    }
+    return `<span class="sylBlock">${html}</span>`;
+  }).join('<span class="sylDot">·</span>');
+}
+
 function renderPhonicRule(p) {
   $("#scr-phonic").innerHTML = `
     <div class="card" style="text-align:center">
@@ -1850,18 +1978,28 @@ function renderPhonicRule(p) {
       <div style="font-size:30px;font-weight:800;color:#6a4a8a;letter-spacing:2px">${esc(p.label)}</div>
       <div style="font-size:20px;color:#b98ff0;font-weight:700">${esc(p.ipa)}</div>
       <div style="font-size:13px;color:#7a5a9a;margin-top:8px;line-height:1.6;text-align:left;background:#fff6fb;border-radius:14px;padding:10px">💡 ${p.tip}</div>
+      <div class="phLegend">
+        <span><b class="phKey">红色</b> = 发这个音的字母</span>
+        <span><b class="phMute">灰色</b> = 不发音</span>
+        <span><b style="color:#b98ff0">·</b> = 音节分界</span>
+      </div>
     </div>
     <div class="sectionTitle">🔊 点一点，听听这些词的共同点</div>
-    <div class="optGrid" id="phWords">
-      ${p.words.map((w, i) => `<button class="optBtn" data-i="${i}">
-        <span class="oEmoji">${w.e}</span>
-        <span style="font-size:16px">${esc(blankWord(w.w, p.re)).replace(/▢/g, '<b style="color:#e56ba0">▢</b>')}</span>
-        <div style="font-size:13px;color:#b08ac0;font-weight:400">${esc(w.w)} ${w.zh}</div>
-      </button>`).join("")}
+    <div id="phWords">
+      ${p.words.map((w, i) => `
+        <div class="phRow" data-i="${i}">
+          <span class="phEmoji">${w.e}</span>
+          <span class="phMid">
+            <span class="phWord">${colorWord(w, p)}</span>
+            <span class="phIpa">${esc(w.ipa || "")}</span>
+            <span class="phZh">${w.zh}</span>
+          </span>
+          <span class="phSpeak">🔊</span>
+        </div>`).join("")}
     </div>
     <div style="height:14px"></div>
     <button class="btn" id="phGo">🎯 挑战拼读关卡</button>`;
-  document.querySelectorAll("#phWords .optBtn").forEach(b => {
+  document.querySelectorAll("#phWords .phRow").forEach(b => {
     b.onclick = () => { speak(p.words[+b.dataset.i].w, 0.75); tone(800, .05); };
   });
   $("#phGo").onclick = () => { phS(p.id).learned = true; save(); go(() => startPhonicGame(p)); };
@@ -2464,6 +2602,183 @@ function renderMicCheck() {
   show("mic", "🎙️ 跟读自检");
 }
 
+/* ================= 伙伴屋：喂养 / 装扮 / 换伙伴 =================
+ * 三个作用：① 金币的日常出口（不然金币会通胀成废数字）
+ *          ② 每天回来看它的理由
+ *          ③ 装扮＝她自己的审美表达
+ * 红线：绝不惩罚。状态只会变淡，不会生病、不会死、不扣任何东西。
+ */
+function renderCare() {
+  decayCare();
+  const st = petStage(S.xp);
+  const w = loadWallet();
+  $("#scr-care").innerHTML = `
+    <div class="card" style="text-align:center">
+      <div class="petShow" style="margin-bottom:6px">
+        <span class="petHat">${wearEmoji("hat")}</span>
+        <span class="petMain" id="carePet">${st.e}</span>
+        <span class="petFace">${wearEmoji("face")}</span>
+        <span class="petItem">${wearEmoji("item")}</span>
+      </div>
+      <div style="font-size:17px;font-weight:800;color:#9b59b6">${esc(petName())}</div>
+      <div style="font-size:12px;color:#b8a8c8">${petDef().n} · ${st.n}　${careMood().e} ${careMood().t}</div>
+      <div style="font-size:13px;margin-top:4px">${"❤️".repeat(bondLv())}${"🤍".repeat(5 - bondLv())}　<span style="font-size:11px;color:#c0a8d0">亲密度 ${S.pet.bond || 0}</span></div>
+      <div id="careSay" style="font-size:13px;color:#7a5a9a;background:#fff6fb;border-radius:12px;padding:8px;margin-top:8px;min-height:34px;line-height:1.5">${
+        careAvg() < 50 ? "（它眼巴巴地看着你……）" : "（它蹭了蹭你的手）"
+      }</div>
+      <button class="btn small ghost" id="renamePet" style="margin-top:8px">✏️ 给它起个名字</button>
+    </div>
+
+    <div class="card">
+      <div class="sectionTitle" style="margin:0 0 8px">照顾它</div>
+      ${[["hunger", "🍖 饱腹"], ["clean", "🛁 干净"], ["mood", "🎾 心情"]].map(([k, lb]) => {
+        const v = S.pet[k] ?? 80;
+        return `<div class="careRow"><span class="careLb">${lb}</span>
+          <span class="careBarWrap"><span class="careBar ${v < 45 ? "low" : ""}" style="width:${v}%"></span></span>
+          <span style="font-size:11px;color:#c0a8d0;width:30px;text-align:right">${v}</span></div>`;
+      }).join("")}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        ${CARE.map(c => `<button class="btn small ghost careBtn" data-c="${c.id}" ${w.coins < c.cost ? "disabled" : ""}>
+          ${c.e} ${c.n}<span style="font-size:11px;color:#c0a8d0">　🪙${c.cost}</span>
+        </button>`).join("")}
+      </div>
+      <div style="font-size:11px;color:#c0b0d0;margin-top:8px;line-height:1.6">
+        照顾它会涨<b>亲密度</b>。它不会生病也不会跑掉——<b>只是会有点想你</b>。
+      </div>
+    </div>
+
+    <div class="card actRow" id="toOutfit">
+      <span class="aIcon">👒</span>
+      <span class="aName">装扮衣橱<span class="aSub">帽子 / 眼镜 / 背包 · 已有 ${(S.pet.outfits || []).length}/${OUTFITS.length}</span></span>
+      <span class="aGo">▶</span>
+    </div>
+    <div class="card actRow" id="toSwap">
+      <span class="aIcon">🔄</span>
+      <span class="aName">换个伙伴<span class="aSub">已拥有 ${(S.pet.owned || []).length}/${PETS.length} 个伙伴</span></span>
+      <span class="aGo">▶</span>
+    </div>`;
+
+  $$("#scr-care .careBtn").forEach(b => {
+    b.onclick = () => {
+      const c = CARE.find(x => x.id === b.dataset.c);
+      const wal = loadWallet();
+      if (wal.coins < c.cost) { toast("金币不够啦，去学习赚金币！💪"); sndWrong(); return; }
+      wal.coins -= c.cost; saveWallet(wal); S.coins = wal.coins;
+      S.pet[c.up] = Math.min(100, (S.pet[c.up] ?? 80) + 25);
+      S.pet.bond = (S.pet.bond || 0) + c.bond;
+      save(); updateCoinBox();
+      sndCoin(); confettiSmall(6);
+      const p = $("#carePet");
+      if (p) { p.classList.remove("bounce"); void p.offsetWidth; p.classList.add("bounce"); }
+      $("#careSay").textContent = "「" + c.say + "」";
+      setTimeout(() => renderCare(), 900);
+    };
+  });
+  $("#renamePet").onclick = () => {
+    const n = prompt("给它起个名字吧（想叫什么都行）", S.pet.name || "");
+    if (n !== null) {
+      S.pet.name = n.trim().slice(0, 10);
+      save(); sndCoin(); toast("🎉 它现在叫「" + (S.pet.name || petStage(S.xp).n) + "」啦！");
+      renderCare();
+    }
+  };
+  $("#toOutfit").onclick = () => go(renderOutfit);
+  $("#toSwap").onclick = () => go(renderSwapPet);
+  show("care", "🏠 伙伴屋");
+}
+
+/* 装扮衣橱 */
+function renderOutfit() {
+  const owned = S.pet.outfits || [];
+  const st = petStage(S.xp);
+  const slots = [["hat", "帽子"], ["face", "脸上"], ["item", "手里"]];
+  $("#scr-outfit").innerHTML = `
+    <div class="card" style="text-align:center">
+      <div class="petShow">
+        <span class="petHat">${wearEmoji("hat")}</span>
+        <span class="petMain">${st.e}</span>
+        <span class="petFace">${wearEmoji("face")}</span>
+        <span class="petItem">${wearEmoji("item")}</span>
+      </div>
+      <div style="font-size:12px;color:#b8a8c8;margin-top:6px">点一下装扮就能穿上，再点一下脱下来</div>
+    </div>
+    ${slots.map(([slot, label]) => `
+      <div class="sectionTitle">${label}</div>
+      <div class="outfitGrid">
+        ${OUTFITS.filter(o => o.slot === slot).map(o => {
+          const has = owned.includes(o.id);
+          const on = S.pet.wear[slot] === o.id;
+          return `<div class="outfitCell ${has ? "" : "lock"} ${on ? "on" : ""}" data-o="${o.id}">
+            <div class="oe">${o.e}</div>
+            <div class="on2">${o.n}</div>
+            <div class="oc">${has ? (on ? "使用中" : "点击穿上") : "🪙" + o.cost}</div>
+          </div>`;
+        }).join("")}
+      </div>`).join("")}`;
+  $$("#scr-outfit .outfitCell").forEach(c => {
+    c.onclick = () => {
+      const o = OUTFITS.find(x => x.id === c.dataset.o);
+      const owned2 = S.pet.outfits || (S.pet.outfits = []);
+      if (!owned2.includes(o.id)) {
+        const wal = loadWallet();
+        if (wal.coins < o.cost) { toast("还差 " + (o.cost - wal.coins) + " 金币～"); sndWrong(); return; }
+        wal.coins -= o.cost; saveWallet(wal); S.coins = wal.coins;
+        owned2.push(o.id);
+        S.pet.wear[o.slot] = o.id;
+        save(); updateCoinBox(); confetti(); sndWin();
+        toast("🎉 买到啦！已经给它穿上「" + o.n + "」");
+      } else {
+        S.pet.wear[o.slot] = (S.pet.wear[o.slot] === o.id) ? "" : o.id;
+        save(); sndCoin();
+      }
+      renderOutfit();
+    };
+  });
+  show("outfit", "👒 装扮衣橱");
+}
+
+/* 换伙伴 */
+function renderSwapPet() {
+  const owned = S.pet.owned || ["classic"];
+  $("#scr-swap").innerHTML = `
+    <div class="card" style="text-align:center;padding:12px">
+      <div style="font-size:15px;font-weight:700;color:#9b59b6">🔄 选一个伙伴</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-top:2px">魔法值是共用的——换伙伴不会让你的进度倒退</div>
+    </div>
+    ${PETS.map(p => {
+      const has = owned.includes(p.id);
+      const cur = S.pet.id === p.id;
+      const st = p.stages.reduce((a, x) => (S.xp >= x.xp ? x : a), p.stages[0]);
+      return `<div class="card actRow" data-p="${p.id}">
+        <span class="aIcon">${has ? st.e : "❓"}</span>
+        <span class="aName">${p.n}<span class="aSub">${p.tag}${has ? "　·　现在是：" + st.n : ""}</span></span>
+        <button class="themeBtn ${cur ? "cur" : has ? "" : "lock"}">${cur ? "使用中 ✓" : has ? "选它" : "🪙" + p.cost}</button>
+      </div>`;
+    }).join("")}
+    <div style="font-size:11px;color:#c0b0d0;text-align:center;line-height:1.7;padding:6px">
+      这些都是<b>原创角色</b>。你可以给它起任何你喜欢的名字 —— 在伙伴屋点「✏️ 起名字」。
+    </div>`;
+  $$("#scr-swap .actRow").forEach(c => {
+    c.onclick = () => {
+      const p = PETS.find(x => x.id === c.dataset.p);
+      const owned2 = S.pet.owned || (S.pet.owned = ["classic"]);
+      if (S.pet.id === p.id) return;
+      if (!owned2.includes(p.id)) {
+        const wal = loadWallet();
+        if (wal.coins < p.cost) { toast("还差 " + (p.cost - wal.coins) + " 金币～"); sndWrong(); return; }
+        wal.coins -= p.cost; saveWallet(wal); S.coins = wal.coins;
+        owned2.push(p.id);
+        confetti(); sndWin(); updateCoinBox();
+      }
+      S.pet.id = p.id; S.pet.name = "";
+      save(); sndCoin();
+      toast("🎉 新伙伴上任！去给它起个名字吧～", 2400);
+      renderSwapPet();
+    };
+  });
+  show("swap", "🔄 换伙伴");
+}
+
 /* ================= 主题换装屋 ================= */
 const THEMES = [
   { id: "candy", n: "🍭 糖果粉粉", sub: "甜甜的经典配色", cost: 0, g: "linear-gradient(135deg,#ffe5f1,#e8e5ff)" },
@@ -2706,6 +3021,12 @@ function pickDeco(s) {
 /* ================= 启动 ================= */
 migrateSRS();
 migrateCheckins();
+/* 老存档迁移：给还没有伙伴数据的档补上默认伙伴 */
+if (!S.pet || !S.pet.stages && !S.pet.id) S.pet = defState().pet;
+if (!S.pet.wear) S.pet.wear = { hat: "", face: "", item: "" };
+if (!S.pet.owned) S.pet.owned = [S.pet.id || "classic"];
+if (!S.pet.outfits) S.pet.outfits = [];
+decayCare();         // 状态随天数自然回落（只会变淡，绝不惩罚）
 walletIn();          // 接入共享钱包（语文App赚的金币在这里也能花）
 applyTheme();
 updateCoinBox();
