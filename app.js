@@ -15,6 +15,9 @@ UNITS.forEach(u => u.words.forEach(w => { WORD_INDEX[w.w] = w; }));
 
 /* ---------------- 存档 ---------------- */
 const LS_KEY = "magicEnglish_v1";
+/* 跨科目共享钱包：语文《寻宝作文记》和英语在同一个域下，localStorage 互通。
+   学英语和学语文赚的是同一份金币和转盘券，喂的是同一只宠物。 */
+const WALLET_KEY = "sharedWallet_v1";
 function defState() {
   return {
     coins: 0, xp: 0, streak: 0, lastDaily: "",
@@ -34,6 +37,7 @@ function defState() {
     theme: "candy",
     themesOwned: ["candy"],
     sound: true,
+    walletMigrated: false, // 首次接入共享钱包时把已有金币/券并进去（只做一次）
     diff: "auto",    // 难度：auto=随掌握词量自动升段，或家长手动锁 1/2/3
     testMode: false, // 家长测试模式：解锁全部内容，给孩子用前记得关掉
     phonics: {},   // 拼读规则id -> {learned:true, stars:0}
@@ -47,7 +51,32 @@ let S = defState();
 try { const raw = localStorage.getItem(LS_KEY); if (raw) S = Object.assign(defState(), JSON.parse(raw)); } catch (e) {}
 S.daily = Object.assign(defState().daily, S.daily);
 if (!S.wheelTouched) S.wheelTouched = todayStr();
-function save() { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {} }
+function save() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {}
+  walletOut();     // 金币/转盘券的变化同步到共享钱包，语文App立刻能看到
+}
+
+/* ---------------- 共享钱包 ----------------
+ * 金币和转盘券以共享钱包为准，两个 App 都读它、都写它。
+ * 首次接入时把英语App已有的金币/券「并」进钱包（walletMigrated 保证只并一次，不会重复计数）。
+ */
+function walletOut() {
+  try { localStorage.setItem(WALLET_KEY, JSON.stringify({ coins: S.coins || 0, tickets: S.tickets || 0 })); } catch (e) {}
+}
+function walletIn() {
+  let w = { coins: 0, tickets: 0 };
+  try { const raw = localStorage.getItem(WALLET_KEY); if (raw) w = JSON.parse(raw) || w; } catch (e) {}
+  if (!S.walletMigrated) {
+    /* 只在第一次接入时把双方已有的加起来，之后钱包就是唯一真相 */
+    w.coins = (w.coins || 0) + (S.coins || 0);
+    w.tickets = (w.tickets || 0) + (S.tickets || 0);
+    S.walletMigrated = true;
+  }
+  S.coins = w.coins || 0;
+  S.tickets = w.tickets || 0;
+  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {}
+  walletOut();
+}
 function unitS(id) { if (!S.units[id]) S.units[id] = { learned: [], stars: 0 }; return S.units[id]; }
 
 /* 跨天重置每日任务 */
@@ -2677,8 +2706,21 @@ function pickDeco(s) {
 /* ================= 启动 ================= */
 migrateSRS();
 migrateCheckins();
+walletIn();          // 接入共享钱包（语文App赚的金币在这里也能花）
 applyTheme();
 updateCoinBox();
+/* 从后台回到前台时重新读钱包：她可能刚在语文App里赚了金币 */
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    const before = S.coins;
+    walletIn();
+    updateCoinBox();
+    if (S.coins > before) {
+      toast("🪙 语文那边赚的 " + (S.coins - before) + " 金币到账啦！", 2600);
+      if ($("#scr-home").classList.contains("on")) renderHome();
+    }
+  }
+});
 /* 连续玩30分钟提醒休息眼睛 */
 let restAt = Date.now();
 setInterval(() => {
