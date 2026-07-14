@@ -395,9 +395,20 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
 .careBar { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, #7cc576, #a8d88a); transition: width .4s; }
 .careBar.low { background: linear-gradient(90deg, #ffb86b, #ff8fab); }
 
-/* 装扮的位置 */
-.petShow .petFace { position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%); font-size: 26px; z-index: 2; pointer-events: none; }
-.petShow .petItem { position: absolute; left: -20px; bottom: 6px; font-size: 30px; z-index: 2; pointer-events: none; animation: floatY 2.8s ease-in-out infinite; }
+/* ---- 伙伴形象：自己上传的图 + 饰品按坐标贴合 ---- */
+.petFig { position: relative; display: inline-block; }
+.petFig .petImg { width: 100%; height: 100%; object-fit: contain; display: block; }
+.petFig .petEmojiBig { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.petDeco { position: absolute; transform: translate(-50%, -50%); z-index: 3; pointer-events: none; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,.2)); }
+.petDeco.deco-item { animation: floatY 2.8s ease-in-out infinite; }
+
+.picPrev { width: 62px; height: 62px; border-radius: 14px; background: #f7f2fb; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
+.picPrev img { width: 100%; height: 100%; object-fit: contain; }
+
+.anchorWrap { position: relative; width: 100%; max-width: 300px; margin: 0 auto; background: #f7f2fb; border-radius: 14px; overflow: hidden; cursor: crosshair; }
+.anchorWrap img { width: 100%; display: block; }
+.anchorDot { position: absolute; transform: translate(-50%, -50%); font-size: 26px; opacity: .55; pointer-events: none; }
+.anchorDot.cur { opacity: 1; font-size: 32px; filter: drop-shadow(0 0 4px #fff); animation: pulse 1.2s infinite; }
 
 .outfitGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
 .outfitCell { background: #fff; border-radius: 14px; text-align: center; padding: 10px 4px; box-shadow: 0 2px 8px rgba(180,140,200,.15); }
@@ -473,6 +484,8 @@ body.th-night .careBarWrap { background: #2a2348; }
     <section id="scr-care" class="screen"></section>
     <section id="scr-outfit" class="screen"></section>
     <section id="scr-swap" class="screen"></section>
+    <section id="scr-pics" class="screen"></section>
+    <section id="scr-anchor" class="screen"></section>
   </main>
 
   <nav id="tabbar">

@@ -38,7 +38,9 @@ function defState() {
       bond: 0,                // 亲密度：喂养积累
       careDay: todayStr(),    // 上次结算状态的日期
       wear: { hat: "", face: "", item: "" },
-      outfits: []             // 已买的装扮
+      outfits: [],            // 已买的装扮
+      pics: {},               // 家长自己上传的伙伴形象：petId -> dataURI（只存本机，不进仓库、不上传）
+      anchors: {}             // 每张图的「头顶/脸/手」坐标（点三下设定），饰品据此精准贴合
     },
     checkins: {},  // 打卡成功的日期（完成当天全部任务才算）
     cyclesPaid: 0, // 已发过奖励的学习周期数（每满 7 天一个周期）
@@ -381,6 +383,37 @@ function wearEmoji(slot) {
   const o = OUTFITS.find(x => x.id === id);
   return o ? o.e : "";
 }
+
+/* ---------------- 伙伴形象：家长自己上传的图 ----------------
+ * 图片只存在这台手机的本地存储里，不进 git 仓库、不上传任何服务器。
+ * 没上传时回退到 emoji。
+ */
+function petPic(id) { return (S.pet.pics || {})[id || S.pet.id] || ""; }
+const DEF_ANCHOR = { hat: { x: 50, y: 6 }, face: { x: 50, y: 34 }, item: { x: 82, y: 70 } };
+function petAnchor(id) {
+  const a = (S.pet.anchors || {})[id || S.pet.id];
+  return {
+    hat: (a && a.hat) || DEF_ANCHOR.hat,
+    face: (a && a.face) || DEF_ANCHOR.face,
+    item: (a && a.item) || DEF_ANCHOR.item
+  };
+}
+/* 伙伴的完整形象：自己上传的图（或 emoji 兜底）+ 饰品贴在设定好的坐标上 */
+function petFigure(size, withOutfit) {
+  const sz = size || 110;
+  const pic = petPic(S.pet.id);
+  const st = petStage(S.xp);
+  const a = petAnchor(S.pet.id);
+  const body = pic
+    ? `<img class="petImg" src="${pic}" alt="">`
+    : `<span class="petEmojiBig" id="petEmoji">${st.e}</span>`;
+  const deco = withOutfit === false ? "" : ["hat", "face", "item"].map(slot => {
+    const e = wearEmoji(slot);
+    if (!e) return "";
+    return `<span class="petDeco deco-${slot}" style="left:${a[slot].x}%;top:${a[slot].y}%;font-size:${Math.round(sz * 0.26)}px">${e}</span>`;
+  }).join("");
+  return `<div class="petFig" style="width:${sz}px;height:${sz}px">${body}${deco}</div>`;
+}
 function addCoins(n) {
   if (n <= 0) return;
   const before = petStage(S.xp).n;
@@ -613,11 +646,9 @@ function renderHome() {
       <div id="streakChip">🔥 连续 ${S.streak} 天</div>
       <button id="themeQuick" style="position:absolute;top:10px;right:10px;border:none;background:none;font-size:22px">🎨</button>
       <div class="petShow" id="petShow">
-        <span class="petHat">${wearEmoji("hat") || (S.hat ? stickerOf(S.hat).e : "")}</span>
-        <span id="petEmoji">${st.e}</span>
-        <span class="petFace">${wearEmoji("face")}</span>
-        <span class="petItem">${wearEmoji("item")}</span>
+        ${petFigure(112)}
         <span class="petBuddy">${S.buddy ? stickerOf(S.buddy).e : ""}</span>
+        <span class="petHat" style="${petPic() ? "display:none" : ""}">${S.hat ? stickerOf(S.hat).e : ""}</span>
       </div>
       <div id="petStage">${esc(petName())}　${careMood().e}</div>
       <div id="petTip">${"❤️".repeat(bondLv())}${"🤍".repeat(5 - bondLv())}　${careMood().t}</div>
@@ -656,9 +687,11 @@ function renderHome() {
       <div class="card" id="homeVoucher"><div class="hIcon">🎟️</div><div class="hName">我的奖励券</div><div class="hSub">${(() => { const p = S.vouchers.filter(v => !v.used).length; return p ? p + " 张待兑换" : "转转盘赢真奖励"; })()}</div></div>
     </div>
     ${renderCalendar()}`;
-  $("#petEmoji").onclick = () => {
+  /* 点伙伴（不管是 emoji 还是家长上传的图）都会说话 */
+  $("#petShow").onclick = () => {
     const p = PRAISES[Math.floor(Math.random() * PRAISES.length)];
-    const el = $("#petEmoji"); el.classList.remove("bounce"); void el.offsetWidth; el.classList.add("bounce");
+    const el = $("#petShow .petFig") || $("#petEmoji");
+    if (el) { el.classList.remove("bounce"); void el.offsetWidth; el.classList.add("bounce"); }
     speak(p.en, 0.9); toast(p.en + "  " + p.zh);
   };
   $("#homeGo").onclick = () => go(() => renderUnit(cu));
@@ -1826,6 +1859,11 @@ function renderParent() {
       <span class="aName">跟读自检<span class="aSub">「魔法回声」用不了时点这里</span></span>
       <span class="aGo">▶</span>
     </div>
+    <div class="card actRow" id="pPics">
+      <span class="aIcon">🖼️</span>
+      <span class="aName">伙伴形象<span class="aSub">上传孩子喜欢的角色图（只存本机，不上传）</span></span>
+      <span class="aGo">▶</span>
+    </div>
     <div style="font-size:11px;color:#c0b0d0;text-align:center">改完直接生效，孩子下次打开转盘就是新奖品</div>`;
   document.querySelectorAll("#scr-parent [data-diff]").forEach(b => {
     b.onclick = () => {
@@ -1839,6 +1877,7 @@ function renderParent() {
   $("#pBackup").onclick = () => go(renderBackup);
   $("#pAudio").onclick = () => go(renderAudioCheck);
   $("#pMic").onclick = () => go(renderMicCheck);
+  $("#pPics").onclick = () => go(renderPetPics);
   $("#pTest").onclick = () => {
     S.testMode = !S.testMode; save();
     toast(S.testMode ? "🧪 测试模式已开启，全部内容解锁" : "✅ 测试模式已关闭，恢复正常闯关", 2200);
@@ -2459,7 +2498,13 @@ function renderReport() {
 
 /* ================= 进度备份码 ================= */
 function exportCode() {
-  try { return btoa(unescape(encodeURIComponent(JSON.stringify(S)))); } catch (e) { return ""; }
+  try {
+    /* 备份码里不放伙伴的图片：图片很大，会把备份码撑成几百KB无法复制。
+       图片本来就是本机私有的，换手机重新选一次即可。 */
+    const lite = JSON.parse(JSON.stringify(S));
+    if (lite.pet) { lite.pet.pics = {}; }
+    return btoa(unescape(encodeURIComponent(JSON.stringify(lite))));
+  } catch (e) { return ""; }
 }
 function importCode(code) {
   try {
@@ -2614,12 +2659,7 @@ function renderCare() {
   const w = loadWallet();
   $("#scr-care").innerHTML = `
     <div class="card" style="text-align:center">
-      <div class="petShow" style="margin-bottom:6px">
-        <span class="petHat">${wearEmoji("hat")}</span>
-        <span class="petMain" id="carePet">${st.e}</span>
-        <span class="petFace">${wearEmoji("face")}</span>
-        <span class="petItem">${wearEmoji("item")}</span>
-      </div>
+      <div class="petShow" id="carePet" style="margin-bottom:6px">${petFigure(120)}</div>
       <div style="font-size:17px;font-weight:800;color:#9b59b6">${esc(petName())}</div>
       <div style="font-size:12px;color:#b8a8c8">${petDef().n} · ${st.n}　${careMood().e} ${careMood().t}</div>
       <div style="font-size:13px;margin-top:4px">${"❤️".repeat(bondLv())}${"🤍".repeat(5 - bondLv())}　<span style="font-size:11px;color:#c0a8d0">亲密度 ${S.pet.bond || 0}</span></div>
@@ -2694,13 +2734,9 @@ function renderOutfit() {
   const slots = [["hat", "帽子"], ["face", "脸上"], ["item", "手里"]];
   $("#scr-outfit").innerHTML = `
     <div class="card" style="text-align:center">
-      <div class="petShow">
-        <span class="petHat">${wearEmoji("hat")}</span>
-        <span class="petMain">${st.e}</span>
-        <span class="petFace">${wearEmoji("face")}</span>
-        <span class="petItem">${wearEmoji("item")}</span>
-      </div>
+      <div class="petShow">${petFigure(120)}</div>
       <div style="font-size:12px;color:#b8a8c8;margin-top:6px">点一下装扮就能穿上，再点一下脱下来</div>
+      ${petPic() ? "" : `<div style="font-size:11px;color:#c0a8d0;margin-top:4px">想换成猫小九的真实形象？家长设置 → 🖼️ 伙伴形象</div>`}
     </div>
     ${slots.map(([slot, label]) => `
       <div class="sectionTitle">${label}</div>
@@ -2777,6 +2813,158 @@ function renderSwapPet() {
     };
   });
   show("swap", "🔄 换伙伴");
+}
+
+/* ================= 伙伴形象：家长上传自己的图 =================
+ * 图片只存在这台手机的本地存储（localStorage），
+ * 不会进 git 仓库、不会上传任何服务器、不会出现在备份码里。
+ * 上传后点三下（头顶 / 脸 / 手），饰品就能精准贴在对的位置。
+ */
+const PIC_MAX = 360;          // 压到 360px，避免撑爆本地存储
+function compressImage(file, cb) {
+  const fr = new FileReader();
+  fr.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, PIC_MAX / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      const cx = cv.getContext("2d");
+      cx.drawImage(img, 0, 0, w, h);
+      let out = "";
+      try { out = cv.toDataURL("image/png"); } catch (e) {}
+      /* PNG 太大就退回 JPEG（会丢透明背景，但能存下） */
+      if (!out || out.length > 500000) {
+        const cv2 = document.createElement("canvas");
+        cv2.width = w; cv2.height = h;
+        const c2 = cv2.getContext("2d");
+        c2.fillStyle = "#fff"; c2.fillRect(0, 0, w, h);
+        c2.drawImage(img, 0, 0, w, h);
+        out = cv2.toDataURL("image/jpeg", 0.85);
+      }
+      cb(out);
+    };
+    img.onerror = () => cb("");
+    img.src = fr.result;
+  };
+  fr.onerror = () => cb("");
+  fr.readAsDataURL(file);
+}
+
+function renderPetPics() {
+  const pics = S.pet.pics || (S.pet.pics = {});
+  $("#scr-pics").innerHTML = `
+    <div class="card" style="font-size:12.5px;color:#7a5a9a;line-height:1.9">
+      <b style="color:#9b59b6">🖼️ 给伙伴换成孩子喜欢的形象</b><br>
+      从手机相册里选图（<b>你自己的图</b>），孩子看到的就是她认识的那个角色。<br>
+      <span style="color:#b8a8c8">图片<b>只存在这台手机里</b>，不会上传到网上、不会进代码仓库、也不会出现在备份码里。换手机需要重新选一次。</span>
+    </div>
+    ${PETS.map(p => {
+      const has = !!pics[p.id];
+      return `<div class="card" style="padding:12px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div class="picPrev">${has ? `<img src="${pics[p.id]}" alt="">` : `<span style="font-size:30px">${p.stages[0].e}</span>`}</div>
+          <div style="flex:1">
+            <div style="font-size:15px;font-weight:700;color:#7a5a9a">${p.n}</div>
+            <div style="font-size:11px;color:#b8a8c8">${has ? "已设置自定义形象" : "现在用的是默认表情"}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+          <label class="btn small ghost" style="cursor:pointer">
+            📷 ${has ? "换一张" : "选图片"}
+            <input type="file" accept="image/*" data-up="${p.id}" style="display:none">
+          </label>
+          ${has ? `<button class="btn small ghost" data-anchor="${p.id}">🎯 调整饰品位置</button>
+                   <button class="btn small ghost" data-del="${p.id}" style="color:#e05a5a">🗑️ 删除</button>` : ""}
+        </div>
+      </div>`;
+    }).join("")}`;
+
+  $$("#scr-pics [data-up]").forEach(inp => {
+    inp.onchange = e => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      toast("正在处理图片……");
+      compressImage(f, dataUri => {
+        if (!dataUri) { toast("这张图读不出来，换一张试试"); return; }
+        try {
+          S.pet.pics[inp.dataset.up] = dataUri;
+          save();
+        } catch (err) {
+          delete S.pet.pics[inp.dataset.up];
+          toast("图片太大了，本地存不下，换一张小一点的", 3000);
+          return;
+        }
+        sndWin(); confetti(10);
+        toast("🎉 形象已换好！接下来点三下设定饰品位置", 2600);
+        go(() => renderAnchor(inp.dataset.up));
+      });
+    };
+  });
+  $$("#scr-pics [data-anchor]").forEach(b => b.onclick = () => go(() => renderAnchor(b.dataset.anchor)));
+  $$("#scr-pics [data-del]").forEach(b => b.onclick = () => {
+    delete S.pet.pics[b.dataset.del];
+    if (S.pet.anchors) delete S.pet.anchors[b.dataset.del];
+    save(); sndCoin(); toast("已删除，恢复默认表情");
+    renderPetPics();
+  });
+  show("pics", "🖼️ 伙伴形象");
+}
+
+/* 点三下：头顶 / 脸 / 手 —— 饰品就贴在这三个点上 */
+function renderAnchor(petId) {
+  const pic = (S.pet.pics || {})[petId];
+  if (!pic) { goBack(); return; }
+  if (!S.pet.anchors) S.pet.anchors = {};
+  const cur = Object.assign({}, DEF_ANCHOR, S.pet.anchors[petId] || {});
+  const steps = [
+    { k: "hat", n: "头顶", e: "🎩", tip: "点一下它<b>头顶</b>的位置（帽子会戴在这里）" },
+    { k: "face", n: "脸", e: "👓", tip: "点一下它<b>脸</b>的位置（眼镜会戴在这里）" },
+    { k: "item", n: "手", e: "🔍", tip: "点一下它<b>手边</b>的位置（放大镜、背包会放在这里）" }
+  ];
+  let si = 0;
+
+  function draw() {
+    const st = steps[si];
+    $("#scr-anchor").innerHTML = `
+      <div class="card" style="text-align:center;padding:12px">
+        <div style="font-size:15px;font-weight:700;color:#9b59b6">${st.e} 第 ${si + 1}/3 步：${st.n}</div>
+        <div style="font-size:13px;color:#7a5a9a;margin-top:4px;line-height:1.6">${st.tip}</div>
+      </div>
+      <div class="card" style="padding:12px">
+        <div class="anchorWrap" id="anchorWrap">
+          <img src="${pic}" alt="">
+          ${steps.map(s => cur[s.k] ? `<span class="anchorDot ${s.k === st.k ? "cur" : ""}" style="left:${cur[s.k].x}%;top:${cur[s.k].y}%">${s.e}</span>` : "").join("")}
+        </div>
+        <div style="font-size:11px;color:#b8a8c8;text-align:center;margin-top:8px">在图片上点一下就行，点错了可以重点</div>
+      </div>
+      <button class="btn" id="anchorNext">${si < 2 ? "下一步 →" : "✅ 完成"}</button>
+      <div style="height:8px"></div>
+      <button class="btn ghost" id="anchorSkip">用默认位置就行</button>`;
+
+    $("#anchorWrap").onclick = ev => {
+      const r = ev.currentTarget.getBoundingClientRect();
+      const x = Math.round(((ev.clientX - r.left) / r.width) * 100);
+      const y = Math.round(((ev.clientY - r.top) / r.height) * 100);
+      cur[steps[si].k] = { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
+      tone(760, .06);
+      draw();
+    };
+    $("#anchorNext").onclick = () => {
+      if (si < 2) { si++; draw(); return; }
+      S.pet.anchors[petId] = cur; save();
+      sndWin(); confetti(10);
+      toast("🎉 设置好啦！去给它戴上装扮试试", 2400);
+      navStack = [renderPetPics]; renderPetPics();
+    };
+    $("#anchorSkip").onclick = () => {
+      S.pet.anchors[petId] = Object.assign({}, DEF_ANCHOR); save();
+      navStack = [renderPetPics]; renderPetPics();
+    };
+    show("anchor", "🎯 设定饰品位置");
+  }
+  draw();
 }
 
 /* ================= 主题换装屋 ================= */
