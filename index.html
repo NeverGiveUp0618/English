@@ -405,10 +405,33 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
 .picPrev { width: 62px; height: 62px; border-radius: 14px; background: #f7f2fb; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
 .picPrev img { width: 100%; height: 100%; object-fit: contain; }
 
-.anchorWrap { position: relative; width: 100%; max-width: 300px; margin: 0 auto; background: #f7f2fb; border-radius: 14px; overflow: hidden; cursor: crosshair; }
-.anchorWrap img { width: 100%; display: block; }
-.anchorDot { position: absolute; transform: translate(-50%, -50%); font-size: 26px; opacity: .55; pointer-events: none; }
-.anchorDot.cur { opacity: 1; font-size: 32px; filter: drop-shadow(0 0 4px #fff); animation: pulse 1.2s infinite; }
+/* ---- 装扮编辑：直接拖动 ---- */
+.decoStage {
+  position: relative; width: 100%; max-width: 300px; margin: 0 auto;
+  min-height: 260px; background: #f7f2fb; border-radius: 14px; overflow: hidden;
+  touch-action: none;   /* 拖饰品时别让页面跟着滚 */
+  user-select: none; -webkit-user-select: none;
+}
+.decoStage img { width: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
+.decoEmojiBg { font-size: 130px; text-align: center; padding: 50px 0; }
+.decoItem {
+  position: absolute; cursor: grab; touch-action: none;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,.25));
+  transition: none;
+}
+.decoItem.sel { outline: 2.5px dashed #b98ff0; outline-offset: 4px; border-radius: 8px; }
+.decoItem:active { cursor: grabbing; }
+
+.decoCtrl { display: flex; gap: 8px; justify-content: center; }
+.decoBtn {
+  flex: 1; border: none; border-radius: 12px; background: #f5eefc; color: #7a5a9a;
+  font-size: 18px; font-weight: 700; padding: 8px 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+}
+.decoBtn span { font-size: 10px; color: #b8a8c8; font-weight: 400; }
+.decoBtn:active { background: #e8dcf6; transform: scale(.95); }
+body.th-night .decoStage { background: #3d3360; }
+body.th-night .decoBtn { background: #473a6e; color: #cfc0ee; }
 
 .outfitGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
 .outfitCell { background: #fff; border-radius: 14px; text-align: center; padding: 10px 4px; box-shadow: 0 2px 8px rgba(180,140,200,.15); }

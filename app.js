@@ -389,28 +389,41 @@ function wearEmoji(slot) {
  * 没上传时回退到 emoji。
  */
 function petPic(id) { return (S.pet.pics || {})[id || S.pet.id] || ""; }
-const DEF_ANCHOR = { hat: { x: 50, y: 6 }, face: { x: 50, y: 34 }, item: { x: 82, y: 70 } };
-function petAnchor(id) {
-  const a = (S.pet.anchors || {})[id || S.pet.id];
-  return {
-    hat: (a && a.hat) || DEF_ANCHOR.hat,
-    face: (a && a.face) || DEF_ANCHOR.face,
-    item: (a && a.item) || DEF_ANCHOR.item
-  };
+
+/* 每件饰品的位置/大小/角度：x,y 是百分比坐标，s 是缩放，r 是旋转角度
+ * 全都可以在「装扮编辑」里直接用手指拖出来 —— 点坐标那套太难点了，弃用。 */
+const DEF_DECO = {
+  hat: { x: 50, y: 8, s: 1, r: 0 },
+  face: { x: 50, y: 34, s: 1, r: 0 },
+  item: { x: 80, y: 70, s: 1, r: 0 }
+};
+function decoOf(slot, id) {
+  const petId = id || S.pet.id;
+  const d = ((S.pet.deco || {})[petId] || {})[slot];
+  /* 兼容早期版本存的 anchors（只有 x/y） */
+  const old = ((S.pet.anchors || {})[petId] || {})[slot];
+  return Object.assign({}, DEF_DECO[slot], old ? { x: old.x, y: old.y } : {}, d || {});
 }
-/* 伙伴的完整形象：自己上传的图（或 emoji 兜底）+ 饰品贴在设定好的坐标上 */
+function setDeco(slot, v, id) {
+  const petId = id || S.pet.id;
+  if (!S.pet.deco) S.pet.deco = {};
+  if (!S.pet.deco[petId]) S.pet.deco[petId] = {};
+  S.pet.deco[petId][slot] = v;
+  save();
+}
+/* 伙伴的完整形象：自己上传的图（或 emoji 兜底）+ 饰品按各自的位置/大小/角度贴上去 */
 function petFigure(size, withOutfit) {
   const sz = size || 110;
   const pic = petPic(S.pet.id);
   const st = petStage(S.xp);
-  const a = petAnchor(S.pet.id);
   const body = pic
     ? `<img class="petImg" src="${pic}" alt="">`
     : `<span class="petEmojiBig" id="petEmoji">${st.e}</span>`;
   const deco = withOutfit === false ? "" : ["hat", "face", "item"].map(slot => {
     const e = wearEmoji(slot);
     if (!e) return "";
-    return `<span class="petDeco deco-${slot}" style="left:${a[slot].x}%;top:${a[slot].y}%;font-size:${Math.round(sz * 0.26)}px">${e}</span>`;
+    const d = decoOf(slot);
+    return `<span class="petDeco deco-${slot}" style="left:${d.x}%;top:${d.y}%;font-size:${Math.round(sz * 0.26 * d.s)}px;transform:translate(-50%,-50%) rotate(${d.r}deg)">${e}</span>`;
   }).join("");
   return `<div class="petFig" style="width:${sz}px;height:${sz}px">${body}${deco}</div>`;
 }
@@ -2736,6 +2749,7 @@ function renderOutfit() {
     <div class="card" style="text-align:center">
       <div class="petShow">${petFigure(120)}</div>
       <div style="font-size:12px;color:#b8a8c8;margin-top:6px">点一下装扮就能穿上，再点一下脱下来</div>
+      <button class="btn small" id="toDecoEdit" style="margin-top:8px">🎯 拖动调整位置 / 大小 / 角度</button>
       ${petPic() ? "" : `<div style="font-size:11px;color:#c0a8d0;margin-top:4px">想换成猫小九的真实形象？家长设置 → 🖼️ 伙伴形象</div>`}
     </div>
     ${slots.map(([slot, label]) => `
@@ -2751,6 +2765,8 @@ function renderOutfit() {
           </div>`;
         }).join("")}
       </div>`).join("")}`;
+  const dEdit = $("#toDecoEdit");
+  if (dEdit) dEdit.onclick = () => go(renderDecoEdit);
   $$("#scr-outfit .outfitCell").forEach(c => {
     c.onclick = () => {
       const o = OUTFITS.find(x => x.id === c.dataset.o);
@@ -2875,7 +2891,7 @@ function renderPetPics() {
             📷 ${has ? "换一张" : "选图片"}
             <input type="file" accept="image/*" data-up="${p.id}" style="display:none">
           </label>
-          ${has ? `<button class="btn small ghost" data-anchor="${p.id}">🎯 调整饰品位置</button>
+          ${has ? `<button class="btn small ghost" data-use="${p.id}">👀 用它并调装扮</button>
                    <button class="btn small ghost" data-del="${p.id}" style="color:#e05a5a">🗑️ 删除</button>` : ""}
         </div>
       </div>`;
@@ -2897,12 +2913,17 @@ function renderPetPics() {
           return;
         }
         sndWin(); confetti(10);
-        toast("🎉 形象已换好！接下来点三下设定饰品位置", 2600);
-        go(() => renderAnchor(inp.dataset.up));
+        S.pet.id = inp.dataset.up;          // 换成这个伙伴，方便立刻看效果
+        save();
+        toast("🎉 形象已换好！戴上装扮后可以直接拖动调整位置", 3000);
+        renderPetPics();
       });
     };
   });
-  $$("#scr-pics [data-anchor]").forEach(b => b.onclick = () => go(() => renderAnchor(b.dataset.anchor)));
+  $$("#scr-pics [data-use]").forEach(b => b.onclick = () => {
+    S.pet.id = b.dataset.use; save();
+    go(renderDecoEdit);
+  });
   $$("#scr-pics [data-del]").forEach(b => b.onclick = () => {
     delete S.pet.pics[b.dataset.del];
     if (S.pet.anchors) delete S.pet.anchors[b.dataset.del];
@@ -2912,57 +2933,130 @@ function renderPetPics() {
   show("pics", "🖼️ 伙伴形象");
 }
 
-/* 点三下：头顶 / 脸 / 手 —— 饰品就贴在这三个点上 */
-function renderAnchor(petId) {
-  const pic = (S.pet.pics || {})[petId];
-  if (!pic) { goBack(); return; }
-  if (!S.pet.anchors) S.pet.anchors = {};
-  const cur = Object.assign({}, DEF_ANCHOR, S.pet.anchors[petId] || {});
-  const steps = [
-    { k: "hat", n: "头顶", e: "🎩", tip: "点一下它<b>头顶</b>的位置（帽子会戴在这里）" },
-    { k: "face", n: "脸", e: "👓", tip: "点一下它<b>脸</b>的位置（眼镜会戴在这里）" },
-    { k: "item", n: "手", e: "🔍", tip: "点一下它<b>手边</b>的位置（放大镜、背包会放在这里）" }
-  ];
-  let si = 0;
+/* ================= 装扮编辑：直接拖 =================
+ * 原来那套「点三下定坐标」太难点了（用户实测点不准），弃用。
+ * 现在：手指按住饰品直接拖，选中后可以放大/缩小/旋转。所见即所得。
+ */
+function renderDecoEdit() {
+  const worn = ["hat", "face", "item"].filter(s => wearEmoji(s));
+  if (!worn.length) {
+    $("#scr-anchor").innerHTML = `
+      <div class="card" style="text-align:center;padding:26px 16px">
+        <div style="font-size:40px">👒</div>
+        <div style="font-size:15px;font-weight:700;color:#9b59b6;margin:8px 0">还没给它戴装扮</div>
+        <div style="font-size:13px;color:#b8a8c8;line-height:1.7">先去<b>装扮衣橱</b>买一顶帽子或一副眼镜，<br>戴上之后就能在这里拖动、放大、旋转啦。</div>
+        <div style="height:14px"></div>
+        <button class="btn" id="deGo">👒 去装扮衣橱</button>
+      </div>`;
+    $("#deGo").onclick = () => { navStack = [renderOutfit]; renderOutfit(); };
+    show("anchor", "🎯 调整装扮");
+    return;
+  }
+  let sel = worn[0];
 
   function draw() {
-    const st = steps[si];
+    const pic = petPic(S.pet.id);
+    const st = petStage(S.xp);
     $("#scr-anchor").innerHTML = `
-      <div class="card" style="text-align:center;padding:12px">
-        <div style="font-size:15px;font-weight:700;color:#9b59b6">${st.e} 第 ${si + 1}/3 步：${st.n}</div>
-        <div style="font-size:13px;color:#7a5a9a;margin-top:4px;line-height:1.6">${st.tip}</div>
+      <div class="card" style="text-align:center;padding:10px">
+        <div style="font-size:13px;color:#7a5a9a;line-height:1.6">
+          <b>按住饰品直接拖</b>到你想要的位置 · 下面的按钮可以放大 / 缩小 / 旋转
+        </div>
       </div>
       <div class="card" style="padding:12px">
-        <div class="anchorWrap" id="anchorWrap">
-          <img src="${pic}" alt="">
-          ${steps.map(s => cur[s.k] ? `<span class="anchorDot ${s.k === st.k ? "cur" : ""}" style="left:${cur[s.k].x}%;top:${cur[s.k].y}%">${s.e}</span>` : "").join("")}
+        <div class="decoStage" id="decoStage">
+          ${pic ? `<img src="${pic}" alt="" draggable="false">` : `<div class="decoEmojiBg">${st.e}</div>`}
+          ${worn.map(slot => {
+            const d = decoOf(slot);
+            return `<span class="decoItem ${slot === sel ? "sel" : ""}" data-slot="${slot}"
+              style="left:${d.x}%;top:${d.y}%;font-size:${Math.round(46 * d.s)}px;transform:translate(-50%,-50%) rotate(${d.r}deg)">${wearEmoji(slot)}</span>`;
+          }).join("")}
         </div>
-        <div style="font-size:11px;color:#b8a8c8;text-align:center;margin-top:8px">在图片上点一下就行，点错了可以重点</div>
       </div>
-      <button class="btn" id="anchorNext">${si < 2 ? "下一步 →" : "✅ 完成"}</button>
-      <div style="height:8px"></div>
-      <button class="btn ghost" id="anchorSkip">用默认位置就行</button>`;
 
-    $("#anchorWrap").onclick = ev => {
-      const r = ev.currentTarget.getBoundingClientRect();
-      const x = Math.round(((ev.clientX - r.left) / r.width) * 100);
-      const y = Math.round(((ev.clientY - r.top) / r.height) * 100);
-      cur[steps[si].k] = { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
-      tone(760, .06);
-      draw();
+      <div class="card" style="padding:12px">
+        <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-bottom:10px">
+          ${worn.map(slot => `<button class="btn small ${slot === sel ? "" : "ghost"}" data-pick="${slot}">
+            ${wearEmoji(slot)} ${slot === "hat" ? "帽子" : slot === "face" ? "脸上" : "手里"}
+          </button>`).join("")}
+        </div>
+        <div class="decoCtrl">
+          <button class="decoBtn" data-act="small">➖<span>缩小</span></button>
+          <button class="decoBtn" data-act="big">➕<span>放大</span></button>
+          <button class="decoBtn" data-act="ccw">↺<span>左转</span></button>
+          <button class="decoBtn" data-act="cw">↻<span>右转</span></button>
+          <button class="decoBtn" data-act="reset">🔄<span>复位</span></button>
+        </div>
+        <div style="font-size:11px;color:#c0b0d0;text-align:center;margin-top:8px">
+          当前：${wearEmoji(sel)}　大小 ${Math.round(decoOf(sel).s * 100)}%　角度 ${decoOf(sel).r}°
+        </div>
+      </div>
+      <button class="btn" id="deDone">✅ 就这样，完成</button>`;
+
+    /* 选中哪件饰品 */
+    $$("#scr-anchor [data-pick]").forEach(b => b.onclick = () => { sel = b.dataset.pick; tone(700, .05); draw(); });
+
+    /* 直接拖动 */
+    const stage = $("#decoStage");
+    $$("#scr-anchor .decoItem").forEach(el => {
+      const slot = el.dataset.slot;
+      let dragging = false;
+
+      const moveTo = (cx, cy) => {
+        const r = stage.getBoundingClientRect();
+        const x = Math.max(0, Math.min(100, ((cx - r.left) / r.width) * 100));
+        const y = Math.max(0, Math.min(100, ((cy - r.top) / r.height) * 100));
+        const d = decoOf(slot);
+        d.x = Math.round(x); d.y = Math.round(y);
+        setDeco(slot, d);
+        el.style.left = d.x + "%";
+        el.style.top = d.y + "%";
+      };
+      const start = ev => {
+        dragging = true; sel = slot;
+        $$("#scr-anchor .decoItem").forEach(x => x.classList.toggle("sel", x === el));
+        ev.preventDefault();
+      };
+      const move = ev => {
+        if (!dragging) return;
+        const t = ev.touches ? ev.touches[0] : ev;
+        moveTo(t.clientX, t.clientY);
+        ev.preventDefault();
+      };
+      const end = () => { if (dragging) { dragging = false; tone(760, .05); draw(); } };
+
+      el.onmousedown = start;
+      el.ontouchstart = start;
+      /* 监听整个舞台，手指拖出饰品范围也不会断 */
+      stage.addEventListener("mousemove", move);
+      stage.addEventListener("touchmove", move, { passive: false });
+      stage.addEventListener("mouseup", end);
+      stage.addEventListener("touchend", end);
+      stage.addEventListener("mouseleave", end);
+    });
+
+    /* 放大 / 缩小 / 旋转 / 复位 */
+    $$("#scr-anchor .decoBtn").forEach(b => {
+      b.onclick = () => {
+        const d = decoOf(sel);
+        const a = b.dataset.act;
+        if (a === "big") d.s = Math.min(3, +(d.s + 0.15).toFixed(2));
+        else if (a === "small") d.s = Math.max(0.4, +(d.s - 0.15).toFixed(2));
+        else if (a === "cw") d.r = (d.r + 15) % 360;
+        else if (a === "ccw") d.r = (d.r - 15 + 360) % 360;
+        else if (a === "reset") Object.assign(d, DEF_DECO[sel]);
+        setDeco(sel, d);
+        tone(a === "reset" ? 500 : 800, .05);
+        draw();
+      };
+    });
+
+    $("#deDone").onclick = () => {
+      sndWin(); confettiSmall(8);
+      toast("🎉 装扮调好啦！", 1800);
+      navStack = [renderOutfit]; renderOutfit();
     };
-    $("#anchorNext").onclick = () => {
-      if (si < 2) { si++; draw(); return; }
-      S.pet.anchors[petId] = cur; save();
-      sndWin(); confetti(10);
-      toast("🎉 设置好啦！去给它戴上装扮试试", 2400);
-      navStack = [renderPetPics]; renderPetPics();
-    };
-    $("#anchorSkip").onclick = () => {
-      S.pet.anchors[petId] = Object.assign({}, DEF_ANCHOR); save();
-      navStack = [renderPetPics]; renderPetPics();
-    };
-    show("anchor", "🎯 设定饰品位置");
+    show("anchor", "🎯 调整装扮");
   }
   draw();
 }
