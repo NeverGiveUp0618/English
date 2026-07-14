@@ -4,3 +4,4 @@ pet-pics/
 *.jpg
 *.jpeg
 !audio/*.mp3
+node_modules/
