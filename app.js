@@ -52,6 +52,7 @@ function defState() {
     themesOwned: ["candy"],
     sound: true,
     walletMigrated: false, // 首次接入共享钱包时把已有金币/券并进去（只做一次）
+    focusBook: "auto",  // 当前学习重点：auto=跟学校进度(四上)，或家长指定某一册（暑假复习用）
     diff: "auto",    // 难度：auto=随掌握词量自动升段，或家长手动锁 1/2/3
     testMode: false, // 家长测试模式：解锁全部内容，给孩子用前记得关掉
     phonics: {},   // 拼读规则id -> {learned:true, stars:0}
@@ -164,7 +165,18 @@ const DIFFS = {
     bossQ: 10, examQ: 15, pairs: 6
   }
 };
-function masteredCount() { return UNITS.reduce((a, u) => a + unitS(u.id).learned.length, 0); }
+/* 段位应该反映「当前教材的掌握度」。
+   低年级（二年级/三上/三下）的词简单得多，暑假刷一遍就把难度顶到最高是错的——
+   所以低年级词只按半个计。 */
+const CORE_BOOKS = ["四上", "四下"];
+function masteredCount() {
+  let n = 0;
+  UNITS.forEach(u => {
+    const c = unitS(u.id).learned.length;
+    n += CORE_BOOKS.includes(u.book) ? c : c * 0.5;
+  });
+  return Math.round(n);
+}
 function levelNum() {
   if (S.diff && S.diff !== "auto") return +S.diff;
   const m = masteredCount();
@@ -660,7 +672,11 @@ function isUnlocked(u) {
    低年级那几册是给暑假复习用的，在地图里随时可以点进去。 */
 const LEARN_ORDER = ["四上", "四下", "三上", "三下", "二年级"];
 function currentUnit() {
-  for (const bk of LEARN_ORDER) {
+  /* 家长指定了学习重点（比如暑假复习三上）就跟着走 */
+  const order = (S.focusBook && S.focusBook !== "auto")
+    ? [S.focusBook].concat(LEARN_ORDER.filter(b => b !== S.focusBook))
+    : LEARN_ORDER;
+  for (const bk of order) {
     for (const u of UNITS.filter(x => x.book === bk)) {
       if (isUnlocked(u) && unitS(u.id).stars < 1) return u;
     }
@@ -671,6 +687,22 @@ function unlockedWords() {
   let ws = [];
   UNITS.forEach(u => { if (isUnlocked(u)) ws = ws.concat(u.words); });
   return ws;
+}
+/* 她真正学过的词。游戏厅只能考这些——考没学过的词是纯粹的挫败。 */
+function learnedWords() {
+  const ws = [];
+  UNITS.forEach(u => {
+    const us = unitS(u.id);
+    u.words.forEach(w => { if (us.learned.includes(w.w)) ws.push(w); });
+  });
+  return ws;
+}
+/* 游戏厅题库：优先用学过的词；学得太少时才退回本单元词（保证游戏能玩） */
+function gamePool() {
+  const lw = learnedWords();
+  if (lw.length >= 6) return lw;
+  const cu = currentUnit();
+  return lw.length ? lw.concat(cu.words.filter(w => !lw.some(x => x.w === w.w))) : cu.words;
 }
 function unlockedSents() {
   let ss = [];
@@ -727,7 +759,7 @@ function renderHome() {
       </div>
       <div class="taskRow clickable ${d.t2 ? "done" : ""}" data-jump="learn">
         <span class="tIcon">2️⃣</span>
-        <span class="tName">📖 ${noFreshWords() ? "复习巩固（新词已学完）" : "学 " + df.newWords + " 个新单词"}<span class="tHint">学校讲到哪个单元就点哪个</span></span>
+        <span class="tName">📖 ${noFreshWords() ? "复习巩固（新词已学完）" : "学 " + df.newWords + " 个新单词"}<span class="tHint">现在学：${cu.book} ${cu.num}${S.focusBook && S.focusBook !== "auto" ? "（家长已指定）" : ""}</span></span>
         <span class="tProg">${noFreshWords() ? Math.min(S.daily.g, 2) + "/2" : Math.min(S.daily.w, df.newWords) + "/" + df.newWords}</span>
       </div>
       <div class="taskRow clickable ${d.t3 ? "done" : ""}" data-jump="game">
@@ -742,7 +774,7 @@ function renderHome() {
       </div>
     </div>
     <div style="text-align:center;font-size:11px;color:#c0b0d0;margin:-4px 0 12px">四项全部完成，才能转今天的转盘 🎡</div>
-    <button class="btn" id="homeGo">✨ 继续闯关：${cu.num} ${cu.zh} →</button>
+    <button class="btn" id="homeGo">✨ 继续闯关：<b>${cu.book}</b> ${cu.num} ${cu.zh} →</button>
     <div style="height:12px"></div>
     <div class="card" style="display:flex;text-align:center;padding:12px">
       <div style="flex:1"><div style="font-size:19px;font-weight:800;color:#e8a33d">${mt.fresh}</div><div style="font-size:11px;color:#b8a8c8">刚学会</div></div>
@@ -1697,7 +1729,7 @@ function startReview() {
 
 /* ================= 游戏厅 ================= */
 function renderArcade() {
-  const pool = unlockedWords(), sents = unlockedSents();
+  const pool = gamePool(), sents = unlockedSents();
   const learnedN = UNITS.reduce((a, u) => a + unitS(u.id).learned.length, 0);
   const dc = dueCount();
   const games = [
@@ -1915,6 +1947,17 @@ function renderParent() {
       </div>` : ""}
     </div>
     <div class="card">
+      <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-bottom:4px">📚 学习重点</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">
+        「学新词」任务会跳到这一册。<b>暑假想复习三年级，就选「三上」</b>；开学跟学校进度就用「自动」。<br>
+        当前：<b style="color:#9b59b6">${currentUnit().book} ${currentUnit().num}</b>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${[["auto", "自动（跟学校）"], ["二年级", "二年级"], ["三上", "三上"], ["三下", "三下"], ["四上", "四上"], ["四下", "四下"]].map(([v, n]) =>
+          `<button class="themeBtn ${String(S.focusBook || "auto") === v ? "cur" : "lock"}" data-focus="${v}">${n}</button>`).join("")}
+      </div>
+    </div>
+    <div class="card">
       <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-bottom:4px">🎚️ 难度</div>
       <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">
         默认「自动升段」：孩子刚开始题目少、3选1、不倒计时、拼写有提示；掌握 25 个词升到魔法师，60 个词升到大魔法师，难度逐步加上去。<br>
@@ -1965,6 +2008,13 @@ function renderParent() {
       <span class="aGo">▶</span>
     </div>
     <div style="font-size:11px;color:#c0b0d0;text-align:center">改完直接生效，孩子下次打开转盘就是新奖品</div>`;
+  document.querySelectorAll("#scr-parent [data-focus]").forEach(b => {
+    b.onclick = () => {
+      S.focusBook = b.dataset.focus; save(); sndCoin();
+      toast(b.dataset.focus === "auto" ? "已设为跟学校进度" : "学习重点已设为「" + b.dataset.focus + "」", 2200);
+      renderParent();
+    };
+  });
   document.querySelectorAll("#scr-parent [data-diff]").forEach(b => {
     b.onclick = () => {
       S.diff = b.dataset.diff === "auto" ? "auto" : +b.dataset.diff;
@@ -2055,12 +2105,78 @@ function phS(id) { if (!S.phonics[id]) S.phonics[id] = { learned: false, stars: 
 function blankWord(word, reSrc) {
   return word.toLowerCase().replace(new RegExp(reSrc), (s, g) => typeof g === "string" ? "▢" + g + "▢" : "▢".repeat(s.length));
 }
+/* 拼读大挑战：从「学过的规则」里混合出题。
+   8 条规则学完后，每天的拼读任务不至于空转——混合复习才是真本事。 */
+function startPhonicMix() {
+  const learned = PHONICS.filter(p => phS(p.id).learned);
+  if (learned.length < 2) { toast("先学 2 条拼读规则，才能玩混合挑战～", 2200); goBack(); return; }
+  const items = [];
+  learned.forEach(p => p.words.forEach(w => items.push({ p, w })));
+  const qs = sample(items, Math.min(8, items.length));
+  let qi = 0, right = 0;
+  function q() {
+    if (qi >= qs.length) {
+      bumpDaily("ph");
+      const stars = right === qs.length ? 3 : right >= qs.length - 2 ? 2 : 1;
+      return renderResult({
+        stars,
+        title: right === qs.length ? "拼读全对，真正的拼读魔法师！" : "拼读大挑战完成！",
+        detail: `答对 ${right}/${qs.length}　混合了 ${learned.length} 条规则`,
+        coins: right * 3 + (right === qs.length ? 8 : 0),
+        replay: () => startPhonicMix()
+      });
+    }
+    const { p, w } = qs[qi];
+    const others = sample(PHONICS.filter(x => x.id !== p.id), D().opts - 1);
+    const opts = shuffle([p].concat(others));
+    $("#scr-play").innerHTML = `
+      <div id="playHead"><div id="playProg">🔮 拼读大挑战 ${qi + 1} / ${qs.length}　已答对 ${right}</div></div>
+      <div class="card" id="playQ">
+        <button id="lcSpeak" style="margin-top:0">🔊</button>
+        <div class="qText" style="letter-spacing:2px;font-size:22px">${esc(w.w)}</div>
+        <div class="qSub">这个词属于哪个发音家族？</div>
+      </div>
+      <div class="optGrid">${opts.map((o, i) => `<button class="optBtn" data-i="${i}">
+        <span style="font-size:20px;font-weight:800">${esc(o.label)}</span>
+        <div style="font-size:13px;color:#b08ac0;font-weight:400">${esc(o.ipa)}</div>
+      </button>`).join("")}</div>`;
+    speak(w.w, 0.75);
+    $("#lcSpeak").onclick = () => speak(w.w, 0.75);
+    let locked = false;
+    $$("#scr-play .optBtn").forEach(b => {
+      b.onclick = () => {
+        if (locked) return; locked = true;
+        const o = opts[+b.dataset.i];
+        if (o.id === p.id) { b.classList.add("right"); sndRight(); right++; logAnswer(true); speak(w.w, 0.75); }
+        else {
+          b.classList.add("wrong"); sndWrong(); logAnswer(false);
+          $$("#scr-play .optBtn").forEach(x => { if (opts[+x.dataset.i].id === p.id) x.classList.add("right"); });
+          toast(w.w + " → " + p.label + " " + p.ipa, 1800);
+        }
+        setTimeout(() => { qi++; q(); }, 1000);
+      };
+    });
+    show("play", "🔮 拼读大挑战");
+  }
+  q();
+}
+
 function renderPhonicsList() {
+  const learnedN = PHONICS.filter(p => phS(p.id).learned).length;
+  const doneToday = S.daily.ph >= 1;
   $("#scr-phonics").innerHTML = `
     <div class="card" style="text-align:center;padding:12px">
       <div style="font-size:15px;font-weight:700;color:#9b59b6">🔮 拼读魔法学院</div>
       <div style="font-size:12px;color:#b8a8c8;margin-top:2px">学会拼读规则，看到生词也能自己念出来！</div>
+      <div style="font-size:12px;margin-top:6px;color:${doneToday ? "#7cc576" : "#e8842d"};font-weight:700">
+        ${doneToday ? "✅ 今天的拼读任务已完成" : "⬜ 今天还没做拼读（每天 1 条，转盘要用）"}
+      </div>
     </div>
+    ${learnedN >= 2 ? `<div class="card actRow" id="phMix" style="background:linear-gradient(135deg,#fff3d6,#ffe0ef)">
+      <span class="aIcon">🎯</span>
+      <span class="aName">拼读大挑战<span class="aSub">把学过的 ${learnedN} 条规则混在一起考 · 也算每日拼读任务</span></span>
+      <span class="aGo">▶</span>
+    </div>` : ""}
     ${["四上", "四下"].map(bk => `
       <div class="bookLabel">—— ✨ ${bk}册 · Let's spell ——</div>
       ${PHONICS.filter(p => p.book === bk).map(p => {
@@ -2071,7 +2187,9 @@ function renderPhonicsList() {
           <span class="unitStars" style="color:#ffb830">${"★".repeat(ps.stars) + "☆".repeat(3 - ps.stars)}</span>
         </div>`;
       }).join("")}`).join("")}`;
-  document.querySelectorAll("#scr-phonics .actRow").forEach(c => {
+  const mix = $("#phMix");
+  if (mix) mix.onclick = () => go(startPhonicMix);
+  document.querySelectorAll("#scr-phonics .actRow[data-pid]").forEach(c => {
     c.onclick = () => go(() => renderPhonicRule(PHONICS.find(p => p.id === c.dataset.pid)));
   });
   show("phonics", "🔮 拼读魔法学院");
@@ -2152,8 +2270,9 @@ function startPhonicGame(p) {
   let qi = 0, right = 0;
   function q() {
     if (qi >= qs.length) {
-      bumpDaily("g");
-      bumpDaily("ph");                 // 自然拼读是每日必做项
+      /* 拼读只计入「拼读」任务，不计入「玩游戏」——
+         否则做3次拼读就凑满了游戏任务，单词游戏可以完全不碰 */
+      bumpDaily("ph");
       const stars = right === qs.length ? 3 : right >= qs.length - 1 ? 2 : 1;
       const ps = phS(p.id);
       if (stars > ps.stars) { ps.stars = stars; save(); }
