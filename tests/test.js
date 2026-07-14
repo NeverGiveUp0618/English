@@ -75,6 +75,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
 
   console.log("— 首页 —");
   ok($("#scr-home").classList.contains("on"), "首页显示");
+  ok($("#hubLink").href === "https://nevergiveup0618.github.io/learning/", "★ 最顶部可直接返回学习导航页");
   ok($("#petEmoji").textContent === "🐱", "★ 默认伙伴是猫小九（不再是蛋）");
   ok($("#coinNum").textContent === "0", "初始金币0");
 
