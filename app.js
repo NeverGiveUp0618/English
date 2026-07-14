@@ -1399,7 +1399,55 @@ function startListen(pool, u) {
   q();
 }
 
-/* ================= 游戏3：拼写工坊 ================= */
+/* ================= 游戏3：听句子选意思 ================= */
+function startSentenceListen(sents) {
+  if (!sents.length) { toast("先学一个有句型的单元，再来挑战吧～"); goBack(); return; }
+  const qs = sample(sents, Math.min(D().opts === 3 ? 6 : 8, sents.length));
+  let qi = 0, right = 0;
+  function q() {
+    if (qi >= qs.length) {
+      bumpDaily("g");
+      const stars = right === qs.length ? 3 : right >= qs.length - 2 ? 2 : 1;
+      return renderResult({
+        stars, title: right === qs.length ? "整句都听懂啦！" : "句子听力完成！",
+        detail: `听懂 ${right}/${qs.length} 句`, coins: right * 3 + (right === qs.length ? 5 : 0),
+        replay: () => startSentenceListen(sents)
+      });
+    }
+    const sent = qs[qi];
+    /* 中文相同的句子不能同时做选项，否则孩子明明听懂了也无法判断。 */
+    const others = sample(sents.filter(s => s.en !== sent.en && s.zh !== sent.zh), D().opts - 1);
+    const opts = shuffle([sent].concat(others));
+    $("#scr-play").innerHTML = `
+      <div id="playHead"><div id="playProg">第 ${qi + 1} / ${qs.length} 题</div></div>
+      <div class="card" id="playQ">
+        <button id="lcSpeak" style="margin-top:0">🔊</button>
+        <div class="qSub">听完整句，选出它的中文意思</div>
+      </div>
+      <div class="optGrid">${opts.map((o, i) => `<button class="optBtn" data-i="${i}">${esc(o.zh)}</button>`).join("")}</div>`;
+    speak(sent.en);
+    $("#lcSpeak").onclick = () => speak(sent.en);
+    let locked = false;
+    document.querySelectorAll("#scr-play .optBtn").forEach(b => {
+      b.onclick = () => {
+        if (locked) return; locked = true;
+        const picked = opts[+b.dataset.i];
+        if (picked.en === sent.en) { b.classList.add("right"); sndRight(); right++; }
+        else {
+          b.classList.add("wrong"); sndWrong();
+          document.querySelectorAll("#scr-play .optBtn").forEach(x => {
+            if (opts[+x.dataset.i].en === sent.en) x.classList.add("right");
+          });
+        }
+        setTimeout(() => { qi++; q(); }, 900);
+      };
+    });
+    show("play", "🎧 听句子");
+  }
+  q();
+}
+
+/* ================= 游戏4：拼写工坊 ================= */
 function startSpell(pool, u) {
   const df = D();
   /* 新手段位只出短词（≤6个字母），别一上来就让她拼 blackboard */
@@ -1488,7 +1536,7 @@ function startSpell(pool, u) {
   q();
 }
 
-/* ================= 游戏4：句子小火车 ================= */
+/* ================= 游戏5：句子小火车 ================= */
 function startSentence(sents, u) {
   const df = D();
   /* 新手段位只排短句（≤5个词），长句子留到升段后 */
@@ -1738,6 +1786,7 @@ function renderArcade() {
     { icon: "🏆", name: "魔法大考", sub: learnedN < 8 ? "学会8个词后解锁" : "跨单元综合复习 · 最高 " + (S.bestExam || 0) + " 分", fn: () => startExam() },
     { icon: "🔗", name: "词语配对", sub: "跨单元混合 · 单词和图片手拉手", fn: () => startMatch(priorityPick(pool, 20)) },
     { icon: "👂", name: "听音选图", sub: "跨单元混合 · 练出小小顺风耳", fn: () => startListen(priorityPick(pool, 20)) },
+    { icon: "🎧", name: "听句子", sub: "听完整句 · 选出对应的中文意思", fn: () => startSentenceListen(sents) },
     { icon: "🔤", name: "拼写工坊", sub: "跨单元混合 · 字母积木拼拼拼", fn: () => startSpell(priorityPick(pool, 20)) },
     { icon: "🚂", name: "句子小火车", sub: "跨单元混合 · 重点句型排排队", fn: () => startSentence(sents) },
     { icon: "📕", name: "错词大扫除", sub: wrongCount() ? "还有 " + wrongCount() + " 个错词" : "错词本是空的", fn: () => startReview() }

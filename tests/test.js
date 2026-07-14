@@ -258,7 +258,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#scr-album").classList.contains("on"), "贴纸册显示");
   ok($$(".albumCell").length === 37, "37格贴纸");
   $$('.tab').find(t => t.dataset.tab === "arcade").click();
-  ok($$("#scr-arcade .actRow").length === 8, "游戏厅8个入口(含今日复习)");
+  ok($$("#scr-arcade .actRow").length === 9, "游戏厅9个入口(新增听句子，含今日复习)");
   ok(S().daily.t1 === true, "无复习任务时t1(复习)自动完成");
   w.eval("bumpDaily('ph')");
   ok(S().daily.t4 === true, "★ 拼读任务(t4)完成");
