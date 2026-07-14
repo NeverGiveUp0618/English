@@ -92,6 +92,10 @@ body {
 .taskRow .tIcon { font-size: 22px; }
 .taskRow .tName { flex: 1; font-size: 14px; }
 .taskRow .tProg { font-size: 13px; color: #c0a0d0; font-weight: 700; }
+.taskRow.clickable { cursor: pointer; border-radius: 12px; transition: background .15s; }
+.taskRow.clickable:active { background: #f8f0ff; }
+.taskRow .tHint { display: block; font-size: 11px; color: #c0a8d0; font-weight: 400; margin-top: 1px; }
+.taskRow.done .tHint { color: #cfe0c0; }
 .taskRow.done .tName { color: #b8d0a8; text-decoration: line-through; }
 .taskRow.done .tProg { color: #7cc576; }
 .homeGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }

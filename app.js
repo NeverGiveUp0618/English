@@ -22,7 +22,7 @@ const WALLET_KEY = "sharedWallet_v1";
 function defState() {
   return {
     coins: 0, xp: 0, streak: 0, lastDaily: "",
-    daily: { date: todayStr(), w: 0, g: 0, r: 0, earn: 0, t1: false, t2: false, t3: false, t4: false, bonus: false, spun: false },
+    daily: { date: todayStr(), w: 0, g: 0, r: 0, ph: 0, earn: 0, t1: false, t2: false, t3: false, t4: false, hard: false, bonus: false, spun: false },
     units: {},    // id -> {learned:[], stars:0, s3:false}
     wrong: {},    // word -> 次数
     stickers: {}, // 贴纸名 -> 数量
@@ -432,7 +432,7 @@ function addCoins(n) {
   const before = petStage(S.xp).n;
   S.coins += n; S.xp += n;
   ensureDaily(); S.daily.earn += n;
-  if (S.daily.earn >= 60 && !S.daily.t4) { S.daily.t4 = true; addTicket(1, "今日勤奋超额"); }
+  if (S.daily.earn >= 60 && !S.daily.hard) { S.daily.hard = true; addTicket(1, "今日勤奋超额"); }
   save();
   $("#coinNum").textContent = S.coins;
   coinFly(n); sndCoin();
@@ -457,23 +457,30 @@ function bumpDaily(key, n) {
 function noFreshWords() {
   return UNITS.filter(isUnlocked).every(u => unitS(u.id).learned.length >= u.words.length);
 }
+/* 每日任务（按正确的先后顺序）：
+ *   ① 复习（还债最优先）→ ② 学新词 → ③ 玩游戏 → ④ 自然拼读（每天一个关卡）
+ * 拼读是「会拼就会写」的地基，所以设为必做项，不做就没有转盘。
+ */
 function taskDone() {
   const noReview = dueCount() === 0 && wrongCount() === 0;
   const d = D();
   return {
-    /* 已解锁单元的新词全学完时，改为「复习也算数」，否则任务永远无法完成 */
-    t1: S.daily.w >= d.newWords || (noFreshWords() && S.daily.g >= 2),
-    t2: S.daily.g >= d.games,
-    /* 复习任务：做掉到期词/错词；今天本来就没有要复习的，玩1局也算完成 */
-    t3: S.daily.r >= d.reviews || (noReview && S.daily.g >= 1)
+    /* ① 复习：做掉到期词/错词；今天本来就没有要复习的，玩1局也算完成 */
+    t1: S.daily.r >= d.reviews || (noReview && S.daily.g >= 1),
+    /* ② 学新词：解锁单元的新词全学完时，改为「复习也算数」，否则任务永远无法完成 */
+    t2: S.daily.w >= d.newWords || (noFreshWords() && S.daily.g >= 2),
+    /* ③ 玩游戏 */
+    t3: S.daily.g >= d.games,
+    /* ④ 自然拼读：每天至少完成 1 个拼读关卡 */
+    t4: S.daily.ph >= 1
   };
 }
 function checkTasks() {
   const d = taskDone();
-  ["t1", "t2", "t3"].forEach(k => {
+  ["t1", "t2", "t3", "t4"].forEach(k => {
     if (d[k] && !S.daily[k]) { S.daily[k] = true; addCoins(10); toast("✅ 完成每日任务，+10金币！"); }
   });
-  if (d.t1 && d.t2 && d.t3 && !S.daily.bonus) {
+  if (d.t1 && d.t2 && d.t3 && d.t4 && !S.daily.bonus) {
     S.daily.bonus = true;
     S.streak = (S.lastDaily === yesterdayStr()) ? S.streak + 1 : 1;
     S.lastDaily = todayStr();
@@ -558,13 +565,38 @@ function srsGrade(word, right) {
   s.due = dateAdd(SRS_STEPS[s.lv - 1]);
   save();
 }
-/* 今天到期（含逾期）的词 */
-function dueWords() {
+/* 今日复习的词 = ① 昨天刚学的（必复习，遗忘曲线最陡的一天）
+ *              ② 到期的（SRS 排程）
+ *              ③ 之前学过的随机抽几个（防止老词悄悄流失）
+ */
+function yesterdayWords() {
+  const y = yesterdayStr();
+  return Object.keys(S.learnedAt).filter(w => S.learnedAt[w] === y && WORD_INDEX[w]).map(w => WORD_INDEX[w]);
+}
+function dueOnly() {
   const t = todayStr();
   return Object.keys(S.srs)
     .filter(w => S.srs[w].due <= t && WORD_INDEX[w])
     .sort((a, b) => (S.srs[a].due < S.srs[b].due ? -1 : 1))   // 逾期最久的排前面
     .map(w => WORD_INDEX[w]);
+}
+/* 随机补的老词：只从「今天以前」学过的里挑。
+   刚学 2 分钟的词不该出现在「复习」里——那不是复习，那是重复。 */
+function oldRandom(n, exclude) {
+  if (n <= 0) return [];
+  const t = todayStr();
+  const ex = new Set(exclude.map(w => w.w));
+  const pool = Object.keys(S.learnedAt)
+    .filter(w => !ex.has(w) && WORD_INDEX[w] && S.learnedAt[w] < t)
+    .map(w => WORD_INDEX[w]);
+  return shuffle(pool).slice(0, n);
+}
+function dueWords() {
+  const yd = yesterdayWords();                                   // ① 昨天刚学的：必复习
+  const due = dueOnly().filter(w => !yd.some(y => y.w === w.w)); // ② SRS 到期的
+  let list = yd.concat(due);
+  if (list.length < 6) list = list.concat(oldRandom(6 - list.length, list));  // ③ 之前学过的随机补
+  return list;
 }
 function dueCount() { return dueWords().length; }
 /* 记忆分层：1-2级=刚学 3-4级=熟悉 5-6级=长期记忆 */
@@ -624,9 +656,16 @@ function isUnlocked(u) {
   if (idx === 0) return true;
   return unitS(list[idx - 1].id).stars >= 1;
 }
+/* 「继续闯关」默认跟着当前学期走（四上），而不是从二年级开始。
+   低年级那几册是给暑假复习用的，在地图里随时可以点进去。 */
+const LEARN_ORDER = ["四上", "四下", "三上", "三下", "二年级"];
 function currentUnit() {
-  for (const u of UNITS) if (isUnlocked(u) && unitS(u.id).stars < 1) return u;
-  return UNITS[0];
+  for (const bk of LEARN_ORDER) {
+    for (const u of UNITS.filter(x => x.book === bk)) {
+      if (isUnlocked(u) && unitS(u.id).stars < 1) return u;
+    }
+  }
+  return UNITS.find(u => isUnlocked(u)) || UNITS[0];
 }
 function unlockedWords() {
   let ws = [];
@@ -679,14 +718,31 @@ function renderHome() {
       <div id="xpText">${nx ? "距离进化【" + nx.n + "】还差 " + (nx.xp - S.xp) + " 魔法值" : "已经是最终形态啦！"}</div>
       <div id="rankChip">${df.rank}　<span style="font-weight:400;color:#c0a8d0">${rankTip}</span></div>
     </div>
-    <div class="sectionTitle">📋 今日任务 · 约${lv === 1 ? "10" : "15"}分钟（全完成 +20🪙+🎟️）</div>
+    <div class="sectionTitle">📋 今日任务 · 按顺序做（全完成 +20🪙+🎟️）　<span style="font-weight:400;color:#c0a8d0;font-size:12px">点任一行直接开始</span></div>
     <div class="card">
-      <div class="taskRow ${d.t1 ? "done" : ""}"><span class="tIcon">📖</span><span class="tName">${noFreshWords() ? "复习巩固（新词已学完）" : "学会 " + df.newWords + " 个新单词"}</span><span class="tProg">${noFreshWords() ? Math.min(S.daily.g, 2) + "/2" : Math.min(S.daily.w, df.newWords) + "/" + df.newWords}</span></div>
-      <div class="taskRow ${d.t2 ? "done" : ""}"><span class="tIcon">🎮</span><span class="tName">完成 ${df.games} 局小游戏</span><span class="tProg">${Math.min(S.daily.g, df.games)}/${df.games}</span></div>
-      <div class="taskRow ${d.t3 ? "done" : ""}"><span class="tIcon">📅</span><span class="tName">复习 ${df.reviews} 个到期单词</span><span class="tProg">${(dc === 0 && wc === 0) ? "无需复习" : Math.min(S.daily.r, df.reviews) + "/" + df.reviews}</span></div>
+      <div class="taskRow clickable ${d.t1 ? "done" : ""}" data-jump="review">
+        <span class="tIcon">1️⃣</span>
+        <span class="tName">📅 <b>先做今日复习</b>${dc ? "（有 " + dc + " 个词到期）" : ""}<span class="tHint">还债最优先——到期的词正要被忘掉</span></span>
+        <span class="tProg">${(dc === 0 && wc === 0) ? "无需复习" : Math.min(S.daily.r, df.reviews) + "/" + df.reviews}</span>
+      </div>
+      <div class="taskRow clickable ${d.t2 ? "done" : ""}" data-jump="learn">
+        <span class="tIcon">2️⃣</span>
+        <span class="tName">📖 ${noFreshWords() ? "复习巩固（新词已学完）" : "学 " + df.newWords + " 个新单词"}<span class="tHint">学校讲到哪个单元就点哪个</span></span>
+        <span class="tProg">${noFreshWords() ? Math.min(S.daily.g, 2) + "/2" : Math.min(S.daily.w, df.newWords) + "/" + df.newWords}</span>
+      </div>
+      <div class="taskRow clickable ${d.t3 ? "done" : ""}" data-jump="game">
+        <span class="tIcon">3️⃣</span>
+        <span class="tName">🎮 玩 ${df.games} 局小游戏<span class="tHint">优先配对 / 听音选图</span></span>
+        <span class="tProg">${Math.min(S.daily.g, df.games)}/${df.games}</span>
+      </div>
+      <div class="taskRow clickable ${d.t4 ? "done" : ""}" data-jump="phonics">
+        <span class="tIcon">4️⃣</span>
+        <span class="tName">🔮 <b>学一条自然拼读</b><span class="tHint">会拼就会写——这是地基，每天一条</span></span>
+        <span class="tProg">${Math.min(S.daily.ph, 1)}/1</span>
+      </div>
     </div>
-    ${dc ? `<button class="btn" id="homeDue" style="background:linear-gradient(135deg,#ffd166,#ff9ec6)">📅 今天有 ${dc} 个词该复习了！（点我）</button><div style="height:12px"></div>` : ""}
-    <button class="btn ${dc ? "ghost" : ""}" id="homeGo">✨ 继续闯关：${cu.num} ${cu.zh} →</button>
+    <div style="text-align:center;font-size:11px;color:#c0b0d0;margin:-4px 0 12px">四项全部完成，才能转今天的转盘 🎡</div>
+    <button class="btn" id="homeGo">✨ 继续闯关：${cu.num} ${cu.zh} →</button>
     <div style="height:12px"></div>
     <div class="card" style="display:flex;text-align:center;padding:12px">
       <div style="flex:1"><div style="font-size:19px;font-weight:800;color:#e8a33d">${mt.fresh}</div><div style="font-size:11px;color:#b8a8c8">刚学会</div></div>
@@ -707,8 +763,25 @@ function renderHome() {
     if (el) { el.classList.remove("bounce"); void el.offsetWidth; el.classList.add("bounce"); }
     speak(p.en, 0.9); toast(p.en + "  " + p.zh);
   };
+  /* 每一行任务都能直接点进对应模块（不用自己找） */
+  $$("#scr-home .taskRow.clickable").forEach(r => {
+    r.onclick = () => {
+      const j = r.dataset.jump;
+      if (j === "review") {
+        if (dueCount() || wrongCount()) go(() => startDueReview());
+        else toast("今天没有要复习的词，直接学新词吧！🌟");
+      } else if (j === "learn") {
+        go(() => renderUnit(currentUnit()));
+      } else if (j === "game") {
+        $$(".tab").forEach(t => t.classList.toggle("on", t.dataset.tab === "arcade"));
+        goTab(renderArcade);
+      } else if (j === "phonics") {
+        $$(".tab").forEach(t => t.classList.toggle("on", t.dataset.tab === "phonics"));
+        goTab(renderPhonicsList);
+      }
+    };
+  });
   $("#homeGo").onclick = () => go(() => renderUnit(cu));
-  if (dc) $("#homeDue").onclick = () => go(() => startDueReview());
   $("#homeReview").onclick = () => { if (wrongCount()) go(() => startReview()); else toast("错词本是空的，去玩游戏吧！"); };
   $("#homeAlbum").onclick = () => go(renderAlbum);
   $("#homeWheel").onclick = () => go(renderWheel);
@@ -781,10 +854,22 @@ function renderCalendar() {
 }
 
 /* ================= 闯关地图 ================= */
+const BOOKS = ["二年级", "三上", "三下", "四上", "四下"];
+const BOOK_TIP = {
+  "二年级": "低年级基础词（暑假复习用）",
+  "三上": "三年级上册", "三下": "三年级下册",
+  "四上": "四年级上册（现在学的）", "四下": "四年级下册"
+};
 function renderMap() {
-  let html = "";
-  ["四上", "四下"].forEach(bk => {
-    html += `<div class="bookLabel">—— 🌈 ${bk}册 ——</div>`;
+  let html = `<div class="card" style="text-align:center;padding:10px;font-size:12px;color:#b8a8c8">
+    共 ${UNITS.length} 个单元 · ${UNITS.reduce((a, u) => a + u.words.length, 0)} 个单词<br>
+    <b style="color:#9b59b6">暑假想复习旧词？直接点「二年级 / 三上 / 三下」——每一册都是独立解锁的</b>
+  </div>`;
+  BOOKS.forEach(bk => {
+    const us = UNITS.filter(u => u.book === bk);
+    if (!us.length) return;
+    const done = us.filter(u => unitS(u.id).stars >= 1).length;
+    html += `<div class="bookLabel">—— 🌈 ${bk} ——<span style="display:block;font-size:11px;color:#c0a8d0;font-weight:400">${BOOK_TIP[bk]}　${done}/${us.length} 单元已通关</span></div>`;
     bookUnits(bk).forEach(u => {
       const us = unitS(u.id), open = isUnlocked(u);
       const stars = "★".repeat(us.stars) + "☆".repeat(3 - us.stars);
@@ -1496,7 +1581,8 @@ function startBoss(u) {
 /* ================= 今日复习（SRS 到期词） ================= */
 function startDueReview() {
   const due = dueWords();
-  if (!due.length) { toast("今天没有到期的词，去学新单词吧！🌟", 2200); goBack(); return; }
+  if (!due.length) { toast("今天没有要复习的词，去学新单词吧！🌟", 2200); goBack(); return; }
+  const ySet = new Set(yesterdayWords().map(w => w.w));
   const qs = due.slice(0, 12);                       // 一次最多12个，控制在几分钟内
   const pool = unlockedWords();
   let qi = 0, right = 0, ups = 0;
@@ -1528,8 +1614,8 @@ function startDueReview() {
     }
     $("#scr-play").innerHTML = `
       <div id="playHead">
-        <div id="playProg">📅 今日复习 ${qi + 1} / ${qs.length}</div>
-        <div style="font-size:11px;color:#c0a8d0">记忆等级 ${"🔒".repeat(0)}${"●".repeat(lv)}${"○".repeat(SRS_MAX - lv)}　答对就更牢固一级</div>
+        <div id="playProg">📅 今日复习 ${qi + 1} / ${qs.length}　<span style="font-size:11px;color:${ySet.has(w.w) ? "#e8842d" : "#c0a8d0"}">${ySet.has(w.w) ? "昨天刚学的" : "以前学过的"}</span></div>
+        <div style="font-size:11px;color:#c0a8d0">记忆等级 ${"●".repeat(lv)}${"○".repeat(SRS_MAX - lv)}　答对就更牢固一级</div>
       </div>
       <div class="card" id="playQ">${head}</div>
       <div class="optGrid">${optHtml}</div>`;
@@ -1658,7 +1744,7 @@ let spinning = false;
 function spunToday() { return S.daily.spun === true; }
 function wheelReady() {
   const d = taskDone();
-  return d.t1 && d.t2 && d.t3;      // 今天的学新词、玩游戏、复习 都完成
+  return d.t1 && d.t2 && d.t3 && d.t4;   // 复习 + 学新词 + 玩游戏 + 自然拼读，四项全完成
 }
 function renderWheel() {
   const prizes = getWheel(), n = prizes.length, seg = 360 / n;
@@ -1691,9 +1777,10 @@ function renderWheel() {
           ${ready ? "✅ 今天的任务全部完成，可以转啦！" : "🔒 完成下面三件事才能转："}
         </div>
         <div style="font-size:12px;color:#8a7a9a;text-align:left;line-height:1.9">
-          ${d.t1 ? "✅" : "⬜"} 学会今天的新单词<br>
-          ${d.t2 ? "✅" : "⬜"} 完成今天的小游戏<br>
-          ${d.t3 ? "✅" : "⬜"} <b>做完今天的复习</b>
+          ${d.t1 ? "✅" : "⬜"} <b>做完今天的复习</b><br>
+          ${d.t2 ? "✅" : "⬜"} 学会今天的新单词<br>
+          ${d.t3 ? "✅" : "⬜"} 完成今天的小游戏<br>
+          ${d.t4 ? "✅" : "⬜"} <b>学一条自然拼读</b>
         </div>
       </div>
 
@@ -2066,6 +2153,7 @@ function startPhonicGame(p) {
   function q() {
     if (qi >= qs.length) {
       bumpDaily("g");
+      bumpDaily("ph");                 // 自然拼读是每日必做项
       const stars = right === qs.length ? 3 : right >= qs.length - 1 ? 2 : 1;
       const ps = phS(p.id);
       if (stars > ps.stars) { ps.stars = stars; save(); }

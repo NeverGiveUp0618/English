@@ -5,6 +5,221 @@
  * ============================================================ */
 
 const UNITS = [
+  /* ---------------- 低年级基础（一二年级通用词，暑假复习用）----------------
+     说明：人教版PEP是「三年级起点」，二年级没有官方英语教材。
+     所以这里收的是各版本二年级共有的基础词：字母认读之外的高频词。 */
+  {
+    id: "b1", book: "二年级", num: "基础 1", name: "Numbers & Colours", zh: "数字与颜色", icon: "🔢",
+    words: [
+      { w: "one", zh: "一", e: "1️⃣" }, { w: "two", zh: "二", e: "2️⃣" },
+      { w: "three", zh: "三", e: "3️⃣" }, { w: "four", zh: "四", e: "4️⃣" },
+      { w: "five", zh: "五", e: "5️⃣" }, { w: "six", zh: "六", e: "6️⃣" },
+      { w: "seven", zh: "七", e: "7️⃣" }, { w: "eight", zh: "八", e: "8️⃣" },
+      { w: "nine", zh: "九", e: "9️⃣" }, { w: "ten", zh: "十", e: "🔟" },
+      { w: "red", zh: "红色", e: "🔴" }, { w: "yellow", zh: "黄色", e: "🟡" },
+      { w: "blue", zh: "蓝色", e: "🔵" }, { w: "green", zh: "绿色", e: "🟢" },
+      { w: "black", zh: "黑色", e: "⚫" }, { w: "white", zh: "白色", e: "⚪" }
+    ],
+    sents: [
+      { en: "How many?", zh: "有多少个？" },
+      { en: "What colour is it?", zh: "它是什么颜色？" },
+      { en: "It's red.", zh: "它是红色的。" }
+    ]
+  },
+  {
+    id: "b2", book: "二年级", num: "基础 2", name: "My Body & Family", zh: "身体与家人", icon: "👦",
+    words: [
+      { w: "head", zh: "头", e: "🗣️" }, { w: "eye", zh: "眼睛", e: "👁️" },
+      { w: "ear", zh: "耳朵", e: "👂" }, { w: "nose", zh: "鼻子", e: "👃" },
+      { w: "mouth", zh: "嘴巴", e: "👄" }, { w: "hand", zh: "手", e: "✋" },
+      { w: "foot", zh: "脚", e: "🦶" }, { w: "arm", zh: "胳膊", e: "💪" },
+      { w: "father", zh: "爸爸", e: "👨" }, { w: "mother", zh: "妈妈", e: "👩" },
+      { w: "brother", zh: "哥哥；弟弟", e: "👦" }, { w: "sister", zh: "姐姐；妹妹", e: "👧" },
+      { w: "grandpa", zh: "爷爷", e: "👴" }, { w: "grandma", zh: "奶奶", e: "👵" },
+      { w: "me", zh: "我", e: "🙋" }
+    ],
+    sents: [
+      { en: "This is my father.", zh: "这是我的爸爸。" },
+      { en: "Touch your nose.", zh: "摸摸你的鼻子。" },
+      { en: "Who is she?", zh: "她是谁？" }
+    ]
+  },
+  /* ---------------- 三年级上册 ---------------- */
+  {
+    id: "t1", book: "三上", num: "Unit 1", name: "Hello!", zh: "你好", icon: "👋",
+    words: [
+      { w: "pen", zh: "钢笔", e: "🖊️" }, { w: "pencil", zh: "铅笔", e: "✏️" },
+      { w: "pencil box", zh: "铅笔盒", e: "🧰" }, { w: "ruler", zh: "尺子", e: "📏" },
+      { w: "eraser", zh: "橡皮", e: "🧽" }, { w: "crayon", zh: "蜡笔", e: "🖍️" },
+      { w: "bag", zh: "书包", e: "🎒" }, { w: "school", zh: "学校", e: "🏫" },
+      { w: "book", zh: "书", e: "📕" }
+    ],
+    sents: [
+      { en: "Hello! I'm Wu Yifan.", zh: "你好！我是吴一凡。" },
+      { en: "What's your name?", zh: "你叫什么名字？" },
+      { en: "Goodbye!", zh: "再见！" }
+    ]
+  },
+  {
+    id: "t2", book: "三上", num: "Unit 2", name: "Colours", zh: "颜色", icon: "🎨",
+    words: [
+      { w: "brown", zh: "棕色", e: "🟤" }, { w: "orange", zh: "橙色", e: "🟠" },
+      { w: "purple", zh: "紫色", e: "🟣" }, { w: "pink", zh: "粉色", e: "🌸" },
+      { w: "colour", zh: "颜色", e: "🎨" }, { w: "paint", zh: "涂色", e: "🖌️" },
+      { w: "balloon", zh: "气球", e: "🎈" }, { w: "rainbow", zh: "彩虹", e: "🌈" }
+    ],
+    sents: [
+      { en: "I see red.", zh: "我看见红色。" },
+      { en: "Colour it brown.", zh: "把它涂成棕色。" },
+      { en: "Look at the rainbow!", zh: "看那道彩虹！" }
+    ]
+  },
+  {
+    id: "t3", book: "三上", num: "Unit 3", name: "Look at Me!", zh: "看看我", icon: "🙋",
+    words: [
+      { w: "face", zh: "脸", e: "😊" }, { w: "leg", zh: "腿", e: "🦵" },
+      { w: "body", zh: "身体", e: "🧍" }, { w: "finger", zh: "手指", e: "☝️" },
+      { w: "hair", zh: "头发", e: "💇" }, { w: "smile", zh: "微笑", e: "😄" },
+      { w: "cry", zh: "哭", e: "😭" }, { w: "clap", zh: "拍手", e: "👏" }
+    ],
+    sents: [
+      { en: "Look at me!", zh: "看看我！" },
+      { en: "Clap your hands.", zh: "拍拍你的手。" },
+      { en: "This is my body.", zh: "这是我的身体。" }
+    ]
+  },
+  {
+    id: "t4", book: "三上", num: "Unit 4", name: "We Love Animals", zh: "我们爱动物", icon: "🐾",
+    words: [
+      { w: "cat", zh: "猫", e: "🐱" }, { w: "dog", zh: "狗", e: "🐶" },
+      { w: "monkey", zh: "猴子", e: "🐵" }, { w: "panda", zh: "熊猫", e: "🐼" },
+      { w: "rabbit", zh: "兔子", e: "🐰" }, { w: "duck", zh: "鸭子", e: "🦆" },
+      { w: "pig", zh: "猪", e: "🐷" }, { w: "bird", zh: "鸟", e: "🐦" },
+      { w: "bear", zh: "熊", e: "🐻" }, { w: "elephant", zh: "大象", e: "🐘" },
+      { w: "tiger", zh: "老虎", e: "🐯" }, { w: "zoo", zh: "动物园", e: "🦁" }
+    ],
+    sents: [
+      { en: "Look! It's a panda.", zh: "看！是一只熊猫。" },
+      { en: "I like animals.", zh: "我喜欢动物。" },
+      { en: "What is it?", zh: "它是什么？" }
+    ]
+  },
+  {
+    id: "t5", book: "三上", num: "Unit 5", name: "Let's Eat!", zh: "一起吃吧", icon: "🍽️",
+    words: [
+      { w: "bread", zh: "面包", e: "🍞" }, { w: "juice", zh: "果汁", e: "🧃" },
+      { w: "egg", zh: "鸡蛋", e: "🥚" }, { w: "milk", zh: "牛奶", e: "🥛" },
+      { w: "water", zh: "水", e: "💧" }, { w: "cake", zh: "蛋糕", e: "🎂" },
+      { w: "fish", zh: "鱼", e: "🐟" }, { w: "hamburger", zh: "汉堡", e: "🍔" },
+      { w: "hungry", zh: "饿的", e: "😋" }
+    ],
+    sents: [
+      { en: "I'd like some juice, please.", zh: "我想要一些果汁。" },
+      { en: "Have some bread.", zh: "吃点面包吧。" },
+      { en: "I'm hungry.", zh: "我饿了。" }
+    ]
+  },
+  {
+    id: "t6", book: "三上", num: "Unit 6", name: "Happy Birthday!", zh: "生日快乐", icon: "🎂",
+    words: [
+      { w: "doll", zh: "洋娃娃", e: "🪆" }, { w: "ball", zh: "球", e: "⚽" },
+      { w: "boat", zh: "小船", e: "⛵" }, { w: "car", zh: "小汽车", e: "🚗" },
+      { w: "kite", zh: "风筝", e: "🪁" }, { w: "plane", zh: "飞机", e: "✈️" },
+      { w: "gift", zh: "礼物", e: "🎁" }, { w: "candle", zh: "蜡烛", e: "🕯️" },
+      { w: "old", zh: "…岁的", e: "🎊" }
+    ],
+    sents: [
+      { en: "Happy birthday!", zh: "生日快乐！" },
+      { en: "How old are you?", zh: "你几岁了？" },
+      { en: "I'm nine years old.", zh: "我九岁了。" }
+    ]
+  },
+  /* ---------------- 三年级下册 ---------------- */
+  {
+    id: "x1", book: "三下", num: "Unit 1", name: "Welcome Back to School", zh: "欢迎回到学校", icon: "🏫",
+    words: [
+      { w: "China", zh: "中国", e: "🇨🇳" }, { w: "Canada", zh: "加拿大", e: "🍁" },
+      { w: "the UK", zh: "英国", e: "🎡" }, { w: "the USA", zh: "美国", e: "🗽" },
+      { w: "student", zh: "学生", e: "🧑‍🎓" }, { w: "teacher", zh: "老师", e: "🧑‍🏫" },
+      { w: "boy", zh: "男孩", e: "👦" }, { w: "girl", zh: "女孩", e: "👧" },
+      { w: "new", zh: "新的", e: "✨" }
+    ],
+    sents: [
+      { en: "Welcome back to school!", zh: "欢迎回到学校！" },
+      { en: "I'm from China.", zh: "我来自中国。" },
+      { en: "We have a new friend.", zh: "我们有一位新朋友。" }
+    ]
+  },
+  {
+    id: "x2", book: "三下", num: "Unit 2", name: "My Family", zh: "我的家人", icon: "👨‍👩‍👧",
+    words: [
+      { w: "man", zh: "男人", e: "🧔" }, { w: "woman", zh: "女人", e: "👩‍🦰" },
+      { w: "dad", zh: "爸爸", e: "👨" }, { w: "mom", zh: "妈妈", e: "👩" },
+      { w: "grandmother", zh: "祖母", e: "👵" }, { w: "grandfather", zh: "祖父", e: "👴" },
+      { w: "family", zh: "家庭", e: "🏠" }, { w: "friend", zh: "朋友", e: "🫶" }
+    ],
+    sents: [
+      { en: "Who's that man?", zh: "那个男人是谁？" },
+      { en: "He's my father.", zh: "他是我的爸爸。" },
+      { en: "This is my family.", zh: "这是我的家人。" }
+    ]
+  },
+  {
+    id: "x3", book: "三下", num: "Unit 3", name: "At the Zoo", zh: "在动物园", icon: "🦒",
+    words: [
+      { w: "giraffe", zh: "长颈鹿", e: "🦒" }, { w: "fat", zh: "胖的", e: "🐷" },
+      { w: "thin", zh: "瘦的", e: "🦩" }, { w: "big", zh: "大的", e: "🐘" },
+      { w: "small", zh: "小的", e: "🐜" }, { w: "so", zh: "如此", e: "😮" },
+      { w: "children", zh: "孩子们", e: "🧒" }
+    ],
+    sents: [
+      { en: "It has a long nose.", zh: "它有一个长鼻子。" },
+      { en: "Look at that giraffe.", zh: "看那只长颈鹿。" },
+      { en: "It's so tall!", zh: "它好高啊！" }
+    ]
+  },
+  {
+    id: "x4", book: "三下", num: "Unit 4", name: "Where Is My Car?", zh: "我的小汽车在哪里", icon: "🚗",
+    words: [
+      { w: "on", zh: "在…上面", e: "⬆️" }, { w: "in", zh: "在…里面", e: "📦" },
+      { w: "under", zh: "在…下面", e: "⬇️" }, { w: "chair", zh: "椅子", e: "🪑" },
+      { w: "desk", zh: "书桌", e: "🖥️" }, { w: "cap", zh: "帽子", e: "🧢" },
+      { w: "box", zh: "盒子", e: "🎁" }, { w: "toy", zh: "玩具", e: "🧸" }
+    ],
+    sents: [
+      { en: "Where is my car?", zh: "我的小汽车在哪里？" },
+      { en: "It's under the chair.", zh: "它在椅子下面。" },
+      { en: "Is it in your bag?", zh: "它在你的书包里吗？" }
+    ]
+  },
+  {
+    id: "x5", book: "三下", num: "Unit 5", name: "Do You Like Pears?", zh: "你喜欢梨吗", icon: "🍐",
+    words: [
+      { w: "pear", zh: "梨", e: "🍐" }, { w: "apple", zh: "苹果", e: "🍎" },
+      { w: "banana", zh: "香蕉", e: "🍌" }, { w: "watermelon", zh: "西瓜", e: "🍉" },
+      { w: "strawberry", zh: "草莓", e: "🍓" }, { w: "grape", zh: "葡萄", e: "🍇" },
+      { w: "peach", zh: "桃子", e: "🍑" }, { w: "buy", zh: "买", e: "🛒" }
+    ],
+    sents: [
+      { en: "Do you like pears?", zh: "你喜欢梨吗？" },
+      { en: "Yes, I do.", zh: "是的，我喜欢。" },
+      { en: "I like apples very much.", zh: "我非常喜欢苹果。" }
+    ]
+  },
+  {
+    id: "x6", book: "三下", num: "Unit 6", name: "How Many?", zh: "有多少", icon: "🔢",
+    words: [
+      { w: "eleven", zh: "十一", e: "🕚" }, { w: "twelve", zh: "十二", e: "🕛" },
+      { w: "thirteen", zh: "十三", e: "🎂" }, { w: "fifteen", zh: "十五", e: "🌕" },
+      { w: "twenty", zh: "二十", e: "💯" }, { w: "beautiful", zh: "美丽的", e: "🌷" },
+      { w: "open", zh: "打开", e: "📂" }, { w: "sister", zh: "姐妹", e: "👧" }
+    ],
+    sents: [
+      { en: "How many kites do you see?", zh: "你看见多少只风筝？" },
+      { en: "I see twelve.", zh: "我看见十二只。" },
+      { en: "Open it and see!", zh: "打开看看！" }
+    ]
+  },
   /* ---------------- 四年级上册 ---------------- */
   {
     id: "u1", book: "四上", num: "Unit 1", name: "My Classroom", zh: "我的教室", icon: "🏫",
