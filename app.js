@@ -31,9 +31,9 @@ function defState() {
     setDone: {},  // 已领过的集齐奖励：r1/r2/r3
     /* 伙伴：多角色 + 喂养 + 装扮 */
     pet: {
-      id: "classic",          // 当前伙伴（老存档默认独角兽那条线）
-      name: "",               // 孩子自己起的名字（比用现成IP更有归属感）
-      owned: ["classic"],     // 已拥有的伙伴
+      id: "cat",              // 默认就是她最喜欢的猫小九
+      name: "",               // 想改名随时可以改
+      owned: ["cat", "classic"],   // 两个免费伙伴，一开始就能选
       hunger: 80, clean: 80, mood: 80,   // 三条状态（只会变淡，绝不会「生病/死掉」）
       bond: 0,                // 亲密度：喂养积累
       careDay: todayStr(),    // 上次结算状态的日期
@@ -2756,7 +2756,7 @@ function renderSwapPet() {
       </div>`;
     }).join("")}
     <div style="font-size:11px;color:#c0b0d0;text-align:center;line-height:1.7;padding:6px">
-      这些都是<b>原创角色</b>。你可以给它起任何你喜欢的名字 —— 在伙伴屋点「✏️ 起名字」。
+      名字不喜欢？在伙伴屋点「✏️ 起名字」，想叫什么都行。
     </div>`;
   $$("#scr-swap .actRow").forEach(c => {
     c.onclick = () => {
@@ -3025,6 +3025,8 @@ migrateCheckins();
 if (!S.pet || !S.pet.stages && !S.pet.id) S.pet = defState().pet;
 if (!S.pet.wear) S.pet.wear = { hat: "", face: "", item: "" };
 if (!S.pet.owned) S.pet.owned = [S.pet.id || "classic"];
+/* 两个免费伙伴（猫小九 / 独角兽）永远可选 */
+["cat", "classic"].forEach(id => { if (!S.pet.owned.includes(id)) S.pet.owned.push(id); });
 if (!S.pet.outfits) S.pet.outfits = [];
 decayCare();         // 状态随天数自然回落（只会变淡，绝不惩罚）
 walletIn();          // 接入共享钱包（语文App赚的金币在这里也能花）
