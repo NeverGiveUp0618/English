@@ -116,7 +116,8 @@ function boot() {
   $("#spinBtn").click();
   await sleep(4600);
   ok(S().daily.spun === true, "★ 转过后标记 spun");
-  ok(S().tickets === tk - 1, "消耗 1 张券");
+  const refunded = $("#wheelWon").textContent.includes("再转一次");
+  ok(S().tickets === tk - 1 + (refunded ? 1 : 0), refunded ? "抽到再转一次：消耗后返还 1 张券" : "消耗 1 张券");
   ok($("#spinBtn").disabled === true && $("#spinBtn").textContent.includes("明天再来"), "★ 转完立刻锁定：今天不能再转");
   w.eval("navStack=[renderWheel];renderWheel();");
   ok($("#spinBtn").disabled === true, "★ 重新进入转盘页仍然是锁定的（一天一次）");
