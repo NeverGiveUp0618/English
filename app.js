@@ -33,7 +33,7 @@ function defState() {
     pet: {
       id: "cat",              // 默认就是她最喜欢的猫小九
       name: "",               // 想改名随时可以改
-      owned: ["cat", "classic"],   // 两个免费伙伴，一开始就能选
+      owned: ["cat", "classic", "abeibei"],   // 免费伙伴一开始就能选
       hunger: 80, clean: 80, mood: 80,   // 三条状态（只会变淡，绝不会「生病/死掉」）
       bond: 0,                // 亲密度：喂养积累
       careDay: todayStr(),    // 上次结算状态的日期
@@ -65,6 +65,11 @@ function defState() {
 let S = defState();
 try { const raw = localStorage.getItem(LS_KEY); if (raw) S = Object.assign(defState(), JSON.parse(raw)); } catch (e) {}
 S.daily = Object.assign(defState().daily, S.daily);
+S.pet = Object.assign(defState().pet, S.pet || {});
+S.pet.wear = Object.assign(defState().pet.wear, S.pet.wear || {});
+S.pet.owned = Array.isArray(S.pet.owned) ? S.pet.owned : ["cat", "classic"];
+/* 阿贝贝是送给孩子的免费伙伴：老存档升级后也直接拥有，不设解锁门槛。 */
+if (!S.pet.owned.includes("abeibei")) S.pet.owned.push("abeibei");
 if (!S.wheelTouched) S.wheelTouched = todayStr();
 function save() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {}
@@ -359,7 +364,7 @@ function coinFly(n) {
  * 设计红线：状态只会「变淡」，绝不会生病、死掉、扣分。
  * 养宠物是为了让她想回来，不是为了制造愧疚和焦虑。
  */
-function petDef() { return PETS.find(p => p.id === S.pet.id) || PETS[3]; }
+function petDef() { return PETS.find(p => p.id === S.pet.id) || PETS.find(p => p.id === "classic") || PETS[0]; }
 function petStages() { return petDef().stages; }
 function petStage(xp) { let st = petStages()[0]; petStages().forEach(p => { if (xp >= p.xp) st = p; }); return st; }
 function petNext(xp) { return petStages().find(p => p.xp > xp) || null; }
@@ -401,6 +406,22 @@ function wearEmoji(slot) {
  * 没上传时回退到 emoji。
  */
 function petPic(id) { return (S.pet.pics || {})[id || S.pet.id] || ""; }
+/* 内置原创形象可以进入公开仓库；家长上传图仍只存在本机，并且优先显示。 */
+function petVisual(id) {
+  const petId = id || S.pet.id;
+  const p = PETS.find(x => x.id === petId);
+  return petPic(petId) || (p && p.art) || "";
+}
+
+function petCheer() {
+  if (S.pet.id !== "abeibei") return "";
+  const d = taskDone();
+  if (d.t1 && d.t2 && d.t3 && d.t4) return "阿贝贝：今天的魔法收集完成！现在放心去玩吧～";
+  if (S.daily.ph) return "阿贝贝：你已经跨过最难的开头啦，再走一小步！";
+  if (S.daily.g) return "阿贝贝：刚才那局很有勇气，答错也算发现了线索！";
+  if (S.daily.w || S.daily.r) return "阿贝贝：我看到你认真试过了，这就很了不起！";
+  return "阿贝贝：不用一下子全会，我们一起先玩一小关吧！";
+}
 
 /* 每件饰品的位置/大小/角度：x,y 是百分比坐标，s 是缩放，r 是旋转角度
  * 全都可以在「装扮编辑」里直接用手指拖出来 —— 点坐标那套太难点了，弃用。 */
@@ -423,10 +444,11 @@ function setDeco(slot, v, id) {
   S.pet.deco[petId][slot] = v;
   save();
 }
+function decoSizePx(canvasSize, d) { return Math.round(canvasSize * 0.26 * d.s); }
 /* 伙伴的完整形象：自己上传的图（或 emoji 兜底）+ 饰品按各自的位置/大小/角度贴上去 */
 function petFigure(size, withOutfit) {
   const sz = size || 110;
-  const pic = petPic(S.pet.id);
+  const pic = petVisual(S.pet.id);
   const st = petStage(S.xp);
   const body = pic
     ? `<img class="petImg" src="${pic}" alt="">`
@@ -435,7 +457,7 @@ function petFigure(size, withOutfit) {
     const e = wearEmoji(slot);
     if (!e) return "";
     const d = decoOf(slot);
-    return `<span class="petDeco deco-${slot}" style="left:${d.x}%;top:${d.y}%;font-size:${Math.round(sz * 0.26 * d.s)}px;transform:translate(-50%,-50%) rotate(${d.r}deg)">${e}</span>`;
+    return `<span class="petDeco deco-${slot}" style="left:${d.x}%;top:${d.y}%;font-size:${decoSizePx(sz, d)}px;transform:translate(-50%,-50%) rotate(${d.r}deg)">${e}</span>`;
   }).join("");
   return `<div class="petFig" style="width:${sz}px;height:${sz}px">${body}${deco}</div>`;
 }
@@ -732,10 +754,11 @@ function renderHome() {
       <div class="petShow" id="petShow">
         ${petFigure(112)}
         <span class="petBuddy">${S.buddy ? stickerOf(S.buddy).e : ""}</span>
-        <span class="petHat" style="${petPic() ? "display:none" : ""}">${S.hat ? stickerOf(S.hat).e : ""}</span>
+        <span class="petHat" style="${petVisual() ? "display:none" : ""}">${S.hat ? stickerOf(S.hat).e : ""}</span>
       </div>
       <div id="petStage">${esc(petName())}　${careMood().e}</div>
       <div id="petTip">${"❤️".repeat(bondLv())}${"🤍".repeat(5 - bondLv())}　${careMood().t}</div>
+      ${petCheer() ? `<div class="petCheer">${esc(petCheer())}</div>` : ""}
 
       <div class="careBars">
         ${[["hunger", "🍖 饱腹"], ["clean", "🛁 干净"], ["mood", "🎾 心情"]].map(([k, lb]) => {
@@ -3006,7 +3029,7 @@ function renderOutfit() {
       <div class="petShow">${petFigure(120)}</div>
       <div style="font-size:12px;color:#b8a8c8;margin-top:6px">点一下装扮就能穿上，再点一下脱下来</div>
       <button class="btn small" id="toDecoEdit" style="margin-top:8px">🎯 拖动调整位置 / 大小 / 角度</button>
-      ${petPic() ? "" : `<div style="font-size:11px;color:#c0a8d0;margin-top:4px">想换成猫小九的真实形象？家长设置 → 🖼️ 伙伴形象</div>`}
+      ${petVisual() ? "" : `<div style="font-size:11px;color:#c0a8d0;margin-top:4px">想换成孩子熟悉的形象？家长设置 → 🖼️ 伙伴形象</div>`}
     </div>
     ${slots.map(([slot, label]) => `
       <div class="sectionTitle">${label}</div>
@@ -3058,7 +3081,7 @@ function renderSwapPet() {
       const cur = S.pet.id === p.id;
       const st = p.stages.reduce((a, x) => (S.xp >= x.xp ? x : a), p.stages[0]);
       return `<div class="card actRow" data-p="${p.id}">
-        <span class="aIcon">${has ? st.e : "❓"}</span>
+        <span class="aIcon">${has && p.art ? `<img class="petChoiceImg" src="${p.art}" alt="">` : has ? st.e : "❓"}</span>
         <span class="aName">${p.n}<span class="aSub">${p.tag}${has ? "　·　现在是：" + st.n : ""}</span></span>
         <button class="themeBtn ${cur ? "cur" : has ? "" : "lock"}">${cur ? "使用中 ✓" : has ? "选它" : "🪙" + p.cost}</button>
       </div>`;
@@ -3134,12 +3157,13 @@ function renderPetPics() {
     </div>
     ${PETS.map(p => {
       const has = !!pics[p.id];
+      const builtIn = p.art || "";
       return `<div class="card" style="padding:12px">
         <div style="display:flex;align-items:center;gap:12px">
-          <div class="picPrev">${has ? `<img src="${pics[p.id]}" alt="">` : `<span style="font-size:30px">${p.stages[0].e}</span>`}</div>
+          <div class="picPrev">${has ? `<img src="${pics[p.id]}" alt="">` : builtIn ? `<img src="${builtIn}" alt="">` : `<span style="font-size:30px">${p.stages[0].e}</span>`}</div>
           <div style="flex:1">
             <div style="font-size:15px;font-weight:700;color:#7a5a9a">${p.n}</div>
-            <div style="font-size:11px;color:#b8a8c8">${has ? "已设置自定义形象" : "现在用的是默认表情"}</div>
+            <div style="font-size:11px;color:#b8a8c8">${has ? "已设置自定义形象" : builtIn ? "现在用的是内置原创形象" : "现在用的是默认表情"}</div>
           </div>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
@@ -3211,7 +3235,7 @@ function renderDecoEdit() {
   let sel = worn[0];
 
   function draw() {
-    const pic = petPic(S.pet.id);
+    const pic = petVisual(S.pet.id);
     const st = petStage(S.xp);
     $("#scr-anchor").innerHTML = `
       <div class="card" style="text-align:center;padding:10px">
@@ -3225,7 +3249,7 @@ function renderDecoEdit() {
           ${worn.map(slot => {
             const d = decoOf(slot);
             return `<span class="decoItem ${slot === sel ? "sel" : ""}" data-slot="${slot}"
-              style="left:${d.x}%;top:${d.y}%;font-size:${Math.round(46 * d.s)}px;transform:translate(-50%,-50%) rotate(${d.r}deg)">${wearEmoji(slot)}</span>`;
+              style="left:${d.x}%;top:${d.y}%;transform:translate(-50%,-50%) rotate(${d.r}deg)">${wearEmoji(slot)}</span>`;
           }).join("")}
         </div>
       </div>
@@ -3254,6 +3278,11 @@ function renderDecoEdit() {
 
     /* 直接拖动 */
     const stage = $("#decoStage");
+    /* 与首页共用同一套尺寸公式；编辑舞台和首页也都是正方形坐标系。 */
+    const stageSize = stage.getBoundingClientRect().width || 300;
+    $$("#scr-anchor .decoItem").forEach(el => {
+      el.style.fontSize = decoSizePx(stageSize, decoOf(el.dataset.slot)) + "px";
+    });
     $$("#scr-anchor .decoItem").forEach(el => {
       const slot = el.dataset.slot;
       let dragging = false;

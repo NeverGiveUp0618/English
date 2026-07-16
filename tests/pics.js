@@ -32,7 +32,7 @@ const S = () => w.eval("S");
   $("#pPics").click();
   ok($("#scr-pics").classList.contains("on"), "进入伙伴形象页");
   ok($("#scr-pics").innerHTML.includes("不会上传到网上") && $("#scr-pics").innerHTML.includes("不会进代码仓库"), "★ 页面写清：图片只存本机");
-  ok($$("#scr-pics [data-up]").length === 4, "4 个伙伴都能换形象");
+  ok($$("#scr-pics [data-up]").length === 5, "5 个伙伴都能换形象");
   ok($$("#scr-pics [data-up]")[0].accept === "image/*", "选图控件正确");
 
   console.log("\n② 上传一张图（模拟家长选了猫小九的图）");
@@ -61,10 +61,12 @@ const S = () => w.eval("S");
 
   // 拖动：把帽子拖到 (30%, 15%)
   const stage = $("#decoStage");
-  stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 300 });
+  ok(/aspect-ratio:\s*1\s*\/\s*1/.test(fs.readFileSync(DIR + "/index.html", "utf8")), "★ 编辑舞台固定为正方形，与首页坐标系一致");
+  stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 200 });
   const hat = $(".decoItem[data-slot='hat']");
+  ok(parseInt(hat.style.fontSize) === w.eval("decoSizePx(300,decoOf('hat'))"), "★ 编辑页和首页共用同一套饰品尺寸公式");
   hat.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true, clientX: 100, clientY: 24 }));
-  stage.dispatchEvent(new w.MouseEvent("mousemove", { bubbles: true, clientX: 60, clientY: 45 }));
+  stage.dispatchEvent(new w.MouseEvent("mousemove", { bubbles: true, clientX: 60, clientY: 30 }));
   stage.dispatchEvent(new w.MouseEvent("mouseup", { bubbles: true }));
   await sleep(30);
   let d = w.eval("decoOf('hat')");
@@ -119,7 +121,12 @@ const S = () => w.eval("S");
   ok(!$("#petShow .petImg"), "没有图片元素");
   ok(!!$("#petShow #petEmoji"), "★ 回退显示 emoji，不会白屏");
 
-  console.log("\n⑧ 删除形象");
+  console.log("\n⑧ 阿贝贝使用内置原创形象与即时鼓励");
+  w.eval("S.pet.id='abeibei';save();navStack=[renderHome];renderHome();");
+  ok(!!$("#petShow .petImg") && /abeibei-companion\.png$/.test($("#petShow .petImg").src), "★ 阿贝贝形象在首页正常显示");
+  ok(!!$(".petCheer") && $(".petCheer").textContent.includes("阿贝贝"), "★ 阿贝贝会按今日进度给无压力鼓励");
+
+  console.log("\n⑨ 删除形象");
   w.eval(`S.pet.pics={cat:"${FAKE_PNG}"};save();navStack=[renderPetPics];renderPetPics();`);
   $("[data-del='cat']").click();
   ok(!S().pet.pics.cat, "★ 可以删除，恢复默认表情");

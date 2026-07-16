@@ -685,6 +685,18 @@ const PETS = [
     ]
   },
   {
+    id: "abeibei", n: "阿贝贝", tag: "勇气守护精灵 · 陪你轻松试一试", cost: 0,
+    art: "assets/abeibei-companion.png",
+    stages: [
+      { xp: 0, e: "🐶", n: "软绵绵阿贝贝" },
+      { xp: 30, e: "🐶", n: "勇气学徒阿贝贝" },
+      { xp: 100, e: "🐶", n: "星光伙伴阿贝贝" },
+      { xp: 300, e: "🐶", n: "魔法守护者阿贝贝" },
+      { xp: 700, e: "🐶", n: "勇气队长阿贝贝" },
+      { xp: 1500, e: "🐶", n: "传奇精灵阿贝贝" }
+    ]
+  },
+  {
     id: "classic", n: "彩虹独角兽", tag: "从蛋孵化的梦幻伙伴", cost: 0,
     stages: PET_STAGES
   }

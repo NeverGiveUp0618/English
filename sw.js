@@ -1,5 +1,5 @@
-const CACHE = "magic-english-v27";
-const FILES = ["./", "./index.html", "./data.js", "./app.js", "./manifest.json", "./audio/manifest.js"];
+const CACHE = "magic-english-v28";
+const FILES = ["./", "./index.html", "./data.js", "./app.js", "./manifest.json", "./audio/manifest.js", "./assets/abeibei-companion.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
 });

@@ -73,11 +73,12 @@ function boot() {
 
   console.log("\n③ 多角色 + 装扮（按孩子点名要的角色）");
   const PETS = w.eval("PETS");
-  ok(PETS.length === 4, "4 个可选伙伴");
+  ok(PETS.length === 5, "5 个可选伙伴（新增阿贝贝）");
   ok(/猫小九/.test(JSON.stringify(PETS)) && /迈克狐/.test(JSON.stringify(PETS)) && /猴子警长/.test(JSON.stringify(PETS)),
      "★ 就是她要的三个角色：猫小九 / 迈克狐 / 猴子警长");
   ok(S().pet.id === "cat", "★ 默认伙伴就是猫小九");
-  ok((S().pet.owned || []).includes("cat") && (S().pet.owned || []).includes("classic"), "两个免费伙伴一开始就有");
+  ok((S().pet.owned || []).includes("cat") && (S().pet.owned || []).includes("classic") && (S().pet.owned || []).includes("abeibei"), "三个免费伙伴一开始就有（含阿贝贝）");
+  ok(PETS.find(p => p.id === "abeibei").art === "assets/abeibei-companion.png", "★ 阿贝贝使用内置原创形象");
   w.eval("navStack=[renderSwapPet];renderSwapPet();");
   ok($("#scr-swap").innerHTML.includes("猫小九"), "换伙伴页显示猫小九");
   ok($("#scr-swap").innerHTML.includes("迈克狐") && $("#scr-swap").innerHTML.includes("猴子警长"), "另外两个角色也在");

@@ -407,6 +407,8 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
 .petFig .petEmojiBig { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .petDeco { position: absolute; transform: translate(-50%, -50%); z-index: 3; pointer-events: none; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,.2)); }
 .petDeco.deco-item { animation: floatY 2.8s ease-in-out infinite; }
+.petCheer { max-width: 290px; margin: 7px auto 0; padding: 7px 10px; border-radius: 12px; background: linear-gradient(135deg,#effcf6,#f5efff); color: #6f5790; font-size: 12px; line-height: 1.5; }
+.petChoiceImg { width: 48px; height: 48px; object-fit: contain; border-radius: 12px; vertical-align: middle; }
 
 .picPrev { width: 62px; height: 62px; border-radius: 14px; background: #f7f2fb; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
 .picPrev img { width: 100%; height: 100%; object-fit: contain; }
@@ -414,12 +416,12 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
 /* ---- 装扮编辑：直接拖动 ---- */
 .decoStage {
   position: relative; width: 100%; max-width: 300px; margin: 0 auto;
-  min-height: 260px; background: #f7f2fb; border-radius: 14px; overflow: hidden;
+  aspect-ratio: 1 / 1; background: #f7f2fb; border-radius: 14px; overflow: hidden;
   touch-action: none;   /* 拖饰品时别让页面跟着滚 */
   user-select: none; -webkit-user-select: none;
 }
-.decoStage img { width: 100%; display: block; pointer-events: none; -webkit-user-drag: none; }
-.decoEmojiBg { font-size: 130px; text-align: center; padding: 50px 0; }
+.decoStage img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; -webkit-user-drag: none; }
+.decoEmojiBg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 130px; }
 .decoItem {
   position: absolute; cursor: grab; touch-action: none;
   filter: drop-shadow(0 2px 3px rgba(0,0,0,.25));
