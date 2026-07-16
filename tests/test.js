@@ -263,10 +263,10 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   console.log("— 白白收藏册 & 游戏厅 & 每日任务t3 —");
   $("#toAlbum").click();
   ok($("#scr-album").classList.contains("on"), "白白收藏册显示");
-  ok($$(".albumCell").length === 12, "12张白白收藏卡");
+  ok($$(".albumCell").length === 100, "100张白白收藏卡");
   ok(w.eval("STICKERS.every(s=>s.n.includes('白白')&&s.art)"), "★ 扭蛋奖励全部是白白，没有其他狗或动物");
   $$('.tab').find(t => t.dataset.tab === "arcade").click();
-  ok($$("#scr-arcade .actRow").length === 9, "游戏厅9个入口(新增听句子，含今日复习)");
+  ok($$("#scr-arcade .actRow").length === 10, "游戏厅10个入口(含听句子、阶段测验和今日复习)");
   ok(S().daily.t1 === true, "无复习任务时t1(复习)自动完成");
   w.eval("bumpDaily('ph')");
   ok(S().daily.t4 === true, "★ 拼读任务(t4)完成");

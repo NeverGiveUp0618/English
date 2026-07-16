@@ -1,4 +1,8 @@
-const CACHE = "magic-english-v30";
+const CACHE = "magic-english-v31";
+const STICKER_V2 = { school:16, season:16, hobby:16, travel:16, magic:16, mood:8 };
+const STICKER_V2_FILES = Object.entries(STICKER_V2).flatMap(([name, count]) =>
+  Array.from({length:count}, (_, i) => `./assets/stickers-v2/${name}-${String(i + 1).padStart(2, "0")}.webp`)
+);
 const FILES = [
   "./", "./index.html", "./data.js", "./app.js", "./manifest.json", "./audio/manifest.js", "./assets/baibai-base.png",
   "./assets/stickers/baibai-wave.webp", "./assets/stickers/baibai-reading.webp", "./assets/stickers/baibai-music.webp",
@@ -10,6 +14,8 @@ const FILES = [
   "./assets/outfits/collar-heart.svg", "./assets/outfits/collar-pearl.svg", "./assets/outfits/cape-royal.svg",
   "./assets/outfits/cape-blossom.svg", "./assets/outfits/cape-starry.svg", "./assets/outfits/cape-fairy.svg",
   "./assets/outfits/cape-strawberry.svg", "./assets/outfits/cape-forest.svg", "./assets/outfits/cape-explorer.svg"
+  ,"./assets/outfits/glasses-round.svg", "./assets/outfits/glasses-heart.svg", "./assets/outfits/glasses-cat.svg",
+  "./assets/outfits/glasses-star.svg", "./assets/outfits/glasses-flower.svg", ...STICKER_V2_FILES
 ];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));

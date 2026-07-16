@@ -64,13 +64,16 @@ function defState() {
     learnedAt: {}, // 单词 -> 首次学会日期
     srs: {},       // 单词 -> {lv:1..6, due:"YYYY-MM-DD"}  间隔重复调度器
     history: {},   // 日期 -> {right, total, w, g, mins}
-    bestExam: 0    // 魔法大考最高分
+    bestExam: 0,   // 魔法大考最高分
+    stageExams: {}, // 阶段测验：stageKey -> {best, passed, date}
+    gachaDup: 0     // 连续重复保护：4次重复后下一颗必出新卡
   };
 }
 let S = defState();
 try { const raw = localStorage.getItem(LS_KEY); if (raw) S = Object.assign(defState(), JSON.parse(raw)); } catch (e) {}
 S.daily = Object.assign(defState().daily, S.daily);
 S.pet = Object.assign(defState().pet, S.pet || {});
+S.stageExams = Object.assign({}, S.stageExams || {});
 S.pet.wear = Object.assign(defState().pet.wear, S.pet.wear || {});
 /* 老伙伴存档只隐藏不删除学习/金币数据；首次升级时让白白以裸狗形象登场。 */
 if (!S.pet.baibaiV1) {
@@ -87,6 +90,16 @@ S.pet.owned = ["baibai"];
 S.pet.worn = Array.isArray(S.pet.worn) ? S.pet.worn.filter(id => OUTFITS.some(o => o.id === id)) : [];
 S.pet.outfits = Array.isArray(S.pet.outfits) ? S.pet.outfits : [];
 ["bb_bow", "bb_flower"].forEach(id => { if (!S.pet.outfits.includes(id)) S.pet.outfits.push(id); });
+/* v31 修复旧帽子坐标：早期默认中心在脸上，且舞台会裁掉顶部。
+   只迁移一次；孩子之后手动保存的位置不再被系统改动。 */
+if (!S.pet.hatFitV2) {
+  const ds = ((S.pet.deco || {}).baibai || {});
+  OUTFITS.filter(o => o.cat === "帽子").forEach(o => {
+    const d = ds[o.id];
+    if (d && Number(d.y) >= 28) { d.y = o.pos.y; d.s = Math.min(Number(d.s) || 1, 1.15); }
+  });
+  S.pet.hatFitV2 = true;
+}
 /* 老贴纸不是白白：升级时按“已有款数 + 总张数”等量换成白白收藏卡，不清空孩子的收集成果。 */
 const oldStickerEntries = Object.entries(S.stickers || {}).filter(([name]) => !STICKERS.some(s => s.n === name));
 if (oldStickerEntries.length) {
@@ -113,7 +126,7 @@ function sharePetOut() {
   try {
     const items = (S.pet.worn || []).map(id => {
       const o = OUTFITS.find(x => x.id === id), d = decoOf(id);
-      return o ? { id: o.id, e: o.e, n: o.n, art: o.art ? new URL(o.art, location.href).href : "", base: o.base || .3, x: d.x, y: d.y, s: d.s, r: d.r } : null;
+      return o ? { id: o.id, e: o.e, n: o.n, art: o.art ? new URL(o.art, location.href).href : "", base: o.base || .3, hue: Number(o.hue) || 0, x: d.x, y: d.y, s: d.s, r: d.r } : null;
     }).filter(Boolean);
     localStorage.setItem(SHARED_PET_KEY, JSON.stringify({ v: 1, name: "白白", items }));
   } catch (e) {}
@@ -197,7 +210,7 @@ const DIFFS = {
     newWords: 4, games: 3, reviews: 3,
     opts: 4,
     timer: 12000,                            // 开始有时间感，但很宽松
-    blanks: 1,
+    blanks: 2,                               // 进入第二段后一次补两个字母
     spellMax: 8, spellHint: true,
     sentMax: 7,
     bossQ: 10, examQ: 12, pairs: 5
@@ -487,8 +500,9 @@ function setDeco(id, v) {
 }
 function decoSizePx(canvasSize, d, o) { return Math.round(canvasSize * ((o && o.base) || .30) * d.s); }
 function outfitVisual(o, cls) {
+  const hue = Math.max(0, Math.min(360, Number(o.hue) || 0));
   return o.art
-    ? `<img class="${cls || "outfitArt"}" src="${o.art}" alt="${esc(o.n)}">`
+    ? `<img class="${cls || "outfitArt"}" src="${o.art}" alt="${esc(o.n)}"${hue ? ` style="filter:hue-rotate(${hue}deg)"` : ""}>`
     : `<span class="${cls || "outfitEmoji"}">${o.e}</span>`;
 }
 function stickerVisual(s, cls) {
@@ -499,9 +513,9 @@ function stickerVisual(s, cls) {
 /* 白白的完整形象：裸狗底图 + 所有已保存装扮；任何页面调用都会得到最新造型。 */
 function petFigure(size, withOutfit) {
   const sz = size || 110;
-  const body = `<img class="petImg" src="${petVisual()}" alt="白白">`;
+  const body = `<img class="petImg" src="${petVisual()}" alt="白白" style="position:relative;z-index:2">`;
   const deco = withOutfit === false ? "" : wornOutfits().map(o => {
-    const d = decoOf(o.id), z = o.group === "body" ? 2 : 3;
+    const d = decoOf(o.id), z = o.group === "body" ? 1 : 3;
     const sizing = o.art ? `width:${decoSizePx(sz, d, o)}px` : `font-size:${decoSizePx(sz, d, o)}px`;
     return `<span class="petDeco deco-${o.cat}" data-outfit="${o.id}" style="z-index:${z};left:${d.x}%;top:${d.y}%;${sizing};transform:translate(-50%,-50%) rotate(${d.r}deg)">${outfitVisual(o)}</span>`;
   }).join("");
@@ -1176,6 +1190,7 @@ function startLearn(u) {
       /* 补字母：按难度挖掉 1~2 个字母，用字母键补回 */
       const letters = [];
       [...w.w].forEach((c, i) => { if (/[a-z]/i.test(c)) letters.push(i); });
+      /* 新手和4字母以内短词仍只挖1格；第二段起，较长单词同时挖2格。 */
       const nHoles = Math.min(w.w.length <= 4 ? 1 : df.blanks, letters.length);
       const holes = sample(letters, nHoles).sort((a, b) => a - b);
       const shown = [...w.w].map((c, i) => holes.includes(i) ? "▢" : c).join("");
@@ -1867,11 +1882,13 @@ function startReview() {
 function renderArcade() {
   const pool = gamePool(), sents = unlockedSents();
   const learnedN = UNITS.reduce((a, u) => a + unitS(u.id).learned.length, 0);
+  const stg = stageExamInfo(learnedN);
   const dc = dueCount();
   const games = [
     { icon: "📅", name: "今日复习", sub: dc ? "有 " + dc + " 个词到期了，趁还记得快复习！" : "今天没有到期的词，很棒！", fn: () => startDueReview() },
     { icon: "🎙️", name: "魔法回声（跟读）", sub: echoMode() === "sr" ? "对着手机大声读，自动给你打分" : echoMode() === "record" ? "录下自己的声音，和标准发音比一比" : "跟着标准发音大声读出来", fn: () => startEcho(unlockedSents().concat(ECHO_EXTRA)) },
     { icon: "🏆", name: "魔法大考", sub: learnedN < 8 ? "学会8个词后解锁" : "跨单元综合复习 · 最高 " + (S.bestExam || 0) + " 分", fn: () => startExam() },
+    { icon: "🎓", name: "阶段测验", sub: learnedN < 20 ? `再学 ${20 - learnedN} 个词解锁第一阶段` : `第 ${stg.no} 阶段 · 25题综合卷 · 最高 ${stg.best || 0} 分`, fn: () => startStageExam() },
     { icon: "🔗", name: "词语配对", sub: "跨单元混合 · 单词和图片手拉手", fn: () => startMatch(priorityPick(pool, 20)) },
     { icon: "👂", name: "听音选图", sub: "跨单元混合 · 练出小小顺风耳", fn: () => startListen(priorityPick(pool, 20)) },
     { icon: "🎧", name: "听句子", sub: "听完整句 · 选出对应的中文意思", fn: () => startSentenceListen(sents) },
@@ -2702,6 +2719,112 @@ function startEcho(items) {
   q();
 }
 
+/* ================= 阶段测验（25题、无倒计时、首次通过大奖励） ================= */
+const STAGE_MARKS = [20, 50, 90, 140, 200];
+function stageExamInfo(n) {
+  const learned = n == null ? learnedWords().length : n;
+  let no = 0;
+  STAGE_MARKS.forEach((m, i) => { if (learned >= m) no = i + 1; });
+  const key = "s" + no, rec = S.stageExams[key] || {};
+  return { no, key, learned, next: STAGE_MARKS[no] || 0, best: rec.best || 0, passed: !!rec.passed };
+}
+function stageExamItems(pool, n) {
+  const out = [];
+  while (out.length < n) out.push(...shuffle(pool));
+  return out.slice(0, n);
+}
+function awardStageCard() {
+  const fresh = STICKERS.filter(s => !S.stickers[s.n]);
+  if (!fresh.length) return "";
+  const st = fresh[Math.floor(Math.random() * fresh.length)];
+  S.stickers[st.n] = 1;
+  checkStickerSets();
+  return st.n;
+}
+function startStageExam() {
+  const learned = learnedWords(), info = stageExamInfo(learned.length);
+  if (!info.no) { toast("学会20个词，就能参加第一阶段测验啦！", 2400); goBack(); return; }
+  const sents = unlockedSents();
+  const wordQs = stageExamItems(learned, sents.length ? 20 : 25);
+  const types = ["listen", "enzh", "zhen", "holes"];
+  let qs = wordQs.map((w, i) => ({ kind: types[i % types.length], w }));
+  if (sents.length) qs = qs.concat(stageExamItems(sents, 5).map(s => ({ kind: "sent", s })));
+  qs = shuffle(qs);
+  let qi = 0, right = 0;
+  function q() {
+    if (qi >= qs.length) return finish();
+    const cur = qs[qi];
+    let head = "", opts = [], answer = "", speakText = "";
+    if (cur.kind === "sent") {
+      const s = cur.s;
+      opts = shuffle([s].concat(sample(sents.filter(x => x.en !== s.en), D().opts - 1)));
+      answer = s.en; speakText = s.en;
+      head = '<button id="lcSpeak" style="margin-top:0">🔊</button><div class="qSub">听完整句子，选出正确意思</div>';
+    } else {
+      const w = cur.w;
+      opts = shuffle([w].concat(distract(learned, w.w)));
+      answer = w.w;
+      if (cur.kind === "listen") {
+        speakText = w.w;
+        head = '<button id="lcSpeak" style="margin-top:0">🔊</button><div class="qSub">听单词，选出正确意思</div>';
+      } else if (cur.kind === "enzh") {
+        head = '<div class="qText">' + esc(w.w) + '</div><div class="qSub">选出正确意思</div>';
+      } else if (cur.kind === "zhen") {
+        head = '<div class="qEmoji" style="font-size:56px">' + w.e + '</div><div class="qSub">' + w.zh + ' —— 选出英文</div>';
+      } else {
+        const letters = [...w.w].map((c, i) => /[a-z]/i.test(c) ? i : -1).filter(i => i >= 0);
+        /* 阶段卷明确升级为双空；日常新手孵化仍按段位保留单空保护。 */
+        const holes = sample(letters, Math.min(2, letters.length));
+        const shown = [...w.w].map((c, i) => holes.includes(i) ? "▢" : c).join("");
+        head = '<div class="qText stageHoles">' + esc(shown) + '</div><div class="qSub">双字母补空：选出完整拼写</div>';
+      }
+    }
+    const labels = opts.map(o => cur.kind === "sent" ? esc(o.zh) : (cur.kind === "zhen" || cur.kind === "holes" ? esc(o.w) : '<span class="oEmoji">' + o.e + '</span>' + o.zh));
+    $("#scr-play").innerHTML =
+      '<div id="playHead"><div id="playProg">🎓 第 ' + info.no + ' 阶段 ' + (qi + 1) + ' / ' + qs.length + '　答对 ' + right + '</div></div>' +
+      '<div class="card" id="playQ">' + head + '</div>' +
+      '<div class="optGrid">' + labels.map((x, i) => '<button class="optBtn" data-i="' + i + '">' + x + '</button>').join("") + '</div>';
+    if (speakText) { speak(speakText); $("#lcSpeak").onclick = () => speak(speakText); }
+    let locked = false;
+    $$("#scr-play .optBtn").forEach(b => b.onclick = () => {
+      if (locked) return; locked = true;
+      const o = opts[+b.dataset.i], got = cur.kind === "sent" ? o.en : o.w;
+      if (got === answer) {
+        b.classList.add("right"); right++; sndRight();
+        if (cur.w) recordRight(cur.w.w);
+      } else {
+        b.classList.add("wrong"); sndWrong();
+        if (cur.w) recordWrong(cur.w.w);
+        $$("#scr-play .optBtn").forEach(x => {
+          const z = opts[+x.dataset.i], v = cur.kind === "sent" ? z.en : z.w;
+          if (v === answer) x.classList.add("right");
+        });
+      }
+      setTimeout(() => { qi++; q(); }, 650);
+    });
+    show("play", "🎓 第 " + info.no + " 阶段测验");
+  }
+  function finish() {
+    bumpDaily("g");
+    const score = Math.round(right / qs.length * 100), passed = score >= 80;
+    const rec = S.stageExams[info.key] || (S.stageExams[info.key] = {});
+    const firstPass = passed && !rec.passed;
+    rec.best = Math.max(rec.best || 0, score);
+    if (firstPass) { rec.passed = true; rec.date = todayStr(); }
+    let gift = "";
+    if (firstPass) { addTicket(2, "第" + info.no + "阶段首次通过"); gift = awardStageCard(); }
+    save();
+    renderResult({
+      stars: score >= 95 ? 3 : passed ? 2 : score >= 60 ? 1 : 0,
+      title: passed ? "第 " + info.no + " 阶段通过！" : "已经完成整张卷子！",
+      detail: "得分 " + score + " 分（" + right + "/" + qs.length + "）" + (firstPass ? "　🎁 首次通过：2张转盘券" + (gift ? " + 「" + gift + "」" : "") : ""),
+      coins: right * 4 + (passed ? 25 : 10),
+      replay: () => startStageExam()
+    });
+  }
+  q();
+}
+
 /* ================= 魔法大考（跨单元综合复习） ================= */
 function startExam() {
   let learned = [];
@@ -3291,7 +3414,7 @@ function renderDecoEdit() {
         <div class="decoStage" id="decoStage">
           <img src="${petVisual()}" alt="白白" draggable="false">
           ${worn.map(id => {
-            const d = draft[id], o = outfitOf(id), z = o.group === "body" ? 2 : 3;
+            const d = draft[id], o = outfitOf(id), z = o.group === "body" ? 1 : 3;
             return `<span class="decoItem ${id === sel ? "sel" : ""}" data-outfit="${id}"
               style="z-index:${z};left:${d.x}%;top:${d.y}%;transform:translate(-50%,-50%) rotate(${d.r}deg)">${outfitVisual(o)}</span>`;
           }).join("")}
@@ -3476,6 +3599,8 @@ function renderTheme() {
 /* ================= 奖励屋（扭蛋） ================= */
 const GACHA_COST = 20;
 function drawSticker() {
+  const fresh = STICKERS.filter(s => !S.stickers[s.n]);
+  if ((S.gachaDup || 0) >= 4 && fresh.length) return fresh[Math.floor(Math.random() * fresh.length)];
   const r = Math.random() * 100;
   const rar = r < 6 ? 3 : r < 32 ? 2 : 1;
   const list = STICKERS.filter(s => s.r === rar);
@@ -3533,6 +3658,7 @@ function renderReward() {
     setTimeout(() => {
       const st = drawSticker();
       const dup = !!S.stickers[st.n];
+      S.gachaDup = dup ? (S.gachaDup || 0) + 1 : 0;
       S.stickers[st.n] = (S.stickers[st.n] || 0) + 1; save();
       if (st.r === 3) { confetti(); sndWin(); } else sndCoin();
       const rarTxt = st.r === 3 ? "✨传说✨" : st.r === 2 ? "稀有" : "普通";
@@ -3541,7 +3667,7 @@ function renderReward() {
           <div class="se">${stickerVisual(st)}</div>
           <div class="sn">${st.n} · ${rarTxt}</div>
           ${dup
-            ? '<div style="font-size:11px;margin-top:2px">重复啦，返还5金币</div>'
+            ? '<div style="font-size:11px;margin-top:2px">重复啦，返还5金币' + (S.gachaDup >= 4 ? ' · 下一颗保证新卡' : '') + '</div>'
             : '<div style="font-size:11px;margin-top:2px">🎊 新的白白收藏卡！去收藏册看大图吧</div>'}
         </div>`;
       if (dup) { S.coins += 5; save(); updateCoinBox(); }

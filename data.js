@@ -614,6 +614,12 @@ const ECHO_EXTRA = [
 
 /* 白白收藏卡：扭蛋奖励永远围绕同一只白白，不再出现其他动物。
    art 是完整收藏卡（不是可穿戴饰品）；r=稀有度 1普通 2稀有 3传说。 */
+function baibaiCards(prefix, names, rarity) {
+  return names.map((n, i) => ({
+    n, e: "🐶", art: `assets/stickers-v2/${prefix}-${String(i + 1).padStart(2, "0")}.webp`,
+    r: typeof rarity === "function" ? rarity(i) : rarity
+  }));
+}
 const STICKERS = [
   { n: "挥手白白", e: "🐶", art: "assets/stickers/baibai-wave.webp", r: 1 },
   { n: "阅读白白", e: "🐶", art: "assets/stickers/baibai-reading.webp", r: 1 },
@@ -626,7 +632,41 @@ const STICKERS = [
   { n: "圣诞守护白白", e: "🐶", art: "assets/stickers/baibai-holiday.webp", r: 3 },
   { n: "樱花公主白白", e: "🐶", art: "assets/stickers/baibai-blossom.webp", r: 3 },
   { n: "星空魔法白白", e: "🐶", art: "assets/stickers/baibai-wizard.webp", r: 3 },
-  { n: "皇家白白", e: "🐶", art: "assets/stickers/baibai-royal.webp", r: 3 }
+  { n: "皇家白白", e: "🐶", art: "assets/stickers/baibai-royal.webp", r: 3 },
+  ...baibaiCards("school", [
+    "校门挥手白白", "绘本时光白白", "铅笔练习白白", "书包出发白白",
+    "举手回答白白", "放大镜发现白白", "卡片配对白白", "算珠思考白白",
+    "小画家白白", "台灯阅读白白", "答对庆祝白白", "灵感来了白白",
+    "整理书架白白", "音乐听读白白", "奖杯时刻白白", "书本午睡白白"
+  ], 1),
+  ...baibaiCards("season", [
+    "春风纸鸢白白", "盛夏西瓜白白", "雨靴小伞白白", "秋叶飞舞白白",
+    "花灯夜游白白", "龙舟鼓手白白", "月饼月光白白", "生日蛋糕白白",
+    "彩带派对白白", "圣诞暖帽白白", "新年灯笼白白", "海边拾贝白白",
+    "樱花野餐白白", "星空露营白白", "雪地围巾白白", "彩虹雨伞白白"
+  ], i => i < 10 ? 1 : 2),
+  ...baibaiCards("hobby", [
+    "饼干烘焙白白", "水果饮品白白", "花园松土白白", "浇花白白",
+    "粉色钢琴白白", "尤克里里白白", "彩带舞蹈白白", "安静瑜伽白白",
+    "积木城堡白白", "拼图专注白白", "折纸白白", "黏土手作白白",
+    "相机白白", "蝴蝶花园白白", "泡泡白白", "抱枕晚安白白"
+  ], 1),
+  ...baibaiCards("travel", [
+    "指南针白白", "山野披风白白", "地图寻路白白", "蒸汽小火车白白",
+    "热气球白白", "森林露营白白", "背包远足白白", "溪石探路白白",
+    "灯塔白白", "高山红叶白白", "沙漠星空白白", "雪峰旗帜白白",
+    "纸船旅行白白", "古城门白白", "望远镜白白", "宝箱发现白白"
+  ], 2),
+  ...baibaiCards("magic", [
+    "星帽魔法白白", "星光魔杖白白", "月牙白白", "云朵梦境白白",
+    "彩虹斗篷白白", "花冠精灵白白", "象牙王冠白白", "翡翠守护白白",
+    "水晶球白白", "飞行魔法书白白", "星星宝盒白白", "萤火收集白白",
+    "月亮摇篮白白", "提灯白白", "爱心环绕白白", "星座勋章白白"
+  ], i => i < 6 ? 3 : 2),
+  ...baibaiCards("mood", [
+    "开心跳跳白白", "自信站立白白", "害羞探头白白", "好奇歪头白白",
+    "惊喜白白", "勇气超人白白", "安静呼吸白白", "困困哈欠白白"
+  ], 1)
 ];
 
 /* 宠物成长线：xp达到阈值即进化（老存档默认用这条线，见 PETS.classic） */
@@ -674,12 +714,12 @@ const OUTFITS = [
   { id:"bb_flower", cat:"发饰", n:"小雏菊发夹", e:"🌼", cost:0, pos:{x:67,y:15,s:.55,r:10} },
   { id:"bb_butterfly", cat:"发饰", n:"蝴蝶发夹", e:"🦋", cost:35, pos:{x:68,y:14,s:.58,r:12} },
   { id:"bb_band", cat:"发饰", n:"星星发箍", e:"🌟", cost:45, pos:{x:50,y:8,s:.62,r:0} },
-  { id:"bb_crown", cat:"帽子", n:"皇家小皇冠", e:"👑", art:"assets/outfits/hat-crown.svg", base:.42, cost:80, pos:{x:50,y:41,s:1,r:0} },
-  { id:"bb_hat", cat:"帽子", n:"春日花朵帽", e:"🌼", art:"assets/outfits/hat-flower.svg", base:.48, cost:60, pos:{x:50,y:43,s:1,r:0} },
-  { id:"bb_treehat", cat:"帽子", n:"圣诞树软帽", e:"🎄", art:"assets/outfits/hat-tree.svg", base:.45, cost:85, pos:{x:50,y:38,s:1,r:0} },
-  { id:"bb_wizardhat", cat:"帽子", n:"星空魔法帽", e:"🧙‍♀️", art:"assets/outfits/hat-wizard.svg", base:.48, cost:90, pos:{x:50,y:38,s:1,r:0} },
-  { id:"bb_beret", cat:"帽子", n:"寻宝侦探帽", e:"🕵️", art:"assets/outfits/hat-beret.svg", base:.50, cost:65, pos:{x:50,y:41,s:1,r:0} },
-  { id:"bb_partyhat", cat:"帽子", n:"彩虹派对帽", e:"🎉", art:"assets/outfits/hat-party.svg", base:.45, cost:55, pos:{x:50,y:38,s:1,r:0} },
+  { id:"bb_crown", cat:"帽子", n:"皇家小皇冠", e:"👑", art:"assets/outfits/hat-crown.svg", base:.32, cost:80, pos:{x:50,y:14,s:1,r:0} },
+  { id:"bb_hat", cat:"帽子", n:"春日花朵帽", e:"🌼", art:"assets/outfits/hat-flower.svg", base:.36, cost:60, pos:{x:50,y:15,s:1,r:0} },
+  { id:"bb_treehat", cat:"帽子", n:"圣诞树软帽", e:"🎄", art:"assets/outfits/hat-tree.svg", base:.30, cost:85, pos:{x:50,y:10,s:1,r:0} },
+  { id:"bb_wizardhat", cat:"帽子", n:"星空魔法帽", e:"🧙‍♀️", art:"assets/outfits/hat-wizard.svg", base:.32, cost:90, pos:{x:50,y:10,s:1,r:0} },
+  { id:"bb_beret", cat:"帽子", n:"寻宝侦探帽", e:"🕵️", art:"assets/outfits/hat-beret.svg", base:.38, cost:65, pos:{x:50,y:15,s:1,r:0} },
+  { id:"bb_partyhat", cat:"帽子", n:"彩虹派对帽", e:"🎉", art:"assets/outfits/hat-party.svg", base:.30, cost:55, pos:{x:50,y:10,s:1,r:0} },
 
   { id:"bb_pearl", cat:"耳饰", n:"珍珠耳环", e:"🤍", cost:30, pos:{x:78,y:39,s:.38,r:0} },
   { id:"bb_gem", cat:"耳饰", n:"宝石耳环", e:"💎", cost:55, pos:{x:79,y:41,s:.4,r:5} },
@@ -705,6 +745,70 @@ const OUTFITS = [
   { id:"bb_bag", cat:"手持", n:"珍珠手提包", e:"👜", cost:55, pos:{x:78,y:76,s:.7,r:0} },
   { id:"bb_umbrella", cat:"手持", n:"彩虹小伞", e:"🌂", cost:50, pos:{x:78,y:62,s:.78,r:-10} }
 ];
+
+/* 长期衣橱：价格随稀有度拉开，避免一次把全部装扮买完。
+   同一顶帽子/同一副镜框会有不同配色，仍然都能独立拖放和保存。 */
+function outfitSeries(prefix, cat, rows, pos) {
+  return rows.map((x, i) => Object.assign({
+    id: prefix + (i + 1), cat, n: x[0], e: x[1], cost: x[2]
+  }, pos || {}, x[3] || {}));
+}
+OUTFITS.push(
+  ...outfitSeries("bb_gx_", "脸上", [
+    ["蜜桃圆框眼镜","👓",90,{art:"assets/outfits/glasses-round.svg",base:.48,hue:0}],
+    ["薄荷圆框眼镜","👓",105,{art:"assets/outfits/glasses-round.svg",base:.48,hue:105}],
+    ["海盐圆框眼镜","👓",120,{art:"assets/outfits/glasses-round.svg",base:.48,hue:190}],
+    ["草莓爱心眼镜","💗",135,{art:"assets/outfits/glasses-heart.svg",base:.50,hue:0}],
+    ["葡萄爱心眼镜","💜",150,{art:"assets/outfits/glasses-heart.svg",base:.50,hue:255}],
+    ["猫眼公主镜","✨",165,{art:"assets/outfits/glasses-cat.svg",base:.50,hue:0}],
+    ["翡翠猫眼镜","💚",180,{art:"assets/outfits/glasses-cat.svg",base:.50,hue:105}],
+    ["星星舞台镜","⭐",195,{art:"assets/outfits/glasses-star.svg",base:.52,hue:0}],
+    ["蓝莓星星镜","💙",210,{art:"assets/outfits/glasses-star.svg",base:.52,hue:195}],
+    ["小花园眼镜","🌸",225,{art:"assets/outfits/glasses-flower.svg",base:.54,hue:0}],
+    ["向日葵眼镜","🌻",240,{art:"assets/outfits/glasses-flower.svg",base:.54,hue:55}],
+    ["银河亮片眼镜","🌌",280,{art:"assets/outfits/glasses-star.svg",base:.52,hue:250}]
+  ], {pos:{x:50,y:37,s:1,r:0}}),
+  ...outfitSeries("bb_hx_", "帽子", [
+    ["蜜桃皇家冠","👑",130,{art:"assets/outfits/hat-crown.svg",base:.32,hue:335}],
+    ["翡翠皇家冠","👑",160,{art:"assets/outfits/hat-crown.svg",base:.32,hue:95}],
+    ["蓝宝石皇冠","👑",190,{art:"assets/outfits/hat-crown.svg",base:.32,hue:205}],
+    ["紫藤花朵帽","🌼",130,{art:"assets/outfits/hat-flower.svg",base:.36,hue:245}],
+    ["海蓝花朵帽","🌼",150,{art:"assets/outfits/hat-flower.svg",base:.36,hue:175}],
+    ["月光魔法帽","🧙‍♀️",180,{art:"assets/outfits/hat-wizard.svg",base:.32,hue:45}],
+    ["樱花魔法帽","🧙‍♀️",210,{art:"assets/outfits/hat-wizard.svg",base:.32,hue:300}],
+    ["薄荷侦探帽","🕵️",145,{art:"assets/outfits/hat-beret.svg",base:.38,hue:95}],
+    ["莓果侦探帽","🕵️",175,{art:"assets/outfits/hat-beret.svg",base:.38,hue:315}],
+    ["星光派对帽","🎉",230,{art:"assets/outfits/hat-party.svg",base:.30,hue:220}]
+  ], {pos:{x:50,y:12,s:1,r:0}}),
+  ...outfitSeries("bb_fx_", "发饰", [
+    ["草莓双蝴蝶结","🎀",85],["蓝莓丝带夹","🎀",100],["珍珠星星夹","⭐",115],
+    ["樱花发夹","🌸",130],["彩虹发箍","🌈",145],["月牙发夹","🌙",160],
+    ["糖果发箍","🍬",175],["小皇冠发箍","♛",190],["雪花发夹","❄️",205],["水晶蝴蝶夹","🦋",235]
+  ], {pos:{x:66,y:15,s:.56,r:8}}),
+  ...outfitSeries("bb_ex_", "耳饰", [
+    ["粉晶耳坠","💗",90],["蓝晶耳坠","💙",105],["小星星耳坠","⭐",120],["小花耳坠","🌸",135],
+    ["珍珠蝴蝶耳坠","🦋",150],["彩虹耳坠","🌈",170],["月光耳坠","🌙",195],["皇家宝石耳坠","💎",240]
+  ], {pos:{x:79,y:42,s:.42,r:3}}),
+  ...outfitSeries("bb_nx_", "项链", [
+    ["草莓吊坠","🍓",90],["小骨头项链","🦴",105],["四叶草项链","🍀",120],["星星项链","⭐",135],
+    ["彩虹项链","🌈",150],["月亮项链","🌙",170],["爱心宝石项链","💖",195],["勇气勋章","🏅",230]
+  ], {pos:{x:50,y:56,s:.42,r:0}}),
+  ...outfitSeries("bb_ix_", "手持", [
+    ["草莓奶昔","🥤",90],["绘本故事","📖",105],["小画板","🎨",120],["泡泡水","🫧",135],
+    ["花束","💐",150],["小提琴","🎻",170],["星星灯笼","🏮",190],["魔法水晶球","🔮",215],
+    ["探险望远镜","🔭",240],["皇家权杖","🪄",280]
+  ], {pos:{x:79,y:68,s:.70,r:-10}}),
+  ...outfitSeries("bb_cx_", "披风", [
+    ["蜜桃旅行披风","🍑",150,{art:"assets/outfits/cape-blossom.svg",base:.74,hue:330,group:"body"}],
+    ["海盐旅行披风","🌊",175,{art:"assets/outfits/cape-explorer.svg",base:.74,hue:180,group:"body"}],
+    ["月光守护披风","🌙",200,{art:"assets/outfits/cape-starry.svg",base:.74,hue:35,group:"body"}],
+    ["紫晶守护披风","💜",225,{art:"assets/outfits/cape-forest.svg",base:.74,hue:245,group:"body"}],
+    ["彩虹仙子披风","🌈",250,{art:"assets/outfits/cape-fairy.svg",base:.74,hue:55,group:"body"}],
+    ["雪国皇家披风","❄️",275,{art:"assets/outfits/cape-royal.svg",base:.74,hue:190,group:"body"}],
+    ["红莓节日披风","🎄",300,{art:"assets/outfits/cape-strawberry.svg",base:.74,hue:330,group:"body"}],
+    ["银河传奇披风","🌌",340,{art:"assets/outfits/cape-starry.svg",base:.74,hue:280,group:"body"}]
+  ], {pos:{x:50,y:63,s:1,r:0}})
+);
 
 /* 点宠物时的英语鼓励（顺带磨耳朵） */
 const PRAISES = [
