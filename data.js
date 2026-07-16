@@ -612,27 +612,21 @@ const ECHO_EXTRA = [
   { en: "See you tomorrow.", zh: "明天见。" }
 ];
 
-/* 扭蛋贴纸库：r=稀有度 1普通 2稀有 3传说 */
+/* 白白收藏卡：扭蛋奖励永远围绕同一只白白，不再出现其他动物。
+   art 是完整收藏卡（不是可穿戴饰品）；r=稀有度 1普通 2稀有 3传说。 */
 const STICKERS = [
-  { n: "草莓甜甜", e: "🍓", r: 1 }, { n: "棒棒糖", e: "🍭", r: 1 },
-  { n: "纸杯蛋糕", e: "🧁", r: 1 }, { n: "甜甜圈", e: "🍩", r: 1 },
-  { n: "小饼干", e: "🍪", r: 1 }, { n: "郁金香", e: "🌷", r: 1 },
-  { n: "小雏菊", e: "🌼", r: 1 }, { n: "四叶草", e: "🍀", r: 1 },
-  { n: "蝴蝶结", e: "🎀", r: 1 }, { n: "小气球", e: "🎈", r: 1 },
-  { n: "小星星", e: "⭐", r: 1 }, { n: "月亮船", e: "🌙", r: 1 },
-  { n: "小瓢虫", e: "🐞", r: 1 }, { n: "小蜜蜂", e: "🐝", r: 1 },
-  { n: "花蝴蝶", e: "🦋", r: 1 }, { n: "小丑鱼", e: "🐠", r: 1 },
-  { n: "月兔", e: "🐰", r: 2 }, { n: "胖达", e: "🐼", r: 2 },
-  { n: "考拉宝宝", e: "🐨", r: 2 }, { n: "小狐狸", e: "🦊", r: 2 },
-  { n: "企鹅蛋蛋", e: "🐧", r: 2 }, { n: "白天鹅", e: "🦢", r: 2 },
-  { n: "彩虹桥", e: "🌈", r: 2 }, { n: "旋转木马", e: "🎠", r: 2 },
-  { n: "梦幻城堡", e: "🏰", r: 2 }, { n: "泰迪熊", e: "🧸", r: 2 },
-  { n: "摩天轮", e: "🎡", r: 2 }, { n: "小樱桃", e: "🍒", r: 2 },
-  { n: "水晶球", e: "🔮", r: 2 },
-  { n: "彩虹独角兽", e: "🦄", r: 3 }, { n: "小美人鱼", e: "🧜‍♀️", r: 3 },
-  { n: "仙女婷婷", e: "🧚", r: 3 }, { n: "公主皇冠", e: "👑", r: 3 },
-  { n: "魔法棒", e: "🪄", r: 3 }, { n: "幸运小龙", e: "🐉", r: 3 },
-  { n: "星光宝石", e: "💠", r: 3 }, { n: "超新星", e: "🌟", r: 3 }
+  { n: "挥手白白", e: "🐶", art: "assets/stickers/baibai-wave.webp", r: 1 },
+  { n: "阅读白白", e: "🐶", art: "assets/stickers/baibai-reading.webp", r: 1 },
+  { n: "音乐白白", e: "🐶", art: "assets/stickers/baibai-music.webp", r: 1 },
+  { n: "派对白白", e: "🐶", art: "assets/stickers/baibai-party.webp", r: 1 },
+  { n: "侦探白白", e: "🐶", art: "assets/stickers/baibai-detective.webp", r: 2 },
+  { n: "雨天白白", e: "🐶", art: "assets/stickers/baibai-rain.webp", r: 2 },
+  { n: "探险白白", e: "🐶", art: "assets/stickers/baibai-explorer.webp", r: 2 },
+  { n: "睡梦白白", e: "🐶", art: "assets/stickers/baibai-sleep.webp", r: 2 },
+  { n: "圣诞守护白白", e: "🐶", art: "assets/stickers/baibai-holiday.webp", r: 3 },
+  { n: "樱花公主白白", e: "🐶", art: "assets/stickers/baibai-blossom.webp", r: 3 },
+  { n: "星空魔法白白", e: "🐶", art: "assets/stickers/baibai-wizard.webp", r: 3 },
+  { n: "皇家白白", e: "🐶", art: "assets/stickers/baibai-royal.webp", r: 3 }
 ];
 
 /* 宠物成长线：xp达到阈值即进化（老存档默认用这条线，见 PETS.classic） */
@@ -673,31 +667,36 @@ const CARE = [
 ];
 
 /* 白白衣橱：每一件都能单独拖动 / 缩放 / 旋转。
-   pos 是首次穿戴的友好落点；同一 body 组只穿一件，其他配饰可以自由叠搭。 */
+   art 装扮是按白白身体轮廓绘制的透明层；同一 body 组只穿一件。
+   旧的人类裙装 id 原位升级成披风，保留已购买记录，不让孩子丢金币。 */
 const OUTFITS = [
   { id:"bb_bow", cat:"发饰", n:"粉色蝴蝶结", e:"🎀", cost:0, pos:{x:31,y:14,s:.62,r:-12} },
   { id:"bb_flower", cat:"发饰", n:"小雏菊发夹", e:"🌼", cost:0, pos:{x:67,y:15,s:.55,r:10} },
   { id:"bb_butterfly", cat:"发饰", n:"蝴蝶发夹", e:"🦋", cost:35, pos:{x:68,y:14,s:.58,r:12} },
   { id:"bb_band", cat:"发饰", n:"星星发箍", e:"🌟", cost:45, pos:{x:50,y:8,s:.62,r:0} },
-  { id:"bb_crown", cat:"发饰", n:"小公主皇冠", e:"👑", cost:80, pos:{x:50,y:8,s:.72,r:0} },
-  { id:"bb_hat", cat:"发饰", n:"春日草帽", e:"👒", cost:60, pos:{x:50,y:10,s:.9,r:0} },
+  { id:"bb_crown", cat:"帽子", n:"皇家小皇冠", e:"👑", art:"assets/outfits/hat-crown.svg", base:.42, cost:80, pos:{x:50,y:41,s:1,r:0} },
+  { id:"bb_hat", cat:"帽子", n:"春日花朵帽", e:"🌼", art:"assets/outfits/hat-flower.svg", base:.48, cost:60, pos:{x:50,y:43,s:1,r:0} },
+  { id:"bb_treehat", cat:"帽子", n:"圣诞树软帽", e:"🎄", art:"assets/outfits/hat-tree.svg", base:.45, cost:85, pos:{x:50,y:38,s:1,r:0} },
+  { id:"bb_wizardhat", cat:"帽子", n:"星空魔法帽", e:"🧙‍♀️", art:"assets/outfits/hat-wizard.svg", base:.48, cost:90, pos:{x:50,y:38,s:1,r:0} },
+  { id:"bb_beret", cat:"帽子", n:"寻宝侦探帽", e:"🕵️", art:"assets/outfits/hat-beret.svg", base:.50, cost:65, pos:{x:50,y:41,s:1,r:0} },
+  { id:"bb_partyhat", cat:"帽子", n:"彩虹派对帽", e:"🎉", art:"assets/outfits/hat-party.svg", base:.45, cost:55, pos:{x:50,y:38,s:1,r:0} },
 
   { id:"bb_pearl", cat:"耳饰", n:"珍珠耳环", e:"🤍", cost:30, pos:{x:78,y:39,s:.38,r:0} },
   { id:"bb_gem", cat:"耳饰", n:"宝石耳环", e:"💎", cost:55, pos:{x:79,y:41,s:.4,r:5} },
   { id:"bb_cherry", cat:"耳饰", n:"樱桃耳坠", e:"🍒", cost:45, pos:{x:78,y:42,s:.46,r:5} },
   { id:"bb_moon", cat:"耳饰", n:"月亮耳坠", e:"🌙", cost:50, pos:{x:79,y:41,s:.42,r:0} },
 
-  { id:"bb_heart", cat:"项链", n:"爱心项链", e:"💖", cost:35, pos:{x:50,y:55,s:.48,r:0} },
-  { id:"bb_pearlneck", cat:"项链", n:"珍珠项链", e:"📿", cost:55, pos:{x:50,y:55,s:.62,r:0} },
+  { id:"bb_heart", cat:"项圈", n:"爱心蝴蝶结项圈", e:"💖", art:"assets/outfits/collar-heart.svg", base:.52, cost:35, pos:{x:50,y:56,s:1,r:0} },
+  { id:"bb_pearlneck", cat:"项圈", n:"珍珠宝石项圈", e:"📿", art:"assets/outfits/collar-pearl.svg", base:.52, cost:55, pos:{x:50,y:56,s:1,r:0} },
   { id:"bb_bell", cat:"项链", n:"幸运铃铛", e:"🔔", cost:45, pos:{x:50,y:55,s:.42,r:0} },
 
-  { id:"bb_wedding", cat:"婚纱裙", group:"body", n:"白色婚纱", e:"🤍👗", cost:120, pos:{x:50,y:73,s:1.2,r:0} },
-  { id:"bb_pinkdress", cat:"婚纱裙", group:"body", n:"樱花公主裙", e:"🌸👗", cost:90, pos:{x:50,y:73,s:1.18,r:0} },
-  { id:"bb_bluedress", cat:"婚纱裙", group:"body", n:"星空礼服", e:"💙👗", cost:100, pos:{x:50,y:73,s:1.18,r:0} },
-  { id:"bb_tutu", cat:"婚纱裙", group:"body", n:"芭蕾蓬蓬裙", e:"🩰", cost:75, pos:{x:50,y:75,s:1.05,r:0} },
-  { id:"bb_shirt", cat:"衣服", group:"body", n:"粉色小毛衣", e:"👚", cost:55, pos:{x:50,y:68,s:1.05,r:0} },
-  { id:"bb_coat", cat:"衣服", group:"body", n:"暖暖外套", e:"🧥", cost:65, pos:{x:50,y:68,s:1.05,r:0} },
-  { id:"bb_vest", cat:"衣服", group:"body", n:"探险小背心", e:"🦺", cost:60, pos:{x:50,y:68,s:1.0,r:0} },
+  { id:"bb_wedding", cat:"披风", group:"body", n:"象牙皇家披风", e:"🤍", art:"assets/outfits/cape-royal.svg", base:.74, cost:120, pos:{x:50,y:63,s:1,r:0} },
+  { id:"bb_pinkdress", cat:"披风", group:"body", n:"樱花珍珠披风", e:"🌸", art:"assets/outfits/cape-blossom.svg", base:.74, cost:90, pos:{x:50,y:63,s:1,r:0} },
+  { id:"bb_bluedress", cat:"披风", group:"body", n:"星空魔法披风", e:"🌌", art:"assets/outfits/cape-starry.svg", base:.74, cost:100, pos:{x:50,y:63,s:1,r:0} },
+  { id:"bb_tutu", cat:"披风", group:"body", n:"紫藤仙子披风", e:"🪻", art:"assets/outfits/cape-fairy.svg", base:.74, cost:75, pos:{x:50,y:63,s:1,r:0} },
+  { id:"bb_shirt", cat:"披风", group:"body", n:"草莓软绒披风", e:"🍓", art:"assets/outfits/cape-strawberry.svg", base:.74, cost:55, pos:{x:50,y:63,s:1,r:0} },
+  { id:"bb_coat", cat:"披风", group:"body", n:"森林守护披风", e:"🌲", art:"assets/outfits/cape-forest.svg", base:.74, cost:65, pos:{x:50,y:63,s:1,r:0} },
+  { id:"bb_vest", cat:"披风", group:"body", n:"晴空探险披风", e:"🧭", art:"assets/outfits/cape-explorer.svg", base:.74, cost:60, pos:{x:50,y:63,s:1,r:0} },
 
   { id:"bb_glasses", cat:"脸上", n:"圆框眼镜", e:"👓", cost:35, pos:{x:50,y:37,s:.72,r:0} },
   { id:"bb_sunglasses", cat:"脸上", n:"酷酷墨镜", e:"🕶️", cost:45, pos:{x:50,y:37,s:.72,r:0} },

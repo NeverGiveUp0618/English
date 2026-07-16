@@ -28,22 +28,25 @@ const S = () => w.eval("S");
   ok($$("#petShow .petDeco").length === 0, "★ 首次登场没有任何默认穿戴");
   ok(fs.existsSync(DIR + "/assets/baibai-base.png"), "白白透明基础图已进入项目");
 
-  console.log("\n② 衣橱覆盖婚纱、裙子、发饰、耳饰、衣服等品类");
+  console.log("\n② 衣橱只提供适合白白身体的披风、帽子与配件");
   w.eval("saveWallet({coins:500,tickets:0});updateCoinBox();navStack=[renderOutfit];renderOutfit();");
   const outfits = w.eval("OUTFITS");
   ok(outfits.length >= 24, "至少 24 件可搭配装扮: " + outfits.length);
-  ok(["发饰","耳饰","项链","婚纱裙","衣服","脸上","手持"].every(c => outfits.some(o => o.cat === c)), "★ 用户指定的主要品类全部覆盖");
+  ok(["发饰","帽子","耳饰","项圈","披风","脸上","手持"].every(c => outfits.some(o => o.cat === c)), "★ 白白适配的主要品类全部覆盖");
+  ok(outfits.filter(o => o.group === "body").every(o => o.cat === "披风" && o.art), "★ 所有人类裙装都已原位升级成宠物披风");
+  ok(outfits.filter(o => o.art).every(o => o.base < .8), "★ 图片装扮裁到物品本身，不用整张透明画布挡住其他配件");
   ok(S().pet.outfits.includes("bb_bow") && S().pet.outfits.includes("bb_flower"), "★ 送两件免费发饰，打开就能玩");
   $("[data-o='bb_bow']").click();
   ok(S().pet.worn.includes("bb_bow"), "点一下免费蝴蝶结立即穿上");
   $("[data-o='bb_wedding']").click();
-  ok(S().pet.worn.includes("bb_wedding") && w.eval("loadWallet().coins") === 380, "★ 花共享金币买白色婚纱并穿上");
+  ok(S().pet.worn.includes("bb_wedding") && w.eval("loadWallet().coins") === 380, "★ 花共享金币买皇家披风并穿上");
   $("[data-o='bb_pinkdress']").click();
-  ok(S().pet.worn.includes("bb_pinkdress") && !S().pet.worn.includes("bb_wedding"), "★ 换裙子时自动收好上一件，避免两条裙子重叠");
+  ok(S().pet.worn.includes("bb_pinkdress") && !S().pet.worn.includes("bb_wedding"), "★ 换披风时自动收好上一件，避免两件披风重叠");
 
   console.log("\n③ 每件装扮独立拖动，点保存前不改正式造型");
   w.eval("S.pet.worn=['bb_bow','bb_pinkdress'];save();navStack=[renderDecoEdit];renderDecoEdit();");
   ok($$(".decoItem").length === 2 && $$(".decoItem").every(x => x.dataset.outfit), "两件装扮都能单独选中和拖动");
+  ok(!!$("#deRemove") && $("#deRemove").textContent.includes("取下"), "★ 编辑页提供明确的取下按钮");
   ok(/aspect-ratio:\s*1\s*\/\s*1/.test(fs.readFileSync(DIR + "/index.html", "utf8")), "编辑器和首页使用同一正方形坐标系");
   const before = w.eval("decoOf('bb_bow')");
   const stage = $("#decoStage");
@@ -68,6 +71,11 @@ const S = () => w.eval("S");
   const shared = JSON.parse(w.localStorage.getItem("sharedPet_v1"));
   ok(shared.name === "白白" && shared.items.some(x => x.id === "bb_bow" && x.x === 35), "★ sharedPet_v1 写入最新白白造型，语文可直接读取");
   ok(JSON.parse(w.localStorage.getItem("sharedWallet_v1")).coins === 290, "装扮消费仍只走 sharedWallet_v1");
+
+  w.eval("navStack=[renderDecoEdit];renderDecoEdit();");
+  $("[data-pick='bb_pinkdress']").click();
+  $("#deRemove").click();
+  ok(!S().pet.worn.includes("bb_pinkdress") && S().pet.worn.includes("bb_bow"), "★ 编辑页点取下后立即生效，白白恢复为剩余造型");
 
   console.log("\n⑥ 投喂、洗澡、陪玩每次都有明确反馈且没有惩罚");
   ok(w.eval("CARE.every(c=>c.say.includes('白白')&&c.fx)"), "四种互动都有白白专属文字和动作反馈");

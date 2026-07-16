@@ -406,6 +406,7 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
 .petFig .petImg { width: 100%; height: 100%; object-fit: contain; display: block; }
 .petFig .petEmojiBig { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
 .petDeco { position: absolute; transform: translate(-50%, -50%); z-index: 3; pointer-events: none; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,.2)); }
+.petDeco img { width:100%; height:auto; display:block; }
 .petDeco.deco-item { animation: floatY 2.8s ease-in-out infinite; }
 .petCheer { max-width: 290px; margin: 7px auto 0; padding: 7px 10px; border-radius: 12px; background: linear-gradient(135deg,#effcf6,#f5efff); color: #6f5790; font-size: 12px; line-height: 1.5; }
 .petChoiceImg { width: 48px; height: 48px; object-fit: contain; border-radius: 12px; vertical-align: middle; }
@@ -434,7 +435,7 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
   touch-action: none;   /* 拖饰品时别让页面跟着滚 */
   user-select: none; -webkit-user-select: none;
 }
-.decoStage img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; -webkit-user-drag: none; }
+.decoStage > img { width: 100%; height: 100%; object-fit: contain; display: block; pointer-events: none; -webkit-user-drag: none; }
 .decoEmojiBg { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 130px; }
 .decoItem {
   position: absolute; cursor: grab; touch-action: none;
@@ -443,10 +444,12 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
 }
 .decoItem.sel { outline: 2.5px dashed #b98ff0; outline-offset: 4px; border-radius: 8px; }
 .decoItem:active { cursor: grabbing; }
+.decoItem img { width:100%; height:auto; display:block; pointer-events:none; -webkit-user-drag:none; }
 
 .decoCtrl { display: flex; gap: 8px; justify-content: center; }
 .decoPickList { display:flex; gap:6px; justify-content:center; overflow-x:auto; padding:2px 1px 10px; margin-bottom:2px; }
 .decoPickList .btn { flex:none; }
+.decoPickList .pickArt { width:28px; height:28px; object-fit:contain; vertical-align:middle; }
 .decoBtn {
   flex: 1; border: none; border-radius: 12px; background: #f5eefc; color: #7a5a9a;
   font-size: 18px; font-weight: 700; padding: 8px 4px;
@@ -460,10 +463,17 @@ body.th-night .decoBtn { background: #473a6e; color: #cfc0ee; }
 .outfitGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
 .outfitCell { background: #fff; border-radius: 14px; text-align: center; padding: 10px 4px; box-shadow: 0 2px 8px rgba(180,140,200,.15); }
 .outfitCell .oe { font-size: 30px; }
+.outfitCell .oe img { width:64px; height:64px; object-fit:contain; display:block; margin:0 auto; }
 .outfitCell .on2 { font-size: 11px; color: #7a5a9a; font-weight: 700; margin-top: 2px; }
 .outfitCell .oc { font-size: 10px; color: #c0a8d0; margin-top: 1px; }
 .outfitCell.lock .oe { filter: grayscale(1); opacity: .4; }
 .outfitCell.on { box-shadow: 0 0 0 2.5px #7cc576; }
+
+/* 白白收藏卡：图片就是奖励主体，任何格子都不再用其他动物 emoji。 */
+.stickerCard .se img { width:150px; height:150px; object-fit:cover; border-radius:20px; display:block; margin:4px auto 8px; }
+.albumCell .ae img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:12px; display:block; }
+.albumCell.no .ae img { filter:grayscale(1); opacity:.22; }
+.decoCard .stickerPreview { width:min(260px,70vw); aspect-ratio:1; object-fit:cover; border-radius:22px; box-shadow:0 7px 24px rgba(100,70,130,.2); }
 
 /* ---- 自然拼读：音节 + 音标 + 颜色 ---- */
 .phRow { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 14px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(180,140,200,.15); }
@@ -501,9 +511,9 @@ body.th-night .careBarWrap { background: #2a2348; }
 </head>
 <body>
 <div id="app">
-  <a class="hubLink" id="hubLink" href="https://nevergiveup0618.github.io/learning/">← 返回学习导航</a>
+  <a class="hubLink" id="hubLink" href="https://nevergiveup0618.github.io/learning/" aria-label="离开英语乐园，返回学习导航">← 返回学习导航</a>
   <header id="topbar">
-    <button id="backBtn">←</button>
+    <button id="backBtn" type="button" aria-label="返回英语乐园上一页">←</button>
     <div id="barTitle">魔法英语乐园</div>
     <div id="coinBox">🪙 <span id="coinNum">0</span></div>
   </header>
@@ -541,7 +551,7 @@ body.th-night .careBarWrap { background: #2a2348; }
     <button class="tab" data-tab="map"><span class="ti">🗺️</span><span class="tn">闯关</span></button>
     <button class="tab" data-tab="phonics"><span class="ti">🔮</span><span class="tn">拼读</span></button>
     <button class="tab" data-tab="arcade"><span class="ti">🎮</span><span class="tn">游戏厅</span></button>
-    <button class="tab" data-tab="reward"><span class="ti">🎁</span><span class="tn">奖励屋</span></button>
+    <button class="tab" data-tab="reward"><span class="ti">🎁</span><span class="tn">白白礼物</span></button>
   </nav>
 </div>
 <div id="toast"></div>

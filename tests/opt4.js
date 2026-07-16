@@ -80,15 +80,16 @@ function boot() {
   w.eval("navStack=[renderCare];renderCare();");
   ok(!$("#toSwap"), "★ 照顾页没有换伙伴按钮");
   const cats = new Set(w.eval("OUTFITS.map(o=>o.cat)"));
-  ok(w.eval("OUTFITS.length") >= 24 && ["发饰","耳饰","婚纱裙","衣服","手持"].every(x=>cats.has(x)),
-     "★ 至少 24 件装扮，覆盖发饰、耳饰、婚纱裙、衣服和手持");
+  ok(w.eval("OUTFITS.length") >= 28 && ["发饰","帽子","耳饰","项圈","披风","手持"].every(x=>cats.has(x)),
+     "★ 至少 28 件白白装扮，覆盖发饰、帽子、耳饰、项圈、披风和手持");
+  ok(w.eval("OUTFITS.filter(o=>o.group==='body').every(o=>o.art&&o.cat==='披风')"), "★ 人类裙装已全部替换为宠物披风图片");
   w.eval("saveWallet({coins:500,tickets:0});updateCoinBox();");
   w.eval("navStack=[renderOutfit];renderOutfit();");
   $("[data-o='bb_crown']").click();
   ok((S().pet.outfits || []).includes("bb_crown") && (S().pet.worn || []).includes("bb_crown"), "★ 买下皇冠后自动加入造型");
   ok(w.eval("loadWallet().coins") === 420, "从共享钱包扣 80 金币");
   w.eval("navStack=[renderHome];renderHome();");
-  ok($("#petShow [data-outfit='bb_crown']")?.textContent === "👑", "★ 首页显示白白最新保存的装扮");
+  ok($("#petShow [data-outfit='bb_crown'] img")?.src.endsWith("/assets/outfits/hat-crown.svg"), "★ 首页显示白白最新保存的皇冠图片");
 
   console.log("\n④ 转盘：每天一次 + 必须学完复习完");
   w.eval("S.daily={date:todayStr(),w:0,g:0,r:0,ph:0,earn:0,t1:false,t2:false,t3:false,t4:false,hard:false,bonus:false,spun:false};S.tickets=3;save();");

@@ -87,6 +87,21 @@ S.pet.owned = ["baibai"];
 S.pet.worn = Array.isArray(S.pet.worn) ? S.pet.worn.filter(id => OUTFITS.some(o => o.id === id)) : [];
 S.pet.outfits = Array.isArray(S.pet.outfits) ? S.pet.outfits : [];
 ["bb_bow", "bb_flower"].forEach(id => { if (!S.pet.outfits.includes(id)) S.pet.outfits.push(id); });
+/* 老贴纸不是白白：升级时按“已有款数 + 总张数”等量换成白白收藏卡，不清空孩子的收集成果。 */
+const oldStickerEntries = Object.entries(S.stickers || {}).filter(([name]) => !STICKERS.some(s => s.n === name));
+if (oldStickerEntries.length) {
+  const oldAll = Object.values(S.stickers || {}).reduce((n, x) => n + Math.max(0, Number(x) || 0), 0);
+  const oldKinds = Object.keys(S.stickers || {}).length;
+  const next = {};
+  for (let i = 0; i < Math.min(oldKinds, STICKERS.length); i++) next[STICKERS[i].n] = 1;
+  let extra = Math.max(0, oldAll - Object.keys(next).length), i = 0;
+  while (extra--) { const n = STICKERS[i++ % STICKERS.length].n; next[n] = (next[n] || 0) + 1; }
+  S.stickers = next;
+  S.setDone = {};                 // 新收藏册重新计算三档集齐奖励
+}
+/* 收藏卡是完整的白白造型，不再把另一只动物贴到白白头上或身边。 */
+S.hat = null;
+S.buddy = null;
 if (!S.wheelTouched) S.wheelTouched = todayStr();
 function save() {
   try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch (e) {}
@@ -98,7 +113,7 @@ function sharePetOut() {
   try {
     const items = (S.pet.worn || []).map(id => {
       const o = OUTFITS.find(x => x.id === id), d = decoOf(id);
-      return o ? { id: o.id, e: o.e, n: o.n, x: d.x, y: d.y, s: d.s, r: d.r } : null;
+      return o ? { id: o.id, e: o.e, n: o.n, art: o.art ? new URL(o.art, location.href).href : "", base: o.base || .3, x: d.x, y: d.y, s: d.s, r: d.r } : null;
     }).filter(Boolean);
     localStorage.setItem(SHARED_PET_KEY, JSON.stringify({ v: 1, name: "白白", items }));
   } catch (e) {}
@@ -277,7 +292,7 @@ setInterval(() => {
 function ttsFail() {
   if (ttsWarned) return;
   ttsWarned = true;
-  toast("🔇 听不到发音？去「奖励屋→家长设置→发音自检」看看", 4000);
+  toast("🔇 听不到发音？去「白白礼物→家长设置→发音自检」看看", 4000);
 }
 /* 主通道：播放预合成 mp3。onEnd 在音频真正播完时回调 */
 function speak(text, rate, onEnd) {
@@ -470,14 +485,25 @@ function setDeco(id, v) {
   S.pet.deco.baibai[id] = v;
   save();
 }
-function decoSizePx(canvasSize, d) { return Math.round(canvasSize * 0.30 * d.s); }
+function decoSizePx(canvasSize, d, o) { return Math.round(canvasSize * ((o && o.base) || .30) * d.s); }
+function outfitVisual(o, cls) {
+  return o.art
+    ? `<img class="${cls || "outfitArt"}" src="${o.art}" alt="${esc(o.n)}">`
+    : `<span class="${cls || "outfitEmoji"}">${o.e}</span>`;
+}
+function stickerVisual(s, cls) {
+  return s.art
+    ? `<img class="${cls || "stickerArt"}" src="${s.art}" alt="${esc(s.n)}">`
+    : `<span>${s.e}</span>`;
+}
 /* 白白的完整形象：裸狗底图 + 所有已保存装扮；任何页面调用都会得到最新造型。 */
 function petFigure(size, withOutfit) {
   const sz = size || 110;
   const body = `<img class="petImg" src="${petVisual()}" alt="白白">`;
   const deco = withOutfit === false ? "" : wornOutfits().map(o => {
     const d = decoOf(o.id), z = o.group === "body" ? 2 : 3;
-    return `<span class="petDeco deco-${o.cat}" data-outfit="${o.id}" style="z-index:${z};left:${d.x}%;top:${d.y}%;font-size:${decoSizePx(sz, d)}px;transform:translate(-50%,-50%) rotate(${d.r}deg)">${o.e}</span>`;
+    const sizing = o.art ? `width:${decoSizePx(sz, d, o)}px` : `font-size:${decoSizePx(sz, d, o)}px`;
+    return `<span class="petDeco deco-${o.cat}" data-outfit="${o.id}" style="z-index:${z};left:${d.x}%;top:${d.y}%;${sizing};transform:translate(-50%,-50%) rotate(${d.r}deg)">${outfitVisual(o)}</span>`;
   }).join("");
   return `<div class="petFig" style="width:${sz}px;height:${sz}px">${body}${deco}</div>`;
 }
@@ -674,20 +700,42 @@ function priorityPick(pool, n) {
 
 /* ---------------- 导航 ---------------- */
 let navStack = [];
+let navTabs = [];
+let activeTab = "home";
+const ROOT_TABS = { home: "home", map: "map", phonics: "phonics", arcade: "arcade", reward: "reward" };
+function setActiveTab(tab) {
+  if (!tab) return;
+  activeTab = tab;
+  document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.tab === tab));
+}
 function show(id, title) {
+  if (ROOT_TABS[id]) setActiveTab(ROOT_TABS[id]);
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("on"));
   $("#scr-" + id).classList.add("on");
   $("#barTitle").textContent = title;
   $("#backBtn").style.visibility = navStack.length > 1 ? "visible" : "hidden";
   $("#screens").scrollTop = 0;
+  if (navStack.length === 1) navTabs = [activeTab];
 }
-function go(render) { navStack.push(render); render(); }
-function goTab(render) { navStack = [render]; render(); }
+function go(render, tab) {
+  navStack.push(render);
+  navTabs.push(tab || activeTab);
+  if (tab) setActiveTab(tab);
+  render();
+}
+function goTab(render, tab) {
+  navStack = [render];
+  navTabs = [tab || activeTab];
+  if (tab) setActiveTab(tab);
+  render();
+}
 function goBack() {
   stopSpeak();                                              // 停掉正在播的发音
   clearTimer();
   if (echoCleanup) { echoCleanup(); echoCleanup = null; }   // 关掉麦克风
-  if (navStack.length > 1) navStack.pop();
+  if (navStack.length <= 1) return;
+  navStack.pop(); navTabs.pop();
+  setActiveTab(navTabs[navTabs.length - 1] || "home");
   navStack[navStack.length - 1]();
 }
 $("#backBtn").onclick = goBack;
@@ -696,9 +744,7 @@ document.querySelectorAll(".tab").forEach(t => {
     clearTimer();
     if (echoCleanup) { echoCleanup(); echoCleanup = null; }
     stopSpeak();
-    document.querySelectorAll(".tab").forEach(x => x.classList.remove("on"));
-    t.classList.add("on");
-    ({ home: () => goTab(renderHome), map: () => goTab(renderMap), phonics: () => goTab(renderPhonicsList), arcade: () => goTab(renderArcade), reward: () => goTab(renderReward) })[t.dataset.tab]();
+    ({ home: () => goTab(renderHome, "home"), map: () => goTab(renderMap, "map"), phonics: () => goTab(renderPhonicsList, "phonics"), arcade: () => goTab(renderArcade, "arcade"), reward: () => goTab(renderReward, "reward") })[t.dataset.tab]();
   };
 });
 
@@ -774,8 +820,6 @@ function renderHome() {
       <button id="themeQuick" style="position:absolute;top:10px;right:10px;border:none;background:none;font-size:22px">🎨</button>
       <div class="petShow" id="petShow">
         ${petFigure(112)}
-        <span class="petBuddy">${S.buddy ? stickerOf(S.buddy).e : ""}</span>
-        <span class="petHat" style="${petVisual() ? "display:none" : ""}">${S.hat ? stickerOf(S.hat).e : ""}</span>
       </div>
       <div id="petStage">${esc(petName())}　${careMood().e}</div>
       <div id="petTip">${"❤️".repeat(bondLv())}${"🤍".repeat(5 - bondLv())}　${careMood().t}</div>
@@ -827,7 +871,7 @@ function renderHome() {
     </div>
     <div class="homeGrid">
       <div class="card" id="homeReview"><div class="hIcon">📕</div><div class="hName">错词本</div><div class="hSub">${wc ? wc + " 个词等你消灭" : "干干净净，真棒！"}</div></div>
-      <div class="card" id="homeAlbum"><div class="hIcon">📔</div><div class="hName">贴纸册</div><div class="hSub">已收集 ${Object.keys(S.stickers).length}/${STICKERS.length}</div></div>
+      <div class="card" id="homeAlbum"><div class="hIcon">🐶</div><div class="hName">白白收藏册</div><div class="hSub">已收集 ${Object.keys(S.stickers).length}/${STICKERS.length}</div></div>
       <div class="card" id="homeWheel"><div class="hIcon">🎡</div><div class="hName">幸运大转盘</div><div class="hSub">${S.tickets ? "有 " + S.tickets + " 张转盘券！" : "完成任务赢转盘券"}</div></div>
       <div class="card" id="homeVoucher"><div class="hIcon">🎟️</div><div class="hName">我的奖励券</div><div class="hSub">${(() => { const p = S.vouchers.filter(v => !v.used).length; return p ? p + " 张待兑换" : "转转盘赢真奖励"; })()}</div></div>
     </div>
@@ -857,12 +901,12 @@ function renderHome() {
       }
     };
   });
-  $("#homeGo").onclick = () => go(() => renderUnit(cu));
+  $("#homeGo").onclick = () => go(() => renderUnit(cu), "map");
   $("#homeReview").onclick = () => { if (wrongCount()) go(() => startReview()); else toast("错词本是空的，去玩游戏吧！"); };
-  $("#homeAlbum").onclick = () => go(renderAlbum);
-  $("#homeWheel").onclick = () => go(renderWheel);
-  $("#homeVoucher").onclick = () => go(renderVoucher);
-  $("#themeQuick").onclick = () => go(renderTheme);
+  $("#homeAlbum").onclick = () => go(renderAlbum, "reward");
+  $("#homeWheel").onclick = () => go(renderWheel, "reward");
+  $("#homeVoucher").onclick = () => go(renderVoucher, "reward");
+  $("#themeQuick").onclick = () => go(renderTheme, "reward");
   $("#goCare").onclick = () => go(renderCare);
   if (S.testMode) $("#testBanner").onclick = () => {
     S.testMode = false; save(); toast("✅ 测试模式已关闭，恢复正常闯关", 2200); renderHome();
@@ -2990,7 +3034,7 @@ function renderCare() {
 
     <div class="card actRow" id="toOutfit">
       <span class="aIcon">👗</span>
-      <span class="aName">白白的梦幻衣橱<span class="aSub">婚纱 / 裙子 / 发夹 / 发箍 / 耳环 / 衣服 · 已有 ${(S.pet.outfits || []).filter(id => outfitOf(id)).length}/${OUTFITS.length}</span></span>
+      <span class="aName">白白的梦幻衣橱<span class="aSub">宠物披风 / 帽子 / 发夹 / 项圈 / 耳饰 · 已有 ${(S.pet.outfits || []).filter(id => outfitOf(id)).length}/${OUTFITS.length}</span></span>
       <span class="aGo">▶</span>
     </div>`;
 
@@ -3034,7 +3078,7 @@ function renderOutfit() {
           const has = owned.includes(o.id);
           const on = (S.pet.worn || []).includes(o.id);
           return `<div class="outfitCell ${has ? "" : "lock"} ${on ? "on" : ""}" data-o="${o.id}">
-            <div class="oe">${o.e}</div>
+            <div class="oe">${outfitVisual(o)}</div>
             <div class="on2">${o.n}</div>
             <div class="oc">${has ? (on ? "已穿上 · 点此取下" : "点一下穿上") : o.cost ? "🪙" + o.cost : "免费"}</div>
           </div>`;
@@ -3216,13 +3260,13 @@ function renderPetPics() {
  * 现在：手指按住饰品直接拖，选中后可以放大/缩小/旋转。所见即所得。
  */
 function renderDecoEdit() {
-  const worn = (S.pet.worn || []).filter(id => outfitOf(id));
+  let worn = (S.pet.worn || []).filter(id => outfitOf(id));
   if (!worn.length) {
     $("#scr-anchor").innerHTML = `
       <div class="card" style="text-align:center;padding:26px 16px">
         <div class="petShow">${petFigure(150, false)}</div>
         <div style="font-size:15px;font-weight:700;color:#9b59b6;margin:8px 0">白白现在是清清爽爽的裸狗</div>
-        <div style="font-size:13px;color:#b8a8c8;line-height:1.7">先去衣橱选一件婚纱、裙子、发夹或耳环，<br>再回来把每一件拖到最合适的位置。</div>
+        <div style="font-size:13px;color:#b8a8c8;line-height:1.7">先去衣橱选一件宠物披风、帽子、发夹或项圈，<br>再回来把每一件拖到最合适的位置。</div>
         <div style="height:14px"></div>
         <button class="btn" id="deGo">👗 去白白的衣橱</button>
       </div>`;
@@ -3249,7 +3293,7 @@ function renderDecoEdit() {
           ${worn.map(id => {
             const d = draft[id], o = outfitOf(id), z = o.group === "body" ? 2 : 3;
             return `<span class="decoItem ${id === sel ? "sel" : ""}" data-outfit="${id}"
-              style="z-index:${z};left:${d.x}%;top:${d.y}%;transform:translate(-50%,-50%) rotate(${d.r}deg)">${o.e}</span>`;
+              style="z-index:${z};left:${d.x}%;top:${d.y}%;transform:translate(-50%,-50%) rotate(${d.r}deg)">${outfitVisual(o)}</span>`;
           }).join("")}
         </div>
       </div>
@@ -3257,7 +3301,7 @@ function renderDecoEdit() {
       <div class="card" style="padding:12px">
         <div class="decoPickList">
           ${worn.map(id => `<button class="btn small ${id === sel ? "" : "ghost"}" data-pick="${id}">
-            ${outfitOf(id).e} ${outfitOf(id).n}
+            ${outfitVisual(outfitOf(id), "pickArt")} ${outfitOf(id).n}
           </button>`).join("")}
         </div>
         <div class="decoCtrl">
@@ -3268,8 +3312,9 @@ function renderDecoEdit() {
           <button class="decoBtn" data-act="reset">🔄<span>复位</span></button>
         </div>
         <div style="font-size:11px;color:#c0b0d0;text-align:center;margin-top:8px">
-          当前：${selected.e} ${selected.n}　大小 ${Math.round(draft[sel].s * 100)}%　角度 ${draft[sel].r}°
+          当前：${selected.n}　大小 ${Math.round(draft[sel].s * 100)}%　角度 ${draft[sel].r}°
         </div>
+        <button class="btn small ghost" id="deRemove" style="display:block;margin:10px auto 0;color:#d75f72">🧺 取下「${selected.n}」</button>
       </div>
       <button class="btn" id="deDone">✅ 保存造型，让白白这样陪我</button>`;
 
@@ -3281,7 +3326,8 @@ function renderDecoEdit() {
     /* 与首页共用同一套尺寸公式；编辑舞台和首页也都是正方形坐标系。 */
     const stageSize = stage.getBoundingClientRect().width || 300;
     $$("#scr-anchor .decoItem").forEach(el => {
-      el.style.fontSize = decoSizePx(stageSize, draft[el.dataset.outfit]) + "px";
+      const o = outfitOf(el.dataset.outfit), px = decoSizePx(stageSize, draft[el.dataset.outfit], o) + "px";
+      if (o.art) el.style.width = px; else el.style.fontSize = px;
     });
     $$("#scr-anchor .decoItem").forEach(el => {
       const id = el.dataset.outfit;
@@ -3333,6 +3379,21 @@ function renderDecoEdit() {
         draw();
       };
     });
+
+    /* 编辑页也能直接取下，不必返回衣橱寻找同一件。当前预览位置一起保存。 */
+    $("#deRemove").onclick = () => {
+      const removed = outfitOf(sel);
+      if (!S.pet.deco) S.pet.deco = {};
+      if (!S.pet.deco.baibai) S.pet.deco.baibai = {};
+      worn.filter(id => id !== sel).forEach(id => { S.pet.deco.baibai[id] = Object.assign({}, draft[id]); });
+      S.pet.worn = (S.pet.worn || []).filter(id => id !== sel);
+      worn = worn.filter(id => id !== sel);
+      save(); sndCoin();
+      toast("白白把「" + removed.n + "」收回衣橱啦", 1800);
+      if (!worn.length) { renderDecoEdit(); return; }
+      sel = worn[0];
+      draw();
+    };
 
     $("#deDone").onclick = () => {
       if (!S.pet.deco) S.pet.deco = {};
@@ -3424,31 +3485,36 @@ function renderReward() {
   const got = Object.keys(S.stickers).length;
   const pend = S.vouchers.filter(v => !v.used).length;
   $("#scr-reward").innerHTML = `
+    <div class="card" style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:linear-gradient(135deg,#fff7ef,#f6efff)">
+      ${petFigure(78)}
+      <div><div style="font-size:16px;font-weight:800;color:#8b5d9f">白白的礼物屋</div>
+      <div style="font-size:12px;color:#a994bd;line-height:1.6">学习得到的每一份惊喜，都由白白陪你收好。</div></div>
+    </div>
     <div class="card actRow" id="toWheel" style="background:linear-gradient(135deg,#fff3d6,#ffe0ef)">
       <span class="aIcon">🎡</span>
-      <span class="aName">幸运大转盘<span class="aSub">转出真实奖励！转盘券：${S.tickets} 张${wheelStale() ? " · 🎁该上新奖品啦" : ""}</span></span>
+      <span class="aName">白白幸运大转盘<span class="aSub">转出真实奖励！转盘券：${S.tickets} 张${wheelStale() ? " · 🎁该上新奖品啦" : ""}</span></span>
       <span class="aGo">▶</span>
     </div>
     <div class="card actRow" id="toVoucher">
       <span class="aIcon">🎟️</span>
-      <span class="aName">我的奖励券<span class="aSub">${pend ? pend + " 张待兑换" : "转到的奖励存在这里"}</span></span>
+      <span class="aName">白白保管的奖励券<span class="aSub">${pend ? pend + " 张待兑换" : "转到的奖励由白白替你收好"}</span></span>
       <span class="aGo">▶</span>
     </div>
     <div class="card" id="gachaBox">
       <div id="gachaEgg">🥚</div>
-      <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-top:6px">魔法扭蛋机</div>
-      <div style="font-size:12px;color:#b8a8c8">攒金币扭出可爱贴纸，集齐 ${STICKERS.length} 款！</div>
+      <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-top:6px">白白百变扭蛋机</div>
+      <div style="font-size:12px;color:#b8a8c8">每一颗都是白白的新姿势、新故事，集齐 ${STICKERS.length} 款！</div>
       <div id="gachaResult"></div>
       <button class="btn" id="gachaBtn">扭一次（🪙${GACHA_COST}）</button>
     </div>
     <div class="card actRow" id="toAlbum">
       <span class="aIcon">📔</span>
-      <span class="aName">我的贴纸册<span class="aSub">已收集 ${got}/${STICKERS.length}</span></span>
+      <span class="aName">白白收藏册<span class="aSub">已收集 ${got}/${STICKERS.length}</span></span>
       <span class="aGo">▶</span>
     </div>
     <div class="card actRow" id="toTheme">
       <span class="aIcon">🎨</span>
-      <span class="aName">主题换装屋<span class="aSub">已拥有 ${S.themesOwned.length}/${THEMES.length} 套皮肤</span></span>
+      <span class="aName">白白的魔法背景<span class="aSub">已拥有 ${S.themesOwned.length}/${THEMES.length} 套乐园皮肤</span></span>
       <span class="aGo">▶</span>
     </div>
     <div id="parentLink">家长设置</div>`;
@@ -3472,11 +3538,11 @@ function renderReward() {
       const rarTxt = st.r === 3 ? "✨传说✨" : st.r === 2 ? "稀有" : "普通";
       $("#gachaResult").innerHTML = `
         <div class="stickerCard r${st.r}">
-          <div class="se">${st.e}</div>
+          <div class="se">${stickerVisual(st)}</div>
           <div class="sn">${st.n} · ${rarTxt}</div>
           ${dup
             ? '<div style="font-size:11px;margin-top:2px">重复啦，返还5金币</div>'
-            : '<div style="font-size:11px;margin-top:2px">🎊 新贴纸！可以去贴纸册给宠物戴上</div>'}
+            : '<div style="font-size:11px;margin-top:2px">🎊 新的白白收藏卡！去收藏册看大图吧</div>'}
         </div>`;
       if (dup) { S.coins += 5; save(); updateCoinBox(); }
       if (!dup) checkStickerSets();          // 可能刚好集齐某个稀有度 → 送转盘券
@@ -3484,10 +3550,10 @@ function renderReward() {
       btn.disabled = false;
     }, 900);
   };
-  show("reward", "🎁 奖励屋");
+  show("reward", "🎁 白白的礼物屋");
 }
 
-/* ================= 贴纸册（可给宠物装扮 + 集齐奖励） ================= */
+/* ================= 白白收藏册（每张都是同一只白白的不同造型） ================= */
 const RARITY = { 1: "普通", 2: "稀有", 3: "传说" };
 /* 某个稀有度是否已集齐 */
 function setComplete(r) {
@@ -3507,24 +3573,10 @@ function checkStickerSets() {
 
 function renderAlbum() {
   const got = Object.keys(S.stickers).length;
-  const owned = STICKERS.filter(s => S.stickers[s.n]);
   $("#scr-album").innerHTML = `
     <div class="card" style="text-align:center;padding:12px">
-      <div style="font-size:15px;font-weight:700;color:#9b59b6">📔 已收集 ${got} / ${STICKERS.length}</div>
-      <div style="font-size:12px;color:#b8a8c8">点已收集的贴纸，可以给宠物戴上或当小伙伴！</div>
-    </div>
-
-    <div class="card" style="text-align:center;padding:14px">
-      <div style="font-size:13px;font-weight:700;color:#9b59b6;margin-bottom:8px">✨ 我的宠物搭配</div>
-      <div class="petShow">
-        <span class="petHat">${S.hat ? stickerOf(S.hat).e : ""}</span>
-        <span class="petMain">${petStage(S.xp).e}</span>
-        <span class="petBuddy">${S.buddy ? stickerOf(S.buddy).e : ""}</span>
-      </div>
-      <div style="font-size:11px;color:#c0a8d0;margin-top:6px">
-        头顶：${S.hat || "空"}　·　小伙伴：${S.buddy || "空"}
-      </div>
-      ${(S.hat || S.buddy) ? `<button class="btn small ghost" id="clearDeco" style="margin-top:8px">取下装扮</button>` : ""}
+      <div style="font-size:15px;font-weight:700;color:#9b59b6">🐶 白白收藏册　${got} / ${STICKERS.length}</div>
+      <div style="font-size:12px;color:#b8a8c8;line-height:1.6">这里只有白白，没有别的小狗。点亮的卡片可以打开看大图。</div>
     </div>
 
     <div class="card" style="padding:12px">
@@ -3544,9 +3596,8 @@ function renderAlbum() {
     <div class="albumGrid">
       ${STICKERS.map((s, i) => {
         const have = !!S.stickers[s.n];
-        const on = S.hat === s.n || S.buddy === s.n;
-        return `<div class="albumCell ${have ? "" : "no"} ${s.r === 3 ? "rr3" : ""} ${on ? "using" : ""}" data-i="${i}">
-          <div class="ae">${s.e}</div>
+        return `<div class="albumCell ${have ? "" : "no"} ${s.r === 3 ? "rr3" : ""}" data-i="${i}">
+          <div class="ae">${stickerVisual(s)}</div>
           <div class="an">${have ? s.n + (S.stickers[s.n] > 1 ? " ×" + S.stickers[s.n] : "") : "？？？"}</div>
         </div>`;
       }).join("")}
@@ -3554,36 +3605,29 @@ function renderAlbum() {
   document.querySelectorAll("#scr-album .albumCell").forEach(c => {
     c.onclick = () => {
       const s = STICKERS[+c.dataset.i];
-      if (!S.stickers[s.n]) { toast("这张还没扭到哦，去扭蛋机试试！"); sndWrong(); return; }
-      pickDeco(s);
+      if (!S.stickers[s.n]) { toast("这张白白还没出现，去扭蛋机找找它吧！"); sndWrong(); return; }
+      viewStickerCard(s);
     };
   });
-  if (S.hat || S.buddy) $("#clearDeco").onclick = () => {
-    S.hat = null; S.buddy = null; save(); sndCoin(); toast("装扮已取下"); renderAlbum();
-  };
-  show("album", "📔 贴纸册");
+  show("album", "🐶 白白收藏册");
 }
 function stickerOf(name) { return STICKERS.find(s => s.n === name) || { e: "", n: "" }; }
 
-/* 选择把贴纸戴在头上 / 当小伙伴 */
-function pickDeco(s) {
+/* 收藏卡是完整造型，只负责欣赏与收集；可穿戴物统一去白白衣橱，避免身体上叠另一只狗。 */
+function viewStickerCard(s) {
   const box = document.createElement("div");
   box.id = "decoPick";
   box.innerHTML = `
     <div class="decoCard">
-      <div style="font-size:44px">${s.e}</div>
+      ${stickerVisual(s, "stickerPreview")}
       <div style="font-size:15px;font-weight:700;color:#7a5a9a;margin:4px 0 10px">${s.n}　<span style="font-size:12px;color:#b8a8c8">${RARITY[s.r]}</span></div>
-      <button class="btn small" id="asHat">👑 戴在头顶</button>
+      <div style="font-size:12px;color:#a994bd;margin:-3px 0 10px">这是陪你学习的白白，也是你的专属收藏。</div>
       <div style="height:8px"></div>
-      <button class="btn small" id="asBuddy">🫶 当小伙伴</button>
-      <div style="height:8px"></div>
-      <button class="btn small ghost" id="decoCancel">取消</button>
+      <button class="btn small ghost" id="decoCancel">收好卡片</button>
     </div>`;
   document.body.appendChild(box);
   const close = () => box.remove();
   box.onclick = e => { if (e.target === box) close(); };
-  $("#asHat").onclick = () => { S.hat = s.n; save(); sndCoin(); confettiSmall(6); close(); toast(s.n + " 戴上啦！"); renderAlbum(); };
-  $("#asBuddy").onclick = () => { S.buddy = s.n; save(); sndCoin(); confettiSmall(6); close(); toast(s.n + " 成为小伙伴啦！"); renderAlbum(); };
   $("#decoCancel").onclick = close;
 }
 
@@ -3620,7 +3664,7 @@ setInterval(() => {
     toast("👀 已经玩了30分钟啦，休息一下眼睛，看看远处再回来～", 4000);
   }
 }, 60000);
-navStack = [renderHome];
+navStack = [renderHome]; navTabs = ["home"];
 renderHome();
 if (!localStorage.getItem(LS_KEY + "_hi")) {
   localStorage.setItem(LS_KEY + "_hi", "1");

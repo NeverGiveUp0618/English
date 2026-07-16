@@ -76,6 +76,12 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   console.log("— 首页 —");
   ok($("#scr-home").classList.contains("on"), "首页显示");
   ok($("#hubLink").href === "https://nevergiveup0618.github.io/learning/", "★ 最顶部可直接返回学习导航页");
+  ok($("#backBtn").style.visibility === "hidden", "★ 英语首页不显示无意义的页内返回箭头");
+  $("#homeAlbum").click();
+  ok($$(".tab").find(t => t.dataset.tab === "reward").classList.contains("on"), "★ 从首页进白白收藏册时，高亮白白礼物而不是首页");
+  ok($("#backBtn").style.visibility === "visible", "★ 进入英语子页面后显示页内返回箭头");
+  $("#backBtn").click();
+  ok($("#scr-home").classList.contains("on") && $$(".tab").find(t => t.dataset.tab === "home").classList.contains("on"), "★ 页内返回回到英语首页并恢复首页高亮");
   ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
   ok($("#coinNum").textContent === "0", "初始金币0");
 
@@ -254,10 +260,11 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok(Object.keys(S().stickers).length === 1, "扭到1张贴纸: " + JSON.stringify(S().stickers));
   ok(S().coins <= 85, "扣了20金币(重复返5): " + S().coins);
 
-  console.log("— 贴纸册 & 游戏厅 & 每日任务t3 —");
+  console.log("— 白白收藏册 & 游戏厅 & 每日任务t3 —");
   $("#toAlbum").click();
-  ok($("#scr-album").classList.contains("on"), "贴纸册显示");
-  ok($$(".albumCell").length === 37, "37格贴纸");
+  ok($("#scr-album").classList.contains("on"), "白白收藏册显示");
+  ok($$(".albumCell").length === 12, "12张白白收藏卡");
+  ok(w.eval("STICKERS.every(s=>s.n.includes('白白')&&s.art)"), "★ 扭蛋奖励全部是白白，没有其他狗或动物");
   $$('.tab').find(t => t.dataset.tab === "arcade").click();
   ok($$("#scr-arcade .actRow").length === 9, "游戏厅9个入口(新增听句子，含今日复习)");
   ok(S().daily.t1 === true, "无复习任务时t1(复习)自动完成");
@@ -562,42 +569,27 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok(S().coins > 0, "跟读有金币奖励");
   $("#resBack").click();
 
-  console.log("— 贴纸装扮宠物 —");
+  console.log("— 白白收藏卡 —");
   const STICKERS = w.eval("STICKERS");
-  // 先给两张贴纸
-  w.eval(`S.stickers={${JSON.stringify(STICKERS[0].n)}:1, ${JSON.stringify(STICKERS[29].n)}:1};save();`);
+  // 先给两张白白收藏卡
+  w.eval(`S.stickers={${JSON.stringify(STICKERS[0].n)}:1, ${JSON.stringify(STICKERS[5].n)}:1};save();`);
   $$('.tab').find(t => t.dataset.tab === "reward").click();
   $("#toAlbum").click();
-  ok($("#scr-album").classList.contains("on"), "贴纸册显示");
-  ok($("#scr-album").innerHTML.includes("我的宠物搭配"), "贴纸册有宠物搭配区");
-  ok($("#scr-album").innerHTML.includes("集齐奖励"), "贴纸册有集齐奖励进度");
-  // 点未拥有的贴纸 → 拒绝
+  ok($("#scr-album").classList.contains("on"), "白白收藏册显示");
+  ok($("#scr-album").textContent.includes("这里只有白白"), "★ 收藏册明确只收集白白");
+  ok($("#scr-album").innerHTML.includes("集齐奖励"), "收藏册有集齐奖励进度");
+  ok($$("#scr-album .albumCell img").length === STICKERS.length, "每张收藏卡都有白白图片");
+  // 点未拥有的卡片 → 拒绝
   const cells = $$("#scr-album .albumCell");
   const lockedCell = cells.find(c => c.classList.contains("no"));
   lockedCell.click();
-  ok(!w.document.getElementById("decoPick"), "未拥有的贴纸不能装扮");
-  // 点已拥有 → 弹装扮选择
+  ok(!w.document.getElementById("decoPick"), "未拥有的白白卡不能打开");
+  // 点已拥有 → 打开收藏大图，不再把另一只动物贴到白白身上
   cells[0].click();
-  ok(!!w.document.getElementById("decoPick"), "已拥有的贴纸弹出装扮选择");
-  ok(!!$("#asHat") && !!$("#asBuddy"), "可选「戴在头顶」或「当小伙伴」");
-  $("#asHat").click();
-  ok(S().hat === STICKERS[0].n, "贴纸已戴在头顶: " + S().hat);
-  ok(!w.document.getElementById("decoPick"), "弹层已关闭");
-  // 再挂一个小伙伴
-  $$("#scr-album .albumCell")[29].click();
-  $("#asBuddy").click();
-  ok(S().buddy === STICKERS[29].n, "贴纸已成为小伙伴: " + S().buddy);
-  ok($$("#scr-album .albumCell.using").length === 2, "使用中的贴纸有高亮标记");
-  // 首页宠物身上要看得见
-  $$('.tab').find(t => t.dataset.tab === "home").click();
-  ok(!!$("#petShow .petHat") && $("#petShow .petHat").textContent === STICKERS[0].e, "首页宠物头顶显示贴纸");
-  ok($("#petShow .petBuddy").textContent === STICKERS[29].e, "首页宠物旁显示小伙伴");
-  ok(!!$("#petShow .petFig .petImg"), "白白本体仍在（可点）");
-  // 取下装扮
-  $$('.tab').find(t => t.dataset.tab === "reward").click();
-  $("#toAlbum").click();
-  $("#clearDeco").click();
-  ok(S().hat === null && S().buddy === null, "可一键取下装扮");
+  ok(!!w.document.getElementById("decoPick") && !!$("#decoPick .stickerPreview"), "已拥有的卡片可打开白白大图");
+  ok(!$("#asHat") && !$("#asBuddy"), "★ 收藏卡不再冒充可穿戴衣服或另一只伙伴");
+  $("#decoCancel").click();
+  ok(S().hat === null && S().buddy === null, "旧动物头饰和小伙伴槽保持清空");
 
   console.log("— 集齐奖励 —");
   const setTk0 = S().tickets;
