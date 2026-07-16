@@ -1,12 +1,10 @@
-/* 伙伴形象上传 + 点三下定位 + 饰品贴合 */
+/* 白白核心伙伴：基础形象 / 多件衣橱 / 保存造型 / 跨科目同步 */
 const { JSDOM } = require("jsdom");
 const fs = require("fs");
 const DIR = require("path").resolve(__dirname, "..");
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? pass++ : fail++; console.log(`  ${c ? "✓" : "✗ FAIL"} ${m}`); };
-
-const FAKE_PNG = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
 const dom = new JSDOM(fs.readFileSync(DIR + "/index.html", "utf8").replace(/<script src="[^"]+"><\/script>/g, ""),
   { runScripts: "dangerously", url: "https://nevergiveup0618.github.io/English/", pretendToBeVisual: true });
@@ -16,120 +14,68 @@ w.speechSynthesis = { speaking: 0, pending: 0, paused: 0, cancel() {}, resume() 
 w.AudioContext = function () { return { state: "running", resume() {}, currentTime: 0, destination: {}, createOscillator: () => ({ frequency: {}, connect() {}, start() {}, stop() {} }), createGain: () => ({ connect() {}, gain: { exponentialRampToValueAtTime() {} } }) }; };
 w.Audio = function () { return { play: () => Promise.resolve(), pause() {}, onended: null }; };
 for (const f of ["audio/manifest.js", "data.js", "app.js"]) {
-  const sc = w.document.createElement("script");
-  sc.textContent = fs.readFileSync(DIR + "/" + f, "utf8");
-  w.document.body.appendChild(sc);
+  const sc = w.document.createElement("script"); sc.textContent = fs.readFileSync(DIR + "/" + f, "utf8"); w.document.body.appendChild(sc);
 }
 const $ = s => w.document.querySelector(s);
 const $$ = s => [...w.document.querySelectorAll(s)];
 const S = () => w.eval("S");
 
 (async () => {
-  console.log("① 家长设置里能进「伙伴形象」");
-  w.eval("parentOK=true;navStack=[renderParent];renderParent();");
-  ok(!!$("#pPics"), "家长设置有「🖼️ 伙伴形象」入口");
-  ok($("#scr-parent").innerHTML.includes("只存本机，不上传"), "★ 明确说明图片不上传");
-  $("#pPics").click();
-  ok($("#scr-pics").classList.contains("on"), "进入伙伴形象页");
-  ok($("#scr-pics").innerHTML.includes("不会上传到网上") && $("#scr-pics").innerHTML.includes("不会进代码仓库"), "★ 页面写清：图片只存本机");
-  ok($$("#scr-pics [data-up]").length === 5, "5 个伙伴都能换形象");
-  ok($$("#scr-pics [data-up]")[0].accept === "image/*", "选图控件正确");
+  console.log("① 白白成为唯一默认伙伴，首次是裸狗形象");
+  ok(w.eval("PETS.length") === 1 && w.eval("PETS[0].id") === "baibai", "★ 暂时隐藏其他伙伴，只保留白白");
+  ok(S().pet.id === "baibai" && w.eval("petName()") === "白白", "★ 老存档打开也统一切到白白");
+  ok(!!$("#petShow .petImg") && /assets\/baibai-base\.png$/.test($("#petShow .petImg").src), "★ 首页使用无衣服无帽子的白白基础图");
+  ok($$("#petShow .petDeco").length === 0, "★ 首次登场没有任何默认穿戴");
+  ok(fs.existsSync(DIR + "/assets/baibai-base.png"), "白白透明基础图已进入项目");
 
-  console.log("\n② 上传一张图（模拟家长选了猫小九的图）");
-  w.eval(`S.pet.pics = { cat: "${FAKE_PNG}" }; save();`);
-  ok(w.eval("petPic('cat')").startsWith("data:image"), "★ 图片存进了本地存档");
-  w.eval("navStack=[renderPetPics];renderPetPics();");
-  ok($("#scr-pics").innerHTML.includes("已设置自定义形象"), "显示已设置");
-  ok(!!$("[data-use='cat']") && !!$("[data-del='cat']"), "出现「用它并调装扮」和「删除」");
+  console.log("\n② 衣橱覆盖婚纱、裙子、发饰、耳饰、衣服等品类");
+  w.eval("saveWallet({coins:500,tickets:0});updateCoinBox();navStack=[renderOutfit];renderOutfit();");
+  const outfits = w.eval("OUTFITS");
+  ok(outfits.length >= 24, "至少 24 件可搭配装扮: " + outfits.length);
+  ok(["发饰","耳饰","项链","婚纱裙","衣服","脸上","手持"].every(c => outfits.some(o => o.cat === c)), "★ 用户指定的主要品类全部覆盖");
+  ok(S().pet.outfits.includes("bb_bow") && S().pet.outfits.includes("bb_flower"), "★ 送两件免费发饰，打开就能玩");
+  $("[data-o='bb_bow']").click();
+  ok(S().pet.worn.includes("bb_bow"), "点一下免费蝴蝶结立即穿上");
+  $("[data-o='bb_wedding']").click();
+  ok(S().pet.worn.includes("bb_wedding") && w.eval("loadWallet().coins") === 380, "★ 花共享金币买白色婚纱并穿上");
+  $("[data-o='bb_pinkdress']").click();
+  ok(S().pet.worn.includes("bb_pinkdress") && !S().pet.worn.includes("bb_wedding"), "★ 换裙子时自动收好上一件，避免两条裙子重叠");
 
-  console.log("\n③ 首页/伙伴屋显示的是这张图，不是 emoji");
-  w.eval("S.pet.id='cat';save();navStack=[renderHome];renderHome();");
-  ok(!!$("#petShow .petImg"), "★ 首页伙伴显示为上传的图片");
-  ok($("#petShow .petImg").src.startsWith("data:image"), "用的正是家长上传的那张");
-  ok(!$("#petShow #petEmoji"), "不再显示 emoji");
-  w.eval("navStack=[renderCare];renderCare();");
-  ok(!!$("#carePet .petImg"), "★ 伙伴屋也显示这张图");
-
-  console.log("\n④ 装扮编辑：直接拖动 / 放大缩小 / 旋转");
-  // 先戴上三件饰品
-  w.eval("S.pet.id='cat';S.pet.outfits=['hat1','face1','item1'];S.pet.wear={hat:'hat1',face:'face1',item:'item1'};save();");
-  w.eval("navStack=[renderDecoEdit];renderDecoEdit();");
-  ok($("#scr-anchor").classList.contains("on"), "进入装扮编辑页");
-  ok($("#scr-anchor").innerHTML.includes("按住饰品直接拖"), "★ 提示可以直接拖");
-  ok($$(".decoItem").length === 3, "三件饰品都能拖");
-  ok($$(".decoBtn").length === 5, "有 缩小/放大/左转/右转/复位 五个按钮");
-
-  // 拖动：把帽子拖到 (30%, 15%)
+  console.log("\n③ 每件装扮独立拖动，点保存前不改正式造型");
+  w.eval("S.pet.worn=['bb_bow','bb_pinkdress'];save();navStack=[renderDecoEdit];renderDecoEdit();");
+  ok($$(".decoItem").length === 2 && $$(".decoItem").every(x => x.dataset.outfit), "两件装扮都能单独选中和拖动");
+  ok(/aspect-ratio:\s*1\s*\/\s*1/.test(fs.readFileSync(DIR + "/index.html", "utf8")), "编辑器和首页使用同一正方形坐标系");
+  const before = w.eval("decoOf('bb_bow')");
   const stage = $("#decoStage");
-  ok(/aspect-ratio:\s*1\s*\/\s*1/.test(fs.readFileSync(DIR + "/index.html", "utf8")), "★ 编辑舞台固定为正方形，与首页坐标系一致");
-  stage.getBoundingClientRect = () => ({ left: 0, top: 0, width: 200, height: 200 });
-  const hat = $(".decoItem[data-slot='hat']");
-  ok(parseInt(hat.style.fontSize) === w.eval("decoSizePx(300,decoOf('hat'))"), "★ 编辑页和首页共用同一套饰品尺寸公式");
-  hat.dispatchEvent(new w.MouseEvent("mousedown", { bubbles: true, clientX: 100, clientY: 24 }));
-  stage.dispatchEvent(new w.MouseEvent("mousemove", { bubbles: true, clientX: 60, clientY: 30 }));
-  stage.dispatchEvent(new w.MouseEvent("mouseup", { bubbles: true }));
-  await sleep(30);
-  let d = w.eval("decoOf('hat')");
-  ok(d.x === 30 && d.y === 15, "★ 帽子拖到了 (30%,15%): " + JSON.stringify({x:d.x,y:d.y}));
+  stage.getBoundingClientRect = () => ({ left:0, top:0, width:200, height:200 });
+  const bow = $("#decoStage [data-outfit='bb_bow']");
+  bow.dispatchEvent(new w.MouseEvent("mousedown", { bubbles:true, clientX:60, clientY:20 }));
+  stage.dispatchEvent(new w.MouseEvent("mousemove", { bubbles:true, clientX:70, clientY:40 }));
+  stage.dispatchEvent(new w.MouseEvent("mouseup", { bubbles:true }));
+  await sleep(20);
+  ok(w.eval("decoOf('bb_bow')").x === before.x, "★ 拖动只是预览，尚未点击保存不会改正式宠物");
+  $("#deDone").click();
+  ok(w.eval("decoOf('bb_bow')").x === 35 && w.eval("decoOf('bb_bow')").y === 20, "★ 点击保存后落点正式生效");
 
-  // 放大
-  w.eval("navStack=[renderDecoEdit];renderDecoEdit();");
-  const s0 = w.eval("decoOf('hat')").s;
-  $$("[data-pick]")[0].click();               // 选中帽子
-  $("[data-act='big']").click();
-  ok(w.eval("decoOf('hat')").s > s0, "★ 放大生效: " + s0 + " → " + w.eval("decoOf('hat')").s);
-  $("[data-act='small']").click(); $("[data-act='small']").click();
-  ok(w.eval("decoOf('hat')").s < s0 + 0.01, "★ 缩小生效: " + w.eval("decoOf('hat')").s);
-
-  // 旋转
-  $("[data-act='cw']").click(); $("[data-act='cw']").click();
-  ok(w.eval("decoOf('hat')").r === 30, "★ 右转两次 = 30°");
-  $("[data-act='ccw']").click();
-  ok(w.eval("decoOf('hat')").r === 15, "★ 左转一次 = 15°");
-
-  // 复位
-  $("[data-act='reset']").click();
-  d = w.eval("decoOf('hat')");
-  ok(d.x === 50 && d.y === 8 && d.s === 1 && d.r === 0, "★ 复位回到默认");
-
-  // 切换选中的饰品
-  $$("[data-pick]")[2].click();
-  $("[data-act='big']").click();
-  ok(w.eval("decoOf('item')").s > 1, "★ 可以切换选中「手里」的饰品单独调整");
-  ok(w.eval("decoOf('hat')").s === 1, "调整一件不影响另一件");
-
-  console.log("\n⑤ 调好的位置/大小/角度要显示在首页");
-  w.eval("S.pet.deco={cat:{hat:{x:30,y:15,s:1.5,r:45},face:{x:50,y:34,s:1,r:0},item:{x:80,y:70,s:1,r:0}}};save();");
+  console.log("\n④ 保存后的最新白白用于首页和每次做题反馈");
   w.eval("navStack=[renderHome];renderHome();");
-  const hd = $("#petShow .deco-hat");
-  ok(hd.style.left === "30%" && hd.style.top === "15%", "★ 首页帽子在拖动后的位置");
-  ok(/rotate\(45deg\)/.test(hd.style.transform), "★ 旋转角度也生效");
-  ok(parseInt(hd.style.fontSize) > 28, "★ 放大后的尺寸也生效: " + hd.style.fontSize);
+  const homeBow = $("#petShow [data-outfit='bb_bow']");
+  ok(homeBow && homeBow.style.left === "35%" && homeBow.style.top === "20%", "首页显示刚保存的位置");
+  w.eval("showBaibaiReaction('right','答对啦！')");
+  ok(!!$("#baibaiReaction .petImg") && !!$("#baibaiReaction [data-outfit='bb_bow']"), "★ 做题即时反馈使用同一份最新装扮白白");
 
-  // 没戴装扮时不能卡住
-  w.eval("S.pet.wear={hat:'',face:'',item:''};save();navStack=[renderDecoEdit];renderDecoEdit();");
-  ok($("#scr-anchor").innerHTML.includes("还没给它戴装扮") && !!$("#deGo"), "★ 没戴装扮时引导去衣橱，不卡死");
+  console.log("\n⑤ 造型跨科目共享，但钱包协议保持独立");
+  const shared = JSON.parse(w.localStorage.getItem("sharedPet_v1"));
+  ok(shared.name === "白白" && shared.items.some(x => x.id === "bb_bow" && x.x === 35), "★ sharedPet_v1 写入最新白白造型，语文可直接读取");
+  ok(JSON.parse(w.localStorage.getItem("sharedWallet_v1")).coins === 290, "装扮消费仍只走 sharedWallet_v1");
 
-  console.log("\n⑥ 备份码不会被图片撑爆");
-  const code = w.eval("exportCode()");
-  ok(code.length < 8000, "★ 备份码仍然很小 (" + code.length + " 字符)，图片没被塞进去");
-  ok(!code.includes("iVBORw0"), "★ 备份码里确实不含图片数据");
-  ok(w.eval("petPic('cat')").length > 50, "但图片仍在本机存档里，正常显示");
-
-  console.log("\n⑦ 没上传图时回退 emoji（不能白屏）");
-  w.eval("S.pet.pics={};S.pet.id='fox';save();navStack=[renderHome];renderHome();");
-  ok(!$("#petShow .petImg"), "没有图片元素");
-  ok(!!$("#petShow #petEmoji"), "★ 回退显示 emoji，不会白屏");
-
-  console.log("\n⑧ 阿贝贝使用内置原创形象与即时鼓励");
-  w.eval("S.pet.id='abeibei';save();navStack=[renderHome];renderHome();");
-  ok(!!$("#petShow .petImg") && /abeibei-companion\.png$/.test($("#petShow .petImg").src), "★ 阿贝贝形象在首页正常显示");
-  ok(!!$(".petCheer") && $(".petCheer").textContent.includes("阿贝贝"), "★ 阿贝贝会按今日进度给无压力鼓励");
-
-  console.log("\n⑨ 删除形象");
-  w.eval(`S.pet.pics={cat:"${FAKE_PNG}"};save();navStack=[renderPetPics];renderPetPics();`);
-  $("[data-del='cat']").click();
-  ok(!S().pet.pics.cat, "★ 可以删除，恢复默认表情");
+  console.log("\n⑥ 投喂、洗澡、陪玩每次都有明确反馈且没有惩罚");
+  ok(w.eval("CARE.every(c=>c.say.includes('白白')&&c.fx)"), "四种互动都有白白专属文字和动作反馈");
+  w.eval("saveWallet({coins:100,tickets:0});S.pet.hunger=40;navStack=[renderCare];renderCare();");
+  $("[data-c='food']").click();
+  ok($("#careSay").textContent.includes("白白") && S().pet.hunger === 65, "★ 投喂后立刻回应并更新状态");
+  w.eval("S.pet.careDay='2026-01-01';S.pet.hunger=100;S.pet.clean=100;S.pet.mood=100;decayCare();");
+  ok(S().pet.hunger >= 20 && !/病|死|离开/.test(JSON.stringify(w.eval("careMood()"))), "★ 长期不操作也不生病、不死亡、不离开");
 
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
   process.exit(fail ? 1 : 0);

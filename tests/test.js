@@ -76,7 +76,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   console.log("— 首页 —");
   ok($("#scr-home").classList.contains("on"), "首页显示");
   ok($("#hubLink").href === "https://nevergiveup0618.github.io/learning/", "★ 最顶部可直接返回学习导航页");
-  ok($("#petEmoji").textContent === "🐱", "★ 默认伙伴是猫小九（不再是蛋）");
+  ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
   ok($("#coinNum").textContent === "0", "初始金币0");
 
   console.log("— 地图与锁 —");
@@ -592,7 +592,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   $$('.tab').find(t => t.dataset.tab === "home").click();
   ok(!!$("#petShow .petHat") && $("#petShow .petHat").textContent === STICKERS[0].e, "首页宠物头顶显示贴纸");
   ok($("#petShow .petBuddy").textContent === STICKERS[29].e, "首页宠物旁显示小伙伴");
-  ok(!!$("#petEmoji"), "宠物本体仍在（可点）");
+  ok(!!$("#petShow .petFig .petImg"), "白白本体仍在（可点）");
   // 取下装扮
   $$('.tab').find(t => t.dataset.tab === "reward").click();
   $("#toAlbum").click();

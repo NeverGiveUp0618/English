@@ -646,91 +646,65 @@ const PET_STAGES = [
 ];
 
 /* ------------------------------------------------------------
- * 可选伙伴（多角色）——按孩子点名要的来
- * 仅供她个人使用、不商用；只用 emoji 表现，不复制任何原版美术图。
- * 名字也可以在伙伴屋里自己改。
+ * 核心伙伴「白白」：陪了孩子五年的真实毛绒伙伴。
+ * 暂时隐藏其他伙伴，把养成、装扮与学习反馈都围绕白白建立。
  * ------------------------------------------------------------ */
 const PETS = [
   {
-    id: "cat", n: "猫小九", tag: "大侦探猫小九 · 破案全靠它", cost: 0,
+    id: "baibai", n: "白白", tag: "陪伴五年的勇气伙伴 · 一直在你身边", cost: 0,
+    art: "assets/baibai-base.png",
     stages: [
-      { xp: 0, e: "🐱", n: "小奶猫小九" },
-      { xp: 30, e: "😺", n: "见习侦探小九" },
-      { xp: 100, e: "😼", n: "侦探猫小九" },
-      { xp: 300, e: "🐈‍⬛", n: "名侦探猫小九" },
-      { xp: 700, e: "🕵️", n: "大侦探猫小九" },
-      { xp: 1500, e: "🦁", n: "传奇神探猫小九" }
+      { xp: 0, e: "🐶", n: "白白", title: "暖心伙伴" },
+      { xp: 30, e: "🐶", n: "白白", title: "勇气搭档" },
+      { xp: 100, e: "🐶", n: "白白", title: "星光搭档" },
+      { xp: 300, e: "🐶", n: "白白", title: "魔法守护者" },
+      { xp: 700, e: "🐶", n: "白白", title: "勇气队长" },
+      { xp: 1500, e: "🐶", n: "白白", title: "传奇伙伴" }
     ]
-  },
-  {
-    id: "fox", n: "迈克狐", tag: "迈克狐 · 戴眼镜的推理天才", cost: 100,
-    stages: [
-      { xp: 0, e: "🦊", n: "小迈克狐" },
-      { xp: 30, e: "🦊", n: "见习侦探迈克狐" },
-      { xp: 100, e: "🧐", n: "推理新星迈克狐" },
-      { xp: 300, e: "🕵️‍♂️", n: "名侦探迈克狐" },
-      { xp: 700, e: "🦊", n: "迈克狐大侦探" },
-      { xp: 1500, e: "🐺", n: "传说中的迈克狐" }
-    ]
-  },
-  {
-    id: "monkey", n: "猴子警长", tag: "猴子警长 · 森林里最靠谱的警长", cost: 100,
-    stages: [
-      { xp: 0, e: "🐒", n: "小猴警员" },
-      { xp: 30, e: "🙉", n: "见习警长" },
-      { xp: 100, e: "🐵", n: "机灵猴警长" },
-      { xp: 300, e: "👮", n: "猴子警长" },
-      { xp: 700, e: "🦍", n: "森林总警长" },
-      { xp: 1500, e: "🐲", n: "传奇猴子警长" }
-    ]
-  },
-  {
-    id: "abeibei", n: "阿贝贝", tag: "勇气守护精灵 · 陪你轻松试一试", cost: 0,
-    art: "assets/abeibei-companion.png",
-    stages: [
-      { xp: 0, e: "🐶", n: "软绵绵阿贝贝" },
-      { xp: 30, e: "🐶", n: "勇气学徒阿贝贝" },
-      { xp: 100, e: "🐶", n: "星光伙伴阿贝贝" },
-      { xp: 300, e: "🐶", n: "魔法守护者阿贝贝" },
-      { xp: 700, e: "🐶", n: "勇气队长阿贝贝" },
-      { xp: 1500, e: "🐶", n: "传奇精灵阿贝贝" }
-    ]
-  },
-  {
-    id: "classic", n: "彩虹独角兽", tag: "从蛋孵化的梦幻伙伴", cost: 0,
-    stages: PET_STAGES
   }
 ];
 
 /* 喂养道具：金币的日常出口，也是每天回来看它的理由 */
 const CARE = [
-  { id: "food", n: "喂食", e: "🍖", cost: 5, up: "hunger", bond: 2, say: "呜姆呜姆……好吃！" },
-  { id: "bath", n: "洗澡", e: "🛁", cost: 5, up: "clean", bond: 2, say: "搓搓搓——香喷喷的！" },
-  { id: "play", n: "陪玩", e: "🎾", cost: 8, up: "mood", bond: 3, say: "再来一次！再来一次！" },
-  { id: "snack", n: "小零食", e: "🍰", cost: 12, up: "mood", bond: 4, say: "这个我最喜欢啦！" }
+  { id: "food", n: "投喂", e: "🍖", cost: 5, up: "hunger", bond: 2, say: "白白咂咂嘴：好香呀，我吃饱啦！", fx: "😋" },
+  { id: "bath", n: "洗澡", e: "🛁", cost: 5, up: "clean", bond: 2, say: "白白甩甩耳朵：洗得香喷喷，抱一下吧！", fx: "🫧" },
+  { id: "play", n: "陪玩", e: "🎾", cost: 8, up: "mood", bond: 3, say: "白白开心地蹦起来：再玩一次嘛！", fx: "🎾" },
+  { id: "snack", n: "小零食", e: "🍰", cost: 12, up: "mood", bond: 4, say: "白白眯起眼睛：你最懂我啦！", fx: "💗" }
 ];
 
-/* 装扮：戴在伙伴身上（帽子 / 脸上 / 手里）
-   都是侦探、警长这套行头，配得上猫小九、迈克狐、猴子警长 */
+/* 白白衣橱：每一件都能单独拖动 / 缩放 / 旋转。
+   pos 是首次穿戴的友好落点；同一 body 组只穿一件，其他配饰可以自由叠搭。 */
 const OUTFITS = [
-  { id: "hat1", slot: "hat", n: "侦探帽", e: "🎩", cost: 40 },
-  { id: "hat2", slot: "hat", n: "警帽", e: "🧢", cost: 40 },
-  { id: "hat3", slot: "hat", n: "皇冠", e: "👑", cost: 90 },
-  { id: "hat4", slot: "hat", n: "小花", e: "🌸", cost: 30 },
-  { id: "hat5", slot: "hat", n: "鸭舌帽", e: "🎓", cost: 50 },
-  { id: "hat6", slot: "hat", n: "蝴蝶结", e: "🎀", cost: 30 },
-  { id: "face1", slot: "face", n: "圆框眼镜", e: "👓", cost: 35 },
-  { id: "face2", slot: "face", n: "墨镜", e: "🕶️", cost: 45 },
-  { id: "face3", slot: "face", n: "口罩", e: "😷", cost: 25 },
-  { id: "item1", slot: "item", n: "放大镜", e: "🔍", cost: 50 },
-  { id: "item2", slot: "item", n: "小背包", e: "🎒", cost: 45 },
-  { id: "item3", slot: "item", n: "手提包", e: "👜", cost: 55 },
-  { id: "item4", slot: "item", n: "魔法棒", e: "🪄", cost: 70 },
-  { id: "item5", slot: "item", n: "小雨伞", e: "☂️", cost: 35 },
-  { id: "item6", slot: "item", n: "警徽", e: "🛡️", cost: 60 },
-  { id: "item7", slot: "item", n: "手电筒", e: "🔦", cost: 40 },
-  { id: "item8", slot: "item", n: "笔记本", e: "📓", cost: 30 },
-  { id: "item9", slot: "item", n: "对讲机", e: "📻", cost: 55 }
+  { id:"bb_bow", cat:"发饰", n:"粉色蝴蝶结", e:"🎀", cost:0, pos:{x:31,y:14,s:.62,r:-12} },
+  { id:"bb_flower", cat:"发饰", n:"小雏菊发夹", e:"🌼", cost:0, pos:{x:67,y:15,s:.55,r:10} },
+  { id:"bb_butterfly", cat:"发饰", n:"蝴蝶发夹", e:"🦋", cost:35, pos:{x:68,y:14,s:.58,r:12} },
+  { id:"bb_band", cat:"发饰", n:"星星发箍", e:"🌟", cost:45, pos:{x:50,y:8,s:.62,r:0} },
+  { id:"bb_crown", cat:"发饰", n:"小公主皇冠", e:"👑", cost:80, pos:{x:50,y:8,s:.72,r:0} },
+  { id:"bb_hat", cat:"发饰", n:"春日草帽", e:"👒", cost:60, pos:{x:50,y:10,s:.9,r:0} },
+
+  { id:"bb_pearl", cat:"耳饰", n:"珍珠耳环", e:"🤍", cost:30, pos:{x:78,y:39,s:.38,r:0} },
+  { id:"bb_gem", cat:"耳饰", n:"宝石耳环", e:"💎", cost:55, pos:{x:79,y:41,s:.4,r:5} },
+  { id:"bb_cherry", cat:"耳饰", n:"樱桃耳坠", e:"🍒", cost:45, pos:{x:78,y:42,s:.46,r:5} },
+  { id:"bb_moon", cat:"耳饰", n:"月亮耳坠", e:"🌙", cost:50, pos:{x:79,y:41,s:.42,r:0} },
+
+  { id:"bb_heart", cat:"项链", n:"爱心项链", e:"💖", cost:35, pos:{x:50,y:55,s:.48,r:0} },
+  { id:"bb_pearlneck", cat:"项链", n:"珍珠项链", e:"📿", cost:55, pos:{x:50,y:55,s:.62,r:0} },
+  { id:"bb_bell", cat:"项链", n:"幸运铃铛", e:"🔔", cost:45, pos:{x:50,y:55,s:.42,r:0} },
+
+  { id:"bb_wedding", cat:"婚纱裙", group:"body", n:"白色婚纱", e:"🤍👗", cost:120, pos:{x:50,y:73,s:1.2,r:0} },
+  { id:"bb_pinkdress", cat:"婚纱裙", group:"body", n:"樱花公主裙", e:"🌸👗", cost:90, pos:{x:50,y:73,s:1.18,r:0} },
+  { id:"bb_bluedress", cat:"婚纱裙", group:"body", n:"星空礼服", e:"💙👗", cost:100, pos:{x:50,y:73,s:1.18,r:0} },
+  { id:"bb_tutu", cat:"婚纱裙", group:"body", n:"芭蕾蓬蓬裙", e:"🩰", cost:75, pos:{x:50,y:75,s:1.05,r:0} },
+  { id:"bb_shirt", cat:"衣服", group:"body", n:"粉色小毛衣", e:"👚", cost:55, pos:{x:50,y:68,s:1.05,r:0} },
+  { id:"bb_coat", cat:"衣服", group:"body", n:"暖暖外套", e:"🧥", cost:65, pos:{x:50,y:68,s:1.05,r:0} },
+  { id:"bb_vest", cat:"衣服", group:"body", n:"探险小背心", e:"🦺", cost:60, pos:{x:50,y:68,s:1.0,r:0} },
+
+  { id:"bb_glasses", cat:"脸上", n:"圆框眼镜", e:"👓", cost:35, pos:{x:50,y:37,s:.72,r:0} },
+  { id:"bb_sunglasses", cat:"脸上", n:"酷酷墨镜", e:"🕶️", cost:45, pos:{x:50,y:37,s:.72,r:0} },
+  { id:"bb_magnifier", cat:"手持", n:"寻宝放大镜", e:"🔍", cost:50, pos:{x:79,y:68,s:.7,r:-12} },
+  { id:"bb_wand", cat:"手持", n:"星星魔法棒", e:"🪄", cost:70, pos:{x:79,y:67,s:.75,r:-18} },
+  { id:"bb_bag", cat:"手持", n:"珍珠手提包", e:"👜", cost:55, pos:{x:78,y:76,s:.7,r:0} },
+  { id:"bb_umbrella", cat:"手持", n:"彩虹小伞", e:"🌂", cost:50, pos:{x:78,y:62,s:.78,r:-10} }
 ];
 
 /* 点宠物时的英语鼓励（顺带磨耳朵） */

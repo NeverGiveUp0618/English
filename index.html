@@ -409,6 +409,20 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
 .petDeco.deco-item { animation: floatY 2.8s ease-in-out infinite; }
 .petCheer { max-width: 290px; margin: 7px auto 0; padding: 7px 10px; border-radius: 12px; background: linear-gradient(135deg,#effcf6,#f5efff); color: #6f5790; font-size: 12px; line-height: 1.5; }
 .petChoiceImg { width: 48px; height: 48px; object-fit: contain; border-radius: 12px; vertical-align: middle; }
+.baibaiReaction { position:fixed; z-index:90; left:50%; bottom:82px; transform:translateX(-50%); width:min(340px,calc(100vw - 28px)); display:flex; align-items:center; gap:9px; padding:8px 12px; border-radius:18px; background:rgba(255,255,255,.97); box-shadow:0 7px 24px rgba(105,70,130,.24); color:#6f5790; font-size:13px; font-weight:700; line-height:1.4; animation:baibaiPop .22s ease-out; }
+@keyframes baibaiPop { from { transform:translateX(-50%) translateY(12px) scale(.9); opacity:0; } to { transform:translateX(-50%); opacity:1; } }
+.baibaiReaction .petFig { flex:none; }
+.baibaiReaction.right { border:2px solid #a8dfb1; }
+.baibaiReaction.try { border:2px solid #f0d59d; }
+.baibaiReaction.win { border:2px solid #e4b4f1; }
+.careSay { font-size:13px; color:#7a5a9a; background:#fff6fb; border-radius:12px; padding:9px; margin-top:8px; min-height:38px; line-height:1.55; }
+.careSay b { font-size:20px; vertical-align:middle; margin-right:4px; }
+.careActions { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:11px; }
+.careAction { border:0; border-radius:14px; background:#f8f1fd; color:#7a5a9a; padding:9px 3px; box-shadow:0 2px 7px rgba(150,100,180,.12); }
+.careAction span,.careAction b,.careAction small { display:block; }
+.careAction span { font-size:24px; }.careAction b { font-size:12px;margin:2px 0 }.careAction small { font-size:9px;color:#b8a8c8 }.careAction:disabled { opacity:.42; }
+.careAction:active { transform:scale(.94); }
+.noPressure { font-size:10.5px; color:#b5a3c3; margin-top:9px; line-height:1.55; }
 
 .picPrev { width: 62px; height: 62px; border-radius: 14px; background: #f7f2fb; display: flex; align-items: center; justify-content: center; overflow: hidden; flex: none; }
 .picPrev img { width: 100%; height: 100%; object-fit: contain; }
@@ -431,6 +445,8 @@ body.th-night #toast { background: rgba(230,220,255,.95); color: #352a55; }
 .decoItem:active { cursor: grabbing; }
 
 .decoCtrl { display: flex; gap: 8px; justify-content: center; }
+.decoPickList { display:flex; gap:6px; justify-content:center; overflow-x:auto; padding:2px 1px 10px; margin-bottom:2px; }
+.decoPickList .btn { flex:none; }
 .decoBtn {
   flex: 1; border: none; border-radius: 12px; background: #f5eefc; color: #7a5a9a;
   font-size: 18px; font-weight: 700; padding: 8px 4px;

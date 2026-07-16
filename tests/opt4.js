@@ -71,36 +71,24 @@ function boot() {
   const teacherHtml = w.eval("colorWord(PHONICS[5].words[7], PHONICS[5])");
   ok((teacherHtml.match(/sylBlock/g) || []).length === 2, "★ teacher 被切成 2 个音节块");
 
-  console.log("\n③ 多角色 + 装扮（按孩子点名要的角色）");
+  console.log("\n③ 白白 + 可保存装扮");
   const PETS = w.eval("PETS");
-  ok(PETS.length === 5, "5 个可选伙伴（新增阿贝贝）");
-  ok(/猫小九/.test(JSON.stringify(PETS)) && /迈克狐/.test(JSON.stringify(PETS)) && /猴子警长/.test(JSON.stringify(PETS)),
-     "★ 就是她要的三个角色：猫小九 / 迈克狐 / 猴子警长");
-  ok(S().pet.id === "cat", "★ 默认伙伴就是猫小九");
-  ok((S().pet.owned || []).includes("cat") && (S().pet.owned || []).includes("classic") && (S().pet.owned || []).includes("abeibei"), "三个免费伙伴一开始就有（含阿贝贝）");
-  ok(PETS.find(p => p.id === "abeibei").art === "assets/abeibei-companion.png", "★ 阿贝贝使用内置原创形象");
-  w.eval("navStack=[renderSwapPet];renderSwapPet();");
-  ok($("#scr-swap").innerHTML.includes("猫小九"), "换伙伴页显示猫小九");
-  ok($("#scr-swap").innerHTML.includes("迈克狐") && $("#scr-swap").innerHTML.includes("猴子警长"), "另外两个角色也在");
-  const rows = $$("#scr-swap .actRow");
+  ok(PETS.length === 1 && PETS[0].id === "baibai", "★ 暂时只保留陪伴五年的白白");
+  ok(PETS[0].art === "assets/baibai-base.png", "★ 白白使用无服装基础形象");
+  ok(S().pet.id === "baibai" && S().pet.name === "白白", "★ 默认伙伴和名字都是白白");
+  ok((S().pet.owned || []).length === 1 && S().pet.owned[0] === "baibai", "不再出现换伙伴入口");
+  w.eval("navStack=[renderCare];renderCare();");
+  ok(!$("#toSwap"), "★ 照顾页没有换伙伴按钮");
+  const cats = new Set(w.eval("OUTFITS.map(o=>o.cat)"));
+  ok(w.eval("OUTFITS.length") >= 24 && ["发饰","耳饰","婚纱裙","衣服","手持"].every(x=>cats.has(x)),
+     "★ 至少 24 件装扮，覆盖发饰、耳饰、婚纱裙、衣服和手持");
   w.eval("saveWallet({coins:500,tickets:0});updateCoinBox();");
-  rows[1].click();   // 买迈克狐 100
-  ok(S().pet.id === "fox", "★ 买下并切换到迈克狐");
-  ok(w.eval("loadWallet().coins") === 400, "扣 100 金币");
-  ok(S().xp === w.eval("S.xp"), "换伙伴不影响魔法值（进度不倒退）");
-  // 起名字
-  ok(/迈克狐/.test(w.eval("petName()")), "伙伴名字显示为迈克狐系列: " + w.eval("petName()"));
-  w.eval("S.pet.name='小狐';save();");
-  ok(w.eval("petName()") === "小狐", "★ 还能自己改名字");
-  // 装扮
   w.eval("navStack=[renderOutfit];renderOutfit();");
-  ok($$(".outfitCell").length === 18, "18 件装扮（侦探帽/警帽/放大镜/警徽/手电筒等，配得上侦探警长）");
-  $$(".outfitCell")[0].click();   // 买侦探帽 40
-  ok((S().pet.outfits || []).includes("hat1"), "★ 买下侦探帽");
-  ok(S().pet.wear.hat === "hat1", "★ 自动穿上");
-  ok(w.eval("wearEmoji('hat')") === "🎩", "装扮 emoji 正确");
+  $("[data-o='bb_crown']").click();
+  ok((S().pet.outfits || []).includes("bb_crown") && (S().pet.worn || []).includes("bb_crown"), "★ 买下皇冠后自动加入造型");
+  ok(w.eval("loadWallet().coins") === 420, "从共享钱包扣 80 金币");
   w.eval("navStack=[renderHome];renderHome();");
-  ok($("#petShow .deco-hat") && $("#petShow .deco-hat").textContent === "🎩", "★ 首页伙伴头上戴着礼帽（按锚点贴合）");
+  ok($("#petShow [data-outfit='bb_crown']")?.textContent === "👑", "★ 首页显示白白最新保存的装扮");
 
   console.log("\n④ 转盘：每天一次 + 必须学完复习完");
   w.eval("S.daily={date:todayStr(),w:0,g:0,r:0,ph:0,earn:0,t1:false,t2:false,t3:false,t4:false,hard:false,bonus:false,spun:false};S.tickets=3;save();");
