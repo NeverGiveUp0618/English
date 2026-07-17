@@ -670,14 +670,29 @@ const BAIBAI_BASE_CARDS = [
 ];
 
 /* 长期收藏系列：保留最初 100 张原卡（旧存档名称完全不变），再为同一批白白
-   姿势制作四套独立闪卡版本。它们共用轻量原画，但拥有不同卡面色调、边框、
-   名称与稀有度；手机只需缓存 100 幅图，也能长期收集 500 张而不撑爆流量。 */
+   姿势制作十九套独立闪卡版本。它们共用轻量原画，但拥有不同卡面色调、边框、
+   名称与稀有度；手机只需缓存 100 幅图，也能长期收集 2000 张而不撑爆流量。 */
 const BAIBAI_CARD_EDITIONS = [
   { id:"classic", n:"原画", prefix:"", tone:"", badge:"🐾" },
   { id:"dawn", n:"晨光", prefix:"晨光·", tone:"sepia(.16) saturate(1.12) brightness(1.06)", badge:"☀️" },
   { id:"mint", n:"薄荷", prefix:"薄荷·", tone:"hue-rotate(58deg) saturate(.88) brightness(1.05)", badge:"🍃" },
   { id:"night", n:"星夜", prefix:"星夜·", tone:"hue-rotate(205deg) saturate(1.15) brightness(.9)", badge:"🌙" },
-  { id:"rainbow", n:"彩虹", prefix:"彩虹·", tone:"hue-rotate(315deg) saturate(1.28) brightness(1.04)", badge:"🌈" }
+  { id:"rainbow", n:"彩虹", prefix:"彩虹·", tone:"hue-rotate(315deg) saturate(1.28) brightness(1.04)", badge:"🌈" },
+  { id:"peach", n:"蜜桃", prefix:"蜜桃·", tone:"sepia(.18) hue-rotate(320deg) saturate(1.18) brightness(1.08)", badge:"🍑" },
+  { id:"ocean", n:"海洋", prefix:"海洋·", tone:"hue-rotate(155deg) saturate(1.16) brightness(.98)", badge:"🌊" },
+  { id:"aurora", n:"极光", prefix:"极光·", tone:"hue-rotate(95deg) saturate(1.34) contrast(1.05)", badge:"✨" },
+  { id:"candy", n:"糖果", prefix:"糖果·", tone:"hue-rotate(285deg) saturate(1.42) brightness(1.08)", badge:"🍬" },
+  { id:"galaxy", n:"银河", prefix:"银河·", tone:"hue-rotate(225deg) saturate(1.34) brightness(.84) contrast(1.1)", badge:"🌌" },
+  { id:"lavender", n:"薰衣草", prefix:"薰衣草·", tone:"hue-rotate(250deg) saturate(.9) brightness(1.08)", badge:"💜" },
+  { id:"forest", n:"森野", prefix:"森野·", tone:"hue-rotate(78deg) saturate(1.18) brightness(.94)", badge:"🌲" },
+  { id:"sunset", n:"落日", prefix:"落日·", tone:"sepia(.28) hue-rotate(338deg) saturate(1.36) brightness(1.03)", badge:"🌅" },
+  { id:"snow", n:"初雪", prefix:"初雪·", tone:"saturate(.68) brightness(1.18) contrast(.94)", badge:"❄️" },
+  { id:"sakura", n:"樱花", prefix:"樱花·", tone:"sepia(.12) hue-rotate(300deg) saturate(1.16) brightness(1.1)", badge:"🌸" },
+  { id:"lemon", n:"柠檬", prefix:"柠檬·", tone:"sepia(.18) hue-rotate(18deg) saturate(1.28) brightness(1.1)", badge:"🍋" },
+  { id:"jewel", n:"宝石", prefix:"宝石·", tone:"hue-rotate(175deg) saturate(1.48) contrast(1.12)", badge:"💎" },
+  { id:"dream", n:"梦境", prefix:"梦境·", tone:"hue-rotate(275deg) saturate(.82) brightness(1.12) contrast(.92)", badge:"🫧" },
+  { id:"cocoa", n:"可可", prefix:"可可·", tone:"sepia(.52) saturate(.78) brightness(.9)", badge:"🍫" },
+  { id:"pearl", n:"珍珠", prefix:"珍珠·", tone:"saturate(.55) brightness(1.15) contrast(1.04)", badge:"🦪" }
 ];
 const STICKERS = BAIBAI_CARD_EDITIONS.flatMap((edition, editionIndex) =>
   BAIBAI_BASE_CARDS.map((card, cardIndex) => Object.assign({}, card, {
