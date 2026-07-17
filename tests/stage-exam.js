@@ -30,6 +30,9 @@ entry().click();
 ok($("#playProg").textContent.includes("1 / 25"), "阶段测验固定25题");
 
 let sawHoles = false, rounds = 0;
+/* 本测试把定时器改成立即执行以快速点完25题；白白声线另有专项测试，
+   此处关闭角色语音，避免“等待英语结束”的真实延时被测试桩无限递归。 */
+w.eval("baibaiSpeak=()=>{}");
 w.setTimeout = fn => { fn(); return 1; };
 while ($("#scr-play").classList.contains("on") && rounds++ < 30) {
   let answer = null;

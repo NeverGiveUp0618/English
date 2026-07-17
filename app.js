@@ -252,10 +252,15 @@ function distract(pool, exclude) {
 }
 
 /* ---------------- 语音 ---------------- */
-let enVoice = null;
+let enVoice = null, zhPetVoice = null;
 function pickVoice() {
-  const vs = speechSynthesis.getVoices().filter(v => /^en/i.test(v.lang));
+  const all = speechSynthesis.getVoices();
+  const vs = all.filter(v => /^en/i.test(v.lang));
   enVoice = vs.find(v => /female|samantha|karen|zira|aria|jenny/i.test(v.name)) || vs[0] || null;
+  const zh = all.filter(v => /^(zh|cmn)/i.test(v.lang));
+  /* 优先挑中文童声/年轻女声；不同手机名称不同，所以保留语言兜底。 */
+  zhPetVoice = zh.find(v => /xiaoxiao|xiaoyi|yunxia|tingting|meijia|hanhan|child|kid|童|晓|小艺|婷婷/i.test(v.name))
+    || zh.find(v => /female|女/i.test(v.name)) || zh[0] || null;
 }
 if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
 
@@ -308,8 +313,13 @@ function ttsFail() {
   toast("🔇 听不到发音？去「白白礼物→家长设置→发音自检」看看", 4000);
 }
 /* 主通道：播放预合成 mp3。onEnd 在音频真正播完时回调 */
+let englishBusyUntil = 0, baibaiVoiceTimer = null, baibaiVoiceGen = 0, baibaiPendingSpeak = null;
+function englishEstimate(text) {
+  return Math.max(850, Math.min(7000, String(text || "").split(/\s+/).length * 520));
+}
 function speak(text, rate, onEnd) {
   unlockAudio();
+  englishBusyUntil = Date.now() + englishEstimate(text);
   const f = audioFile(text);
   if (AUD && f) {
     try {
@@ -318,7 +328,14 @@ function speak(text, rate, onEnd) {
       AUD.src = "audio/" + f;
       AUD.playbackRate = Math.min(1, Math.max(0.6, rate || 0.95));
       AUD.currentTime = 0;
-      if (onEnd) AUD.onended = () => { AUD.onended = null; onEnd(); };
+      AUD.onended = () => {
+        AUD.onended = null; englishBusyUntil = 0;
+        if (baibaiPendingSpeak) {
+          clearTimeout(baibaiVoiceTimer);
+          baibaiVoiceTimer = setTimeout(baibaiPendingSpeak, 120);
+        }
+        if (onEnd) onEnd();
+      };
       const p = AUD.play();
       if (p && p.catch) p.catch(() => speakTTS(text, rate, onEnd));   // 被浏览器拦截 → 退回系统TTS
       return;
@@ -335,8 +352,16 @@ function speakTTS(text, rate, onEnd) {
     u.lang = "en-US"; u.rate = rate || 0.8; u.volume = 1; u.pitch = 1.1;
     if (!enVoice) pickVoice();
     if (enVoice) u.voice = enVoice;
-    if (onEnd) u.onend = onEnd;
+    u.onend = () => {
+      englishBusyUntil = 0;
+      if (baibaiPendingSpeak) {
+        clearTimeout(baibaiVoiceTimer);
+        baibaiVoiceTimer = setTimeout(baibaiPendingSpeak, 120);
+      }
+      if (onEnd) onEnd();
+    };
     u.onerror = e => {
+      englishBusyUntil = 0;
       if (e && e.error !== "interrupted" && e.error !== "canceled") ttsFail();
       if (onEnd) onEnd();
     };
@@ -346,12 +371,52 @@ function speakTTS(text, rate, onEnd) {
     }, 50);
   } catch (e) { ttsFail(); if (onEnd) onEnd(); }
 }
+
+/* 白白专属中文“小奶狗声线”。
+ * 英语学习音频是主声道：若正在读单词/句子，白白会乖乖等它读完再说，绝不叠音。
+ * 系统没有儿童声时，用中文女声 + 较高音调和轻快语速模拟幼犬般软糯的声音。 */
+function baibaiLine(text) {
+  const s = String(text || "").trim();
+  return (s.includes("：") ? s.slice(s.indexOf("：") + 1) : s.replace(/^白白[：:]?\s*/, "")).trim();
+}
+function puppyHello() {
+  if (S.sound === false) return;
+  tone(780, .055, "sine", 0, .025);
+  tone(1040, .075, "sine", .055, .022);
+}
+function baibaiSpeak(text, delay) {
+  const line = baibaiLine(text);
+  if (!line || !("speechSynthesis" in window)) return;
+  const gen = ++baibaiVoiceGen;
+  clearTimeout(baibaiVoiceTimer);
+  const trySpeak = () => {
+    if (gen !== baibaiVoiceGen) return;
+    const wait = englishBusyUntil - Date.now();
+    if (wait > 0) { baibaiVoiceTimer = setTimeout(trySpeak, wait + 120); return; }
+    try {
+      baibaiPendingSpeak = null;
+      if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+      if (!zhPetVoice) pickVoice();
+      puppyHello();
+      const u = new SpeechSynthesisUtterance(line);
+      u.lang = "zh-CN"; u.rate = 1.08; u.pitch = 1.55; u.volume = 0.92;
+      if (zhPetVoice) u.voice = zhPetVoice;
+      baibaiVoiceTimer = setTimeout(() => {
+        if (gen !== baibaiVoiceGen) return;
+        try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch (e) {}
+      }, 120);
+    } catch (e) {}
+  };
+  baibaiPendingSpeak = trySpeak;
+  baibaiVoiceTimer = setTimeout(trySpeak, delay == null ? 120 : delay);
+}
 /* 立刻闭嘴：停 mp3、停系统TTS，并作废所有等待中的"读完再继续"回调
  * （离开游戏后声音还在读、题目还在后台推进，就是漏了这一步）
  */
 let speakGen = 0;
 function stopSpeak() {
   speakGen++;
+  baibaiVoiceGen++; clearTimeout(baibaiVoiceTimer); baibaiPendingSpeak = null; englishBusyUntil = 0;
   try { if (AUD) { AUD.onended = null; AUD.pause(); } } catch (e) {}
   try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
 }
@@ -409,8 +474,10 @@ function showBaibaiReaction(kind, message) {
       : ["答对啦！", "就是这样！", "好厉害，我都记住了！"];
   const d = document.createElement("div");
   d.id = "baibaiReaction"; d.className = "baibaiReaction " + kind;
-  d.innerHTML = `${petFigure(62)}<span>${esc(message || lines[Math.floor(Math.random() * lines.length)])}</span>`;
+  const line = message || lines[Math.floor(Math.random() * lines.length)];
+  d.innerHTML = `${petFigure(62)}<span>🔊 ${esc(line)}</span>`;
   document.body.appendChild(d);
+  baibaiSpeak(line);
   clearTimeout(baibaiReactionTimer);
   baibaiReactionTimer = setTimeout(() => d.remove(), 1800);
 }
@@ -837,7 +904,7 @@ function renderHome() {
       </div>
       <div id="petStage">${esc(petName())}　${careMood().e}</div>
       <div id="petTip">${"❤️".repeat(bondLv())}${"🤍".repeat(5 - bondLv())}　${careMood().t}</div>
-      ${petCheer() ? `<div class="petCheer">${esc(petCheer())}</div>` : ""}
+      ${petCheer() ? `<div class="petCheer">🔊 ${esc(petCheer())}</div>` : ""}
 
       <div class="careBars">
         ${[["hunger", "🍖 饱腹"], ["clean", "🛁 干净"], ["mood", "🎾 心情"]].map(([k, lb]) => {
@@ -890,13 +957,19 @@ function renderHome() {
       <div class="card" id="homeVoucher"><div class="hIcon">🎟️</div><div class="hName">我的奖励券</div><div class="hSub">${(() => { const p = S.vouchers.filter(v => !v.used).length; return p ? p + " 张待兑换" : "转转盘赢真奖励"; })()}</div></div>
     </div>
     ${renderCalendar()}`;
-  /* 点伙伴（不管是 emoji 还是家长上传的图）都会说话 */
+  /* 点白白：屏幕只显示中文，声音也走白白的中文小奶狗声线。 */
   $("#petShow").onclick = () => {
     const p = PRAISES[Math.floor(Math.random() * PRAISES.length)];
     const el = $("#petShow .petFig") || $("#petEmoji");
     if (el) { el.classList.remove("bounce"); void el.offsetWidth; el.classList.add("bounce"); }
-    speak(p.en, 0.9); toast(p.en + "  " + p.zh);
+    baibaiSpeak(p.zh); toast("白白：“" + p.zh + "”");
   };
+  const cheer = $("#scr-home .petCheer");
+  if (cheer) {
+    cheer.title = "点一下听白白说";
+    cheer.style.cursor = "pointer";
+    cheer.onclick = () => baibaiSpeak(cheer.textContent);
+  }
   /* 每一行任务都能直接点进对应模块（不用自己找） */
   $$("#scr-home .taskRow.clickable").forEach(r => {
     r.onclick = () => {
@@ -3136,7 +3209,7 @@ function renderCare() {
       <div style="font-size:19px;font-weight:800;color:#9b59b6">白白</div>
       <div style="font-size:12px;color:#b8a8c8">陪伴五年的伙伴 · ${st.title || "暖心伙伴"}　${careMood().e} ${careMood().t}</div>
       <div style="font-size:13px;margin-top:4px">${"❤️".repeat(bondLv())}${"🤍".repeat(5 - bondLv())}　<span style="font-size:11px;color:#c0a8d0">亲密度 ${S.pet.bond || 0}</span></div>
-      <div id="careSay" class="careSay">白白歪着脑袋看你：今天想一起做什么？</div>
+      <div id="careSay" class="careSay">🔊 白白歪着脑袋看你：今天想一起做什么？</div>
     </div>
 
     <div class="card">
@@ -3178,6 +3251,10 @@ function renderCare() {
       setTimeout(() => renderCare(), 1800);
     };
   });
+  $("#carePet").onclick = () => {
+    const line = "今天想一起做什么呀？";
+    baibaiSpeak(line); toast("白白：“" + line + "”");
+  };
   $("#toOutfit").onclick = () => go(renderOutfit);
   show("care", "🏠 白白的小屋");
 }

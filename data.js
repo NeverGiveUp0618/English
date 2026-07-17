@@ -810,7 +810,7 @@ OUTFITS.push(
   ], {pos:{x:50,y:63,s:1,r:0}})
 );
 
-/* 点宠物时的英语鼓励（顺带磨耳朵） */
+/* 点白白时的中文鼓励：英语学习发音与角色台词分开，孩子不会混淆。 */
 const PRAISES = [
   { en: "Great job!", zh: "干得漂亮！" },
   { en: "You are amazing!", zh: "你太棒了！" },

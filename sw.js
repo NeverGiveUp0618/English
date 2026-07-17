@@ -1,4 +1,4 @@
-const CACHE = "magic-english-v31";
+const CACHE = "magic-english-v32";
 const STICKER_V2 = { school:16, season:16, hobby:16, travel:16, magic:16, mood:8 };
 const STICKER_V2_FILES = Object.entries(STICKER_V2).flatMap(([name, count]) =>
   Array.from({length:count}, (_, i) => `./assets/stickers-v2/${name}-${String(i + 1).padStart(2, "0")}.webp`)
