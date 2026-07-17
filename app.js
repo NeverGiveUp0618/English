@@ -631,8 +631,11 @@ function outfitVisual(o, cls) {
 function stickerVisual(s, cls) {
   const style = s.tone ? ` style="filter:${s.tone}"` : "";
   return s.art
-    ? `<span class="stickerVisual ${s.edition || "classic"}"><img loading="lazy" class="${cls || "stickerArt"}" src="${s.art}" alt="${esc(s.n)}"${style}><span class="stickerEdition">${s.badge || "🐾"}</span></span>`
+    ? `<span class="stickerVisual ${s.edition || "classic"}"><img loading="lazy" class="${cls || "stickerArt"}" src="${s.art}" alt="${esc(s.n)}"${style} onerror="this.onerror=null;this.src='assets/baibai-base.png';this.style.filter='grayscale(1)'"><span class="stickerEdition">${s.badge || "🐾"}</span></span>`
     : `<span>${s.e}</span>`;
+}
+function lockedStickerVisual(s) {
+  return `<span class="stickerVisual lockedBaibai"><img class="stickerArt" src="assets/baibai-base.png" alt="尚未获得的白白"><span class="stickerEdition">${s.badge || "🐾"}</span></span>`;
 }
 /* 白白的完整形象：裸狗底图 + 所有已保存装扮；任何页面调用都会得到最新造型。 */
 function petFigure(size, withOutfit) {
@@ -839,6 +842,9 @@ function priorityPick(pool, n) {
 /* ---------------- 导航 ---------------- */
 let navStack = [];
 let navTabs = [];
+let navScrolls = [];
+let pendingScroll = null;
+let currentScreenId = "";
 let activeTab = "home";
 const ROOT_TABS = { home: "home", map: "map", phonics: "phonics", arcade: "arcade", reward: "reward" };
 function setActiveTab(tab) {
@@ -847,32 +853,43 @@ function setActiveTab(tab) {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.tab === tab));
 }
 function show(id, title) {
-  if (ROOT_TABS[id]) setActiveTab(ROOT_TABS[id]);
+  const isRoot = !!ROOT_TABS[id];
+  if (isRoot) setActiveTab(ROOT_TABS[id]);
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("on"));
   $("#scr-" + id).classList.add("on");
   $("#barTitle").textContent = title;
-  $("#backBtn").style.visibility = navStack.length > 1 ? "visible" : "hidden";
-  $("#screens").scrollTop = 0;
+  $("#hubLink").style.display = isRoot ? "inline-flex" : "none";
+  $("#backBtn").style.visibility = isRoot ? "hidden" : "visible";
+  if (navScrolls.length !== navStack.length) navScrolls = navStack.map(() => 0);
+  if (pendingScroll !== null) { $("#screens").scrollTop = pendingScroll; pendingScroll = null; }
+  else if (currentScreenId && currentScreenId !== id) $("#screens").scrollTop = 0;
+  currentScreenId = id;
   if (navStack.length === 1) navTabs = [activeTab];
 }
+function rememberScroll() { if (navStack.length) navScrolls[navStack.length - 1] = $("#screens").scrollTop; }
 function go(render, tab) {
+  rememberScroll();
   navStack.push(render);
   navTabs.push(tab || activeTab);
+  navScrolls.push(0); pendingScroll = 0;
   if (tab) setActiveTab(tab);
   render();
 }
 function goTab(render, tab) {
   navStack = [render];
   navTabs = [tab || activeTab];
+  navScrolls = [0]; pendingScroll = 0;
   if (tab) setActiveTab(tab);
   render();
 }
+function rootRender() { return ({home:renderHome,map:renderMap,phonics:renderPhonicsList,arcade:renderArcade,reward:renderReward})[activeTab] || renderHome; }
 function goBack() {
   stopSpeak();                                              // 停掉正在播的发音
   clearTimer();
   if (echoCleanup) { echoCleanup(); echoCleanup = null; }   // 关掉麦克风
-  if (navStack.length <= 1) return;
+  if (navStack.length <= 1) { goTab(rootRender(), activeTab); return; }
   navStack.pop(); navTabs.pop();
+  navScrolls.pop(); pendingScroll = navScrolls[navScrolls.length - 1] || 0;
   setActiveTab(navTabs[navTabs.length - 1] || "home");
   navStack[navStack.length - 1]();
 }
@@ -3561,6 +3578,7 @@ function renderDecoEdit() {
   worn.forEach(id => { draft[id] = Object.assign({}, decoOf(id)); });
 
   function draw() {
+    const keepScroll = $("#screens").scrollTop;
     const selected = outfitOf(sel);
     $("#scr-anchor").innerHTML = `
       <div class="card" style="text-align:center;padding:10px">
@@ -3685,6 +3703,7 @@ function renderDecoEdit() {
       navStack = [renderOutfit]; renderOutfit();
     };
     show("anchor", "🎯 打扮白白");
+    $("#screens").scrollTop = keepScroll;
   }
   draw();
 }
@@ -3930,7 +3949,7 @@ function renderAlbum() {
         const i = STICKERS.indexOf(s);
         const have = !!S.stickers[s.n];
         return `<div class="albumCell ${have ? "" : "no"} ${s.r === 3 ? "rr3" : ""}" data-i="${i}">
-          <div class="ae">${stickerVisual(s)}</div>
+          <div class="ae">${have ? stickerVisual(s) : lockedStickerVisual(s)}</div>
           <div class="an">${have ? s.n + (S.stickers[s.n] > 1 ? " ×" + S.stickers[s.n] : "") : "？？？"}</div>
         </div>`;
       }).join("")}

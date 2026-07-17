@@ -75,11 +75,11 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
 
   console.log("— 首页 —");
   ok($("#scr-home").classList.contains("on"), "首页显示");
-  ok($("#hubLink").href === "https://nevergiveup0618.github.io/learning/", "★ 最顶部可直接返回学习导航页");
+  ok($("#hubLink").href === "https://nevergiveup0618.github.io/learning/" && $("#hubLink").style.display !== "none", "★ 首页显示返回学习导航");
   ok($("#backBtn").style.visibility === "hidden", "★ 英语首页不显示无意义的页内返回箭头");
   $("#homeAlbum").click();
   ok($$(".tab").find(t => t.dataset.tab === "reward").classList.contains("on"), "★ 从首页进白白收藏册时，高亮白白礼物而不是首页");
-  ok($("#backBtn").style.visibility === "visible", "★ 进入英语子页面后显示页内返回箭头");
+  ok($("#backBtn").style.visibility === "visible" && $("#hubLink").style.display === "none", "★ 进入英语子页面只显示页内返回");
   $("#backBtn").click();
   ok($("#scr-home").classList.contains("on") && $$(".tab").find(t => t.dataset.tab === "home").classList.contains("on"), "★ 页内返回回到英语首页并恢复首页高亮");
   ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
@@ -87,8 +87,8 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
 
   console.log("— 地图与锁 —");
   $$('.tab').find(t => t.dataset.tab === "map").click();
-  ok($("#scr-map").classList.contains("on"), "地图显示");
-  const cards = $$("#scr-map .unitCard");
+  ok($("#scr-map").classList.contains("on") && $("#hubLink").style.display !== "none" && $("#backBtn").style.visibility === "hidden", "地图同级大菜单显示学习导航，不显示页内返回");
+  let cards = $$("#scr-map .unitCard");
   const cardOf = id => cards.find(c => c.dataset.uid === id);
   ok(cards.length === 26, "26个单元卡片（新增二年级/三上/三下）");
   ok(!cardOf("u1").classList.contains("locked") && cardOf("u2").classList.contains("locked"), "四上U1解锁 U2锁定");
@@ -96,6 +96,12 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
      "★ 每册第一单元默认解锁（暑假可直接复习低年级）");
   cardOf("u2").click();
   ok($("#scr-map").classList.contains("on"), "点锁定单元不进入");
+  $("#screens").scrollTop = 420;
+  cardOf("u1").click();
+  ok($("#hubLink").style.display === "none" && $("#backBtn").style.visibility === "visible", "进入地图项目后只显示返回");
+  $("#backBtn").click();
+  ok($("#scr-map").classList.contains("on") && $("#screens").scrollTop === 420, "★ 从项目返回地图时恢复原来的滚动位置");
+  cards = $$("#scr-map .unitCard");
 
   console.log("— 难度：新手段位（刚上四年级） —");
   ok(w.eval("levelNum()") === 1, "0词时=1段(小小魔法学徒)");
@@ -585,6 +591,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   // 点未拥有的卡片 → 拒绝
   const cells = $$("#scr-album .albumCell");
   const lockedCell = cells.find(c => c.classList.contains("no"));
+  ok(lockedCell.querySelector("img")?.src.endsWith("/assets/baibai-base.png"), "★ 未获得卡使用PNG灰色白白占位，兼容旧iPad Safari");
   lockedCell.click();
   ok(!w.document.getElementById("decoPick"), "未拥有的白白卡不能打开");
   // 点已拥有 → 打开收藏大图，不再把另一只动物贴到白白身上
