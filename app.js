@@ -384,6 +384,7 @@ function puppyHello() {
   tone(780, .055, "sine", 0, .025);
   tone(1040, .075, "sine", .055, .022);
 }
+let baibaiAudio = null;
 function baibaiSpeak(text, delay) {
   const line = baibaiLine(text);
   if (!line || !("speechSynthesis" in window)) return;
@@ -396,6 +397,13 @@ function baibaiSpeak(text, delay) {
     try {
       baibaiPendingSpeak = null;
       if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+      /* 固定中文台词播放预生成神经网络录音，微信和没有中文语音包的手机也能说话。 */
+      if (typeof BAIBAI_AUDIO !== "undefined" && BAIBAI_AUDIO[line] && window.Audio) {
+        if (baibaiAudio) { baibaiAudio.pause(); baibaiAudio.currentTime = 0; }
+        baibaiAudio = new Audio(BAIBAI_AUDIO[line]); baibaiAudio.volume = .92;
+        const p = baibaiAudio.play(); if (p && p.catch) p.catch(() => {});
+        return;
+      }
       if (!zhPetVoice) pickVoice();
       puppyHello();
       const u = new SpeechSynthesisUtterance(line);
@@ -418,6 +426,7 @@ function stopSpeak() {
   speakGen++;
   baibaiVoiceGen++; clearTimeout(baibaiVoiceTimer); baibaiPendingSpeak = null; englishBusyUntil = 0;
   try { if (AUD) { AUD.onended = null; AUD.pause(); } } catch (e) {}
+  try { if (baibaiAudio) { baibaiAudio.pause(); baibaiAudio.currentTime = 0; } } catch (e) {}
   try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) {}
 }
 

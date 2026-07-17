@@ -1,10 +1,11 @@
-const CACHE = "magic-english-v32";
+importScripts("./audio/baibai/manifest.js");
+const CACHE = "magic-english-v33";
 const STICKER_V2 = { school:16, season:16, hobby:16, travel:16, magic:16, mood:8 };
 const STICKER_V2_FILES = Object.entries(STICKER_V2).flatMap(([name, count]) =>
   Array.from({length:count}, (_, i) => `./assets/stickers-v2/${name}-${String(i + 1).padStart(2, "0")}.webp`)
 );
 const FILES = [
-  "./", "./index.html", "./data.js", "./app.js", "./manifest.json", "./audio/manifest.js", "./assets/baibai-base.png",
+  "./", "./index.html", "./data.js", "./app.js", "./manifest.json", "./audio/manifest.js", "./audio/baibai/manifest.js", ...Object.values(BAIBAI_AUDIO), "./assets/baibai-base.png",
   "./assets/stickers/baibai-wave.webp", "./assets/stickers/baibai-reading.webp", "./assets/stickers/baibai-music.webp",
   "./assets/stickers/baibai-party.webp", "./assets/stickers/baibai-detective.webp", "./assets/stickers/baibai-rain.webp",
   "./assets/stickers/baibai-explorer.webp", "./assets/stickers/baibai-sleep.webp", "./assets/stickers/baibai-holiday.webp",
