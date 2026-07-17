@@ -9,7 +9,7 @@ const ok = (c, m) => { c ? pass++ : fail++; console.log(`  ${c ? "✓" : "✗ FA
 
 const html = fs.readFileSync(DIR + "/index.html", "utf8").replace(/<script src="[^"]+"><\/script>/g, "");
 const dom = new JSDOM(html, { runScripts:"dangerously", url:"https://nevergiveup0618.github.io/English/", pretendToBeVisual:true });
-const w = dom.window, spoken = [], audios = [];
+const w = dom.window, spoken = [], audios = [], plays = [];
 w.SpeechSynthesisUtterance = function(t) { this.text = t; };
 w.speechSynthesis = {
   speaking:false, pending:false, paused:false,
@@ -20,7 +20,7 @@ w.speechSynthesis = {
   ]
 };
 w.AudioContext = function(){ return {state:"running",resume(){},currentTime:0,destination:{},createOscillator:()=>({frequency:{value:0},connect(){},start(){},stop(){}}),createGain:()=>({connect(){},gain:{value:0,exponentialRampToValueAtTime(){}}})}; };
-w.Audio = function(src){ const a={src:src||"",paused:true,onended:null,play(){this.paused=false;return Promise.resolve();},pause(){this.paused=true;}};audios.push(a);return a; };
+w.Audio = function(src){ const a={src:src||"",paused:true,onended:null,preload:"",currentTime:0,load(){},play(){this.paused=false;plays.push(this);return Promise.resolve();},pause(){this.paused=true;}};audios.push(a);return a; };
 for (const f of ["audio/manifest.js","audio/baibai/manifest.js","data.js","app.js"]) {
   const sc=w.document.createElement("script");sc.textContent=fs.readFileSync(DIR+"/"+f,"utf8");w.document.body.appendChild(sc);
 }
@@ -34,30 +34,30 @@ const bbAudios=()=>audios.filter(a=>/audio\/baibai\/[a-f0-9]+\.mp3/.test(a.src))
   const clips=Object.values(manifestContext.BAIBAI_AUDIO||{});
   ok(clips.length===26&&clips.every(p=>fs.existsSync(DIR+"/"+p)&&fs.statSync(DIR+"/"+p).size>1000),"26 条英语互动台词都有固定动漫角色录音");
   spoken.length=0;
+  const beforeHome=plays.filter(a=>/audio\/baibai\//.test(a.src)).length;
   $("#petShow").click();
-  await sleep(320);
-  ok(bbAudios().at(-1)&&!bbAudios().at(-1).paused,"点首页白白会真正播放固定中文 MP3");
+  ok(plays.filter(a=>/audio\/baibai\//.test(a.src)).length===beforeHome+1,"点首页白白在同一次手势里立即播放中文 MP3");
   ok(zhSpoken().length===0,"常用台词不再依赖可能失声的手机系统 TTS");
 
   spoken.length=0;
   w.eval("saveWallet({coins:100,tickets:0});S.coins=100;navStack=[renderCare];renderCare();");
   $$(".careBtn")[0].click();
-  await sleep(320);
   ok(bbAudios().at(-1)?.src.includes("audio/baibai/"), "喂食后白白播放动漫角色录音");
 
   spoken.length=0;
-  const beforeWait=bbAudios().length;
+  const beforeWait=plays.filter(a=>/audio\/baibai\//.test(a.src)).length;
   w.eval("speak('cake');showBaibaiReaction('right','我等你听完英语再说！');");
   await sleep(260);
-  ok(bbAudios().length===beforeWait, "英语单词播放期间白白不会插话或叠音");
+  ok(plays.filter(a=>/audio\/baibai\//.test(a.src)).length===beforeWait, "英语单词播放期间白白不会插话或叠音");
   const aud=w.eval("AUD"); if(aud.onended) aud.onended();
   await sleep(340);
-  ok(bbAudios().length===beforeWait+1&&!bbAudios().at(-1).paused, "英语结束后白白才接着播放中文录音");
+  ok(plays.filter(a=>/audio\/baibai\//.test(a.src)).length===beforeWait+1, "英语结束后白白才接着播放中文录音");
 
-  const beforeStop=bbAudios().length;
+  const beforeStop=plays.filter(a=>/audio\/baibai\//.test(a.src)).length;
   w.eval("showBaibaiReaction('try','再试一次，我陪着你。');stopSpeak();");
   await sleep(320);
-  ok(bbAudios().length===beforeStop, "离开页面会取消尚未说出的白白台词");
+  const afterStop=plays.filter(a=>/audio\/baibai\//.test(a.src));
+  ok(afterStop.length===beforeStop+1&&afterStop.at(-1).paused, "离开页面会立刻停止已经开始的白白录音");
 
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
   process.exit(fail?1:0);

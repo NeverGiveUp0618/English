@@ -385,9 +385,19 @@ function puppyHello() {
   tone(1040, .075, "sine", .055, .022);
 }
 let baibaiAudio = null;
+const baibaiAudioPool = {};
+function preloadBaibaiAudio() {
+  if (typeof BAIBAI_AUDIO === "undefined" || !window.Audio) return;
+  [...new Set(Object.values(BAIBAI_AUDIO))].forEach(src => {
+    try {
+      const a = new Audio(); a.preload = "auto"; a.src = src;
+      if (a.load) a.load(); baibaiAudioPool[src] = a;
+    } catch (e) {}
+  });
+}
 function baibaiSpeak(text, delay) {
   const line = baibaiLine(text);
-  if (!line || !("speechSynthesis" in window)) return;
+  if (!line) return;
   const gen = ++baibaiVoiceGen;
   clearTimeout(baibaiVoiceTimer);
   const trySpeak = () => {
@@ -396,14 +406,16 @@ function baibaiSpeak(text, delay) {
     if (wait > 0) { baibaiVoiceTimer = setTimeout(trySpeak, wait + 120); return; }
     try {
       baibaiPendingSpeak = null;
-      if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
+      if (window.speechSynthesis && (speechSynthesis.speaking || speechSynthesis.pending)) speechSynthesis.cancel();
       /* 固定中文台词播放预生成神经网络录音，微信和没有中文语音包的手机也能说话。 */
       if (typeof BAIBAI_AUDIO !== "undefined" && BAIBAI_AUDIO[line] && window.Audio) {
         if (baibaiAudio) { baibaiAudio.pause(); baibaiAudio.currentTime = 0; }
-        baibaiAudio = new Audio(BAIBAI_AUDIO[line]); baibaiAudio.volume = .92;
+        const src = BAIBAI_AUDIO[line];
+        baibaiAudio = baibaiAudioPool[src] || new Audio(src); baibaiAudio.volume = .92; baibaiAudio.currentTime = 0;
         const p = baibaiAudio.play(); if (p && p.catch) p.catch(() => {});
         return;
       }
+      if (!("speechSynthesis" in window)) return;
       if (!zhPetVoice) pickVoice();
       puppyHello();
       const u = new SpeechSynthesisUtterance(line);
@@ -416,8 +428,11 @@ function baibaiSpeak(text, delay) {
     } catch (e) {}
   };
   baibaiPendingSpeak = trySpeak;
-  baibaiVoiceTimer = setTimeout(trySpeak, delay == null ? 120 : delay);
+  /* 固定录音必须留在本次点击手势中播放；iPhone/微信会拦截延时后的 play()。 */
+  if (delay > 0) baibaiVoiceTimer = setTimeout(trySpeak, delay);
+  else trySpeak();
 }
+preloadBaibaiAudio();
 /* 立刻闭嘴：停 mp3、停系统TTS，并作废所有等待中的"读完再继续"回调
  * （离开游戏后声音还在读、题目还在后台推进，就是漏了这一步）
  */
