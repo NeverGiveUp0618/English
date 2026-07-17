@@ -620,7 +620,7 @@ function baibaiCards(prefix, names, rarity) {
     r: typeof rarity === "function" ? rarity(i) : rarity
   }));
 }
-const STICKERS = [
+const BAIBAI_BASE_CARDS = [
   { n: "挥手白白", e: "🐶", art: "assets/stickers/baibai-wave.webp", r: 1 },
   { n: "阅读白白", e: "🐶", art: "assets/stickers/baibai-reading.webp", r: 1 },
   { n: "音乐白白", e: "🐶", art: "assets/stickers/baibai-music.webp", r: 1 },
@@ -668,6 +668,28 @@ const STICKERS = [
     "惊喜白白", "勇气超人白白", "安静呼吸白白", "困困哈欠白白"
   ], 1)
 ];
+
+/* 长期收藏系列：保留最初 100 张原卡（旧存档名称完全不变），再为同一批白白
+   姿势制作四套独立闪卡版本。它们共用轻量原画，但拥有不同卡面色调、边框、
+   名称与稀有度；手机只需缓存 100 幅图，也能长期收集 500 张而不撑爆流量。 */
+const BAIBAI_CARD_EDITIONS = [
+  { id:"classic", n:"原画", prefix:"", tone:"", badge:"🐾" },
+  { id:"dawn", n:"晨光", prefix:"晨光·", tone:"sepia(.16) saturate(1.12) brightness(1.06)", badge:"☀️" },
+  { id:"mint", n:"薄荷", prefix:"薄荷·", tone:"hue-rotate(58deg) saturate(.88) brightness(1.05)", badge:"🍃" },
+  { id:"night", n:"星夜", prefix:"星夜·", tone:"hue-rotate(205deg) saturate(1.15) brightness(.9)", badge:"🌙" },
+  { id:"rainbow", n:"彩虹", prefix:"彩虹·", tone:"hue-rotate(315deg) saturate(1.28) brightness(1.04)", badge:"🌈" }
+];
+const STICKERS = BAIBAI_CARD_EDITIONS.flatMap((edition, editionIndex) =>
+  BAIBAI_BASE_CARDS.map((card, cardIndex) => Object.assign({}, card, {
+    n: edition.prefix + card.n,
+    edition: edition.id,
+    editionName: edition.n,
+    badge: edition.badge,
+    tone: edition.tone,
+    /* 后四套每逢 10/25 张提升稀有度，让新系列既有普通卡也有追逐卡。 */
+    r: editionIndex === 0 ? card.r : (cardIndex % 25 === 24 ? 3 : cardIndex % 10 === 9 ? 2 : card.r)
+  }))
+);
 
 /* 宠物成长线：xp达到阈值即进化（老存档默认用这条线，见 PETS.classic） */
 const PET_STAGES = [

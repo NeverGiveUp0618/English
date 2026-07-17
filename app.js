@@ -597,8 +597,9 @@ function outfitVisual(o, cls) {
     : `<span class="${cls || "outfitEmoji"}">${o.e}</span>`;
 }
 function stickerVisual(s, cls) {
+  const style = s.tone ? ` style="filter:${s.tone}"` : "";
   return s.art
-    ? `<img class="${cls || "stickerArt"}" src="${s.art}" alt="${esc(s.n)}">`
+    ? `<span class="stickerVisual ${s.edition || "classic"}"><img loading="lazy" class="${cls || "stickerArt"}" src="${s.art}" alt="${esc(s.n)}"${style}><span class="stickerEdition">${s.badge || "🐾"}</span></span>`
     : `<span>${s.e}</span>`;
 }
 /* 白白的完整形象：裸狗底图 + 所有已保存装扮；任何页面调用都会得到最新造型。 */
@@ -3798,12 +3799,22 @@ function checkStickerSets() {
   });
 }
 
+let albumEdition = "classic";
 function renderAlbum() {
   const got = Object.keys(S.stickers).length;
+  const visible = STICKERS.filter(s => s.edition === albumEdition);
   $("#scr-album").innerHTML = `
     <div class="card" style="text-align:center;padding:12px">
       <div style="font-size:15px;font-weight:700;color:#9b59b6">🐶 白白收藏册　${got} / ${STICKERS.length}</div>
       <div style="font-size:12px;color:#b8a8c8;line-height:1.6">这里只有白白，没有别的小狗。点亮的卡片可以打开看大图。</div>
+    </div>
+
+    <div class="albumSeries" aria-label="收藏系列">
+      ${BAIBAI_CARD_EDITIONS.map(e => {
+        const cards = STICKERS.filter(s => s.edition === e.id);
+        const have = cards.filter(s => S.stickers[s.n]).length;
+        return `<button class="albumSeriesBtn ${albumEdition === e.id ? "on" : ""}" data-edition="${e.id}">${e.badge} ${e.n}<small>${have}/100</small></button>`;
+      }).join("")}
     </div>
 
     <div class="card" style="padding:12px">
@@ -3821,7 +3832,8 @@ function renderAlbum() {
     </div>
 
     <div class="albumGrid">
-      ${STICKERS.map((s, i) => {
+      ${visible.map(s => {
+        const i = STICKERS.indexOf(s);
         const have = !!S.stickers[s.n];
         return `<div class="albumCell ${have ? "" : "no"} ${s.r === 3 ? "rr3" : ""}" data-i="${i}">
           <div class="ae">${stickerVisual(s)}</div>
@@ -3835,6 +3847,9 @@ function renderAlbum() {
       if (!S.stickers[s.n]) { toast("这张白白还没出现，去扭蛋机找找它吧！"); sndWrong(); return; }
       viewStickerCard(s);
     };
+  });
+  document.querySelectorAll("#scr-album .albumSeriesBtn").forEach(btn => {
+    btn.onclick = () => { albumEdition = btn.dataset.edition; renderAlbum(); };
   });
   show("album", "🐶 白白收藏册");
 }

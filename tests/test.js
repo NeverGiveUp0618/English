@@ -263,7 +263,10 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   console.log("— 白白收藏册 & 游戏厅 & 每日任务t3 —");
   $("#toAlbum").click();
   ok($("#scr-album").classList.contains("on"), "白白收藏册显示");
-  ok($$(".albumCell").length === 100, "100张白白收藏卡");
+  ok(w.eval("STICKERS.length") === 500, "500张白白收藏卡");
+  ok($$(".albumCell").length === 100, "收藏册按系列每次展示100张，手机不卡顿");
+  ok($$(".albumSeriesBtn").length === 5, "500张分成5个独立收藏系列");
+  ok(w.eval("new Set(STICKERS.map(s=>s.n)).size===500"), "500张卡名全部唯一，能独立解锁");
   ok(w.eval("STICKERS.every(s=>s.n.includes('白白')&&s.art)"), "★ 扭蛋奖励全部是白白，没有其他狗或动物");
   $$('.tab').find(t => t.dataset.tab === "arcade").click();
   ok($$("#scr-arcade .actRow").length === 10, "游戏厅10个入口(含听句子、阶段测验和今日复习)");
@@ -578,7 +581,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#scr-album").classList.contains("on"), "白白收藏册显示");
   ok($("#scr-album").textContent.includes("这里只有白白"), "★ 收藏册明确只收集白白");
   ok($("#scr-album").innerHTML.includes("集齐奖励"), "收藏册有集齐奖励进度");
-  ok($$("#scr-album .albumCell img").length === STICKERS.length, "每张收藏卡都有白白图片");
+  ok($$("#scr-album .albumCell img").length === 100 && w.eval("STICKERS.every(s=>!!s.art)"), "五个系列的每张收藏卡都有白白图片");
   // 点未拥有的卡片 → 拒绝
   const cells = $$("#scr-album .albumCell");
   const lockedCell = cells.find(c => c.classList.contains("no"));

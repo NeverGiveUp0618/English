@@ -470,11 +470,26 @@ body.th-night .decoBtn { background: #473a6e; color: #cfc0ee; }
 .outfitCell.lock .oe { filter: grayscale(1); opacity: .4; }
 .outfitCell.on { box-shadow: 0 0 0 2.5px #7cc576; }
 
-/* 白白收藏卡：图片就是奖励主体，任何格子都不再用其他动物 emoji。 */
-.stickerCard .se img { width:150px; height:150px; object-fit:cover; border-radius:20px; display:block; margin:4px auto 8px; }
-.albumCell .ae img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:12px; display:block; }
+/* 白白收藏卡：500 张分成五个系列，每次只渲染一册，真机滑动更轻。 */
+.stickerVisual { position:relative; display:block; border-radius:inherit; overflow:hidden; }
+.stickerVisual.dawn { background:linear-gradient(145deg,#fff4cc,#ffd8bd); box-shadow:inset 0 0 0 3px #f5c96d; }
+.stickerVisual.mint { background:linear-gradient(145deg,#ddfff0,#cfefff); box-shadow:inset 0 0 0 3px #77d7b0; }
+.stickerVisual.night { background:linear-gradient(145deg,#292653,#655296); box-shadow:inset 0 0 0 3px #9b8bea; }
+.stickerVisual.rainbow { background:linear-gradient(145deg,#ffd9eb,#fff1a8,#ccefff); box-shadow:inset 0 0 0 3px #ff91bd; }
+.stickerEdition { position:absolute; right:5px; top:5px; display:grid; place-items:center; width:25px; height:25px; border-radius:50%; background:rgba(255,255,255,.9); box-shadow:0 2px 7px rgba(80,50,100,.2); font-size:14px; }
+.stickerCard .se .stickerVisual { width:150px; height:150px; margin:4px auto 8px; border-radius:20px; }
+.stickerCard .se img { width:100%; height:100%; object-fit:cover; border-radius:20px; display:block; }
+.albumCell .ae .stickerVisual { width:100%; aspect-ratio:1; border-radius:12px; }
+.albumCell .ae img { width:100%; height:100%; aspect-ratio:1; object-fit:cover; border-radius:12px; display:block; }
 .albumCell.no .ae img { filter:grayscale(1); opacity:.22; }
-.decoCard .stickerPreview { width:min(260px,70vw); aspect-ratio:1; object-fit:cover; border-radius:22px; box-shadow:0 7px 24px rgba(100,70,130,.2); }
+.decoCard .stickerVisual { width:min(260px,70vw); aspect-ratio:1; margin:0 auto; border-radius:22px; box-shadow:0 7px 24px rgba(100,70,130,.2); }
+.decoCard .stickerPreview { width:100%; height:100%; aspect-ratio:1; object-fit:cover; border-radius:22px; }
+.albumSeries { display:flex; gap:7px; overflow-x:auto; padding:3px 2px 10px; scrollbar-width:none; }
+.albumSeries::-webkit-scrollbar { display:none; }
+.albumSeriesBtn { flex:0 0 auto; border:0; border-radius:14px; padding:8px 12px; background:#fff; color:#806294; font-weight:800; box-shadow:0 2px 8px rgba(120,80,150,.13); }
+.albumSeriesBtn small { display:block; margin-top:2px; color:#b8a8c8; font-size:10px; }
+.albumSeriesBtn.on { color:#fff; background:linear-gradient(135deg,#b58aeb,#f191bd); }
+.albumSeriesBtn.on small { color:#fff; opacity:.9; }
 
 /* ---- 自然拼读：音节 + 音标 + 颜色 ---- */
 .phRow { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 14px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 2px 8px rgba(180,140,200,.15); }
