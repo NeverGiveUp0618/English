@@ -82,7 +82,7 @@ function boot() {
   const cats = new Set(w.eval("OUTFITS.map(o=>o.cat)"));
   ok(w.eval("OUTFITS.length") >= 28 && ["发饰","帽子","耳饰","项圈","披风","手持"].every(x=>cats.has(x)),
      "★ 至少 28 件白白装扮，覆盖发饰、帽子、耳饰、项圈、披风和手持");
-  ok(w.eval("OUTFITS.filter(o=>o.group==='body').every(o=>o.art&&o.cat==='披风')"), "★ 人类裙装已全部替换为宠物披风图片");
+  ok(w.eval("OUTFITS.filter(o=>o.group==='body').every(o=>o.art&&['披风','婚纱'].includes(o.cat))"), "★ 人类裙装已全部替换为适合白白体型的披风/婚纱图片");
   w.eval("saveWallet({coins:500,tickets:0});updateCoinBox();");
   w.eval("navStack=[renderOutfit];renderOutfit();");
   $("[data-o='bb_crown']").click();

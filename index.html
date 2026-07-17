@@ -469,6 +469,13 @@ body.th-night .decoBtn { background: #473a6e; color: #cfc0ee; }
 .outfitCell .oc { font-size: 10px; color: #c0a8d0; margin-top: 1px; }
 .outfitCell.lock .oe { filter: grayscale(1); opacity: .4; }
 .outfitCell.on { box-shadow: 0 0 0 2.5px #7cc576; }
+.poseGrid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; padding-bottom:14px; }
+.poseCell { border:0; border-radius:16px; background:#fff; padding:7px; color:#7a5a9a; box-shadow:0 3px 10px rgba(130,90,160,.15); }
+.poseCell img { width:100%; aspect-ratio:1; object-fit:contain; border-radius:12px; background:#faf6ff; }
+.poseCell b,.poseCell small { display:block; margin-top:3px; }
+.poseCell b { font-size:11px; }.poseCell small { font-size:9px;color:#b8a8c8; }
+.poseCell.lock img { filter:grayscale(.8); opacity:.5; }.poseCell.on { box-shadow:0 0 0 3px #7cc576; }
+.cardUnlockTip { margin-top:7px; padding:7px 9px; border-radius:10px; background:#fff2c9; color:#966516; font-size:11px; font-weight:800; }
 
 /* 白白收藏卡：500 张分成五个系列，每次只渲染一册，真机滑动更轻。 */
 .stickerVisual { position:relative; display:block; border-radius:inherit; overflow:hidden; }

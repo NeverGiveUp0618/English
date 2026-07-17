@@ -21,6 +21,8 @@ const LS_KEY = "magicEnglish_v1";
 const WALLET_KEY = "sharedWallet_v1";
 /* 白白的最新装扮也跨科目共享：语文只读取展示，不从这里扣钱。 */
 const SHARED_PET_KEY = "sharedPet_v1";
+const CARD_DAILY_KEY = "sharedCardDaily_v1";
+const CARD_DAILY_LIMIT = 5;
 function defState() {
   return {
     coins: 0, xp: 0, streak: 0, lastDaily: "",
@@ -45,6 +47,9 @@ function defState() {
       pics: {},               // 家长自己上传的伙伴形象：petId -> dataURI（只存本机，不进仓库、不上传）
       anchors: {},            // 兼容旧存档
       deco: { baibai: {} },   // outfitId -> {x,y,s,r}
+      pose: "p01",            // 当前白白姿势
+      posesOwned: ["p01","p02","p03","p04","p05"],
+      decoByPose: {},          // poseId -> outfitId -> {x,y,s,r}
       baibaiV1: true
     },
     checkins: {},  // 打卡成功的日期（完成当天全部任务才算）
@@ -89,6 +94,10 @@ S.pet.name = "白白";
 S.pet.owned = ["baibai"];
 S.pet.worn = Array.isArray(S.pet.worn) ? S.pet.worn.filter(id => OUTFITS.some(o => o.id === id)) : [];
 S.pet.outfits = Array.isArray(S.pet.outfits) ? S.pet.outfits : [];
+S.pet.pose = BAIBAI_POSES.some(p => p.id === S.pet.pose) ? S.pet.pose : "p01";
+S.pet.posesOwned = Array.isArray(S.pet.posesOwned) ? S.pet.posesOwned.filter(id => BAIBAI_POSES.some(p => p.id === id)) : [];
+BAIBAI_POSES.slice(0, 5).forEach(p => { if (!S.pet.posesOwned.includes(p.id)) S.pet.posesOwned.push(p.id); });
+S.pet.decoByPose = Object.assign({}, S.pet.decoByPose || {});
 ["bb_bow", "bb_flower"].forEach(id => { if (!S.pet.outfits.includes(id)) S.pet.outfits.push(id); });
 /* v31 修复旧帽子坐标：早期默认中心在脸上，且舞台会裁掉顶部。
    只迁移一次；孩子之后手动保存的位置不再被系统改动。 */
@@ -128,7 +137,7 @@ function sharePetOut() {
       const o = OUTFITS.find(x => x.id === id), d = decoOf(id);
       return o ? { id: o.id, e: o.e, n: o.n, art: o.art ? new URL(o.art, location.href).href : "", base: o.base || .3, hue: Number(o.hue) || 0, x: d.x, y: d.y, s: d.s, r: d.r } : null;
     }).filter(Boolean);
-    localStorage.setItem(SHARED_PET_KEY, JSON.stringify({ v: 1, name: "白白", items }));
+    localStorage.setItem(SHARED_PET_KEY, JSON.stringify({ v: 2, name: "白白", body: new URL(petVisual(), location.href).href, pose: S.pet.pose, items }));
   } catch (e) {}
 }
 
@@ -146,6 +155,22 @@ function loadWallet() {
 function saveWallet(w) {
   S.coins = w.coins || 0; S.tickets = w.tickets || 0;
   try { localStorage.setItem(WALLET_KEY, JSON.stringify({ coins: S.coins, tickets: S.tickets })); } catch (e) {}
+}
+function cardDaily() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(CARD_DAILY_KEY) || "null"); } catch (e) {}
+  if (!d || d.date !== todayStr()) d = { date: todayStr(), english: 0, chinese: 0, pendingChinese: 0 };
+  d.english = Math.max(0, Number(d.english) || 0);
+  d.chinese = Math.max(0, Number(d.chinese) || 0);
+  d.pendingChinese = Math.max(0, Number(d.pendingChinese) || 0);
+  return d;
+}
+function saveCardDaily(d) { try { localStorage.setItem(CARD_DAILY_KEY, JSON.stringify(d)); } catch (e) {} }
+function englishCardLeft() { return Math.max(0, CARD_DAILY_LIMIT - cardDaily().english); }
+function takeEnglishCardChance() {
+  const d = cardDaily();
+  if (d.english >= CARD_DAILY_LIMIT) return false;
+  d.english++; saveCardDaily(d); return true;
 }
 function walletIn() {
   let w = { coins: 0, tickets: 0 };
@@ -559,11 +584,16 @@ function careMood() {
 /* 亲密度等级：1~5 心 */
 function bondLv() { const b = S.pet.bond || 0; return Math.min(5, Math.floor(b / 60) + (b > 0 ? 1 : 0)); }
 function outfitOf(id) { return OUTFITS.find(x => x.id === id); }
+function poseDecoMap() {
+  if (!S.pet.decoByPose) S.pet.decoByPose = {};
+  return S.pet.decoByPose[S.pet.pose] || (S.pet.decoByPose[S.pet.pose] = {});
+}
 function wornOutfits() { return (S.pet.worn || []).map(outfitOf).filter(Boolean); }
 
 /* 旧版本的本机图片仍留在存档中，但白白上线后不再显示或上传。 */
 function petPic(id) { return (S.pet.pics || {})[id || S.pet.id] || ""; }
-function petVisual() { return "assets/baibai-base.png"; }
+function currentPose() { return BAIBAI_POSES.find(p => p.id === S.pet.pose) || BAIBAI_POSES[0]; }
+function petVisual() { return currentPose().art; }
 
 function petCheer() {
   const d = taskDone();
@@ -580,13 +610,15 @@ function decoDefault(id) {
   return Object.assign({ x: 50, y: 50, s: 1, r: 0 }, o && o.pos || {});
 }
 function decoOf(id) {
-  const d = ((S.pet.deco || {}).baibai || {})[id];
+  const poseMap = (S.pet.decoByPose || {})[S.pet.pose] || {};
+  const legacy = S.pet.pose === "p01" ? ((S.pet.deco || {}).baibai || {}) : {};
+  const d = poseMap[id] || legacy[id];
   return Object.assign({}, decoDefault(id), d || {});
 }
 function setDeco(id, v) {
-  if (!S.pet.deco) S.pet.deco = {};
-  if (!S.pet.deco.baibai) S.pet.deco.baibai = {};
-  S.pet.deco.baibai[id] = v;
+  if (!S.pet.decoByPose) S.pet.decoByPose = {};
+  if (!S.pet.decoByPose[S.pet.pose]) S.pet.decoByPose[S.pet.pose] = {};
+  S.pet.decoByPose[S.pet.pose][id] = v;
   save();
 }
 function decoSizePx(canvasSize, d, o) { return Math.round(canvasSize * ((o && o.base) || .30) * d.s); }
@@ -2832,10 +2864,12 @@ function stageExamItems(pool, n) {
   return out.slice(0, n);
 }
 function awardStageCard() {
+  if (!takeEnglishCardChance()) return "";
   const fresh = STICKERS.filter(s => !S.stickers[s.n]);
   if (!fresh.length) return "";
   const st = fresh[Math.floor(Math.random() * fresh.length)];
   S.stickers[st.n] = 1;
+  unlockStickerOutfit(st);
   checkStickerSets();
   return st.n;
 }
@@ -3246,9 +3280,9 @@ function renderCare() {
           <span style="font-size:11px;color:#c0a8d0;width:30px;text-align:right">${v}</span></div>`;
       }).join("")}
       <div class="careActions">
-        ${CARE.map(c => `<button class="careAction careBtn" data-c="${c.id}" ${w.coins < c.cost ? "disabled" : ""}>
-          <span>${c.e}</span><b>${c.n}</b><small>🪙${c.cost}</small>
-        </button>`).join("")}
+        ${CARE.map(c => { const full = (S.pet[c.up] ?? 80) >= 100; return `<button class="careAction careBtn" data-c="${c.id}" ${!full && w.coins < c.cost ? "disabled" : ""}>
+          <span>${c.e}</span><b>${c.n}</b><small>${full ? "满值免费" : "🪙" + c.cost}</small>
+        </button>`; }).join("")}
       </div>
       <div class="noPressure">白白不会生病、不会离开、不会扣分。照顾是你们的开心互动，不是任务。</div>
     </div>
@@ -3263,15 +3297,18 @@ function renderCare() {
     b.onclick = () => {
       const c = CARE.find(x => x.id === b.dataset.c);
       const wal = loadWallet();
-      if (wal.coins < c.cost) { toast("金币不够啦，去学习赚金币！💪"); sndWrong(); return; }
-      wal.coins -= c.cost; saveWallet(wal); S.coins = wal.coins;
-      S.pet[c.up] = Math.min(100, (S.pet[c.up] ?? 80) + 25);
-      S.pet.bond = (S.pet.bond || 0) + c.bond;
+      const full = (S.pet[c.up] ?? 80) >= 100;
+      if (!full && wal.coins < c.cost) { toast("金币不够啦，去学习赚金币！💪"); sndWrong(); return; }
+      if (!full) {
+        wal.coins -= c.cost; saveWallet(wal); S.coins = wal.coins;
+        S.pet[c.up] = Math.min(100, (S.pet[c.up] ?? 80) + 25);
+        S.pet.bond = (S.pet.bond || 0) + c.bond;
+      }
       save(); updateCoinBox();
       sndCoin(); confettiSmall(6);
       const p = $("#carePet");
       if (p) { p.classList.remove("bounce"); void p.offsetWidth; p.classList.add("bounce"); }
-      $("#careSay").innerHTML = `<b>${c.fx}</b> ${esc(c.say)}`;
+      $("#careSay").innerHTML = `<b>${c.fx}</b> ${esc(c.say)}${full ? "（今天已经满满的，这次是免费抱抱！）" : ""}`;
       showBaibaiReaction("right", c.say);
       setTimeout(() => renderCare(), 1800);
     };
@@ -3296,6 +3333,9 @@ function renderOutfit() {
       <div style="font-size:11px;color:#a27b45;margin-top:4px">🪙 在语文寻宝赚到的金币，也能在这里给白白买新衣服</div>
       <button class="btn small" id="toDecoEdit" style="margin-top:9px">🎯 调整每件装扮并保存</button>
     </div>
+    <div class="card actRow" id="toPoses">
+      <span class="aIcon">🐾</span><span class="aName">白白的姿势册<span class="aSub">已拥有 ${(S.pet.posesOwned || []).length}/30 · 前5个免费</span></span><span class="aGo">▶</span>
+    </div>
     ${cats.map(cat => `
       <div class="sectionTitle">${cat}</div>
       <div class="outfitGrid">
@@ -3311,6 +3351,7 @@ function renderOutfit() {
       </div>`).join("")}`;
   const dEdit = $("#toDecoEdit");
   if (dEdit) dEdit.onclick = () => go(renderDecoEdit);
+  $("#toPoses").onclick = () => go(renderPoses);
   $$("#scr-outfit .outfitCell").forEach(c => {
     c.onclick = () => {
       const o = OUTFITS.find(x => x.id === c.dataset.o);
@@ -3333,6 +3374,22 @@ function renderOutfit() {
     };
   });
   show("outfit", "👗 白白的衣橱");
+}
+
+function renderPoses() {
+  const owned = S.pet.posesOwned || [];
+  $("#scr-outfit").innerHTML = `<div class="card" style="text-align:center"><b style="color:#8b5d9f">🐾 选一个白白的姿势</b><div style="font-size:12px;color:#a994bd;margin-top:5px">前5个免费；买下后永久拥有。每个姿势会保存自己的装扮位置。</div></div>
+    <div class="poseGrid">${BAIBAI_POSES.map(p => { const has=owned.includes(p.id), on=S.pet.pose===p.id; return `<button class="poseCell ${on?'on':''} ${has?'':'lock'}" data-pose="${p.id}"><img src="${p.art}" alt="${p.n}"><b>${p.n}</b><small>${on?'正在使用':has?'点一下切换':'🪙'+p.cost}</small></button>`; }).join("")}</div>`;
+  $$("#scr-outfit [data-pose]").forEach(b => b.onclick = () => {
+    const p = BAIBAI_POSES.find(x => x.id === b.dataset.pose);
+    if (!owned.includes(p.id)) {
+      const wal=loadWallet(); if (wal.coins < p.cost) { toast("还差 "+(p.cost-wal.coins)+" 金币～"); sndWrong(); return; }
+      wal.coins-=p.cost; saveWallet(wal); owned.push(p.id); S.pet.posesOwned=owned; updateCoinBox(); confettiSmall(8);
+      toast("🎉 解锁新姿势「"+p.n+"」！",1800);
+    }
+    S.pet.pose=p.id; save(); sndCoin(); renderPoses();
+  });
+  show("outfit", "🐾 白白的姿势册");
 }
 
 /* 换伙伴 */
@@ -3608,9 +3665,8 @@ function renderDecoEdit() {
     /* 编辑页也能直接取下，不必返回衣橱寻找同一件。当前预览位置一起保存。 */
     $("#deRemove").onclick = () => {
       const removed = outfitOf(sel);
-      if (!S.pet.deco) S.pet.deco = {};
-      if (!S.pet.deco.baibai) S.pet.deco.baibai = {};
-      worn.filter(id => id !== sel).forEach(id => { S.pet.deco.baibai[id] = Object.assign({}, draft[id]); });
+      const map = poseDecoMap();
+      worn.filter(id => id !== sel).forEach(id => { map[id] = Object.assign({}, draft[id]); });
       S.pet.worn = (S.pet.worn || []).filter(id => id !== sel);
       worn = worn.filter(id => id !== sel);
       save(); sndCoin();
@@ -3621,9 +3677,8 @@ function renderDecoEdit() {
     };
 
     $("#deDone").onclick = () => {
-      if (!S.pet.deco) S.pet.deco = {};
-      if (!S.pet.deco.baibai) S.pet.deco.baibai = {};
-      worn.forEach(id => { S.pet.deco.baibai[id] = Object.assign({}, draft[id]); });
+      const map = poseDecoMap();
+      worn.forEach(id => { map[id] = Object.assign({}, draft[id]); });
       save();
       sndWin(); confettiSmall(8);
       toast("🎉 白白的新造型保存好啦！语文那边也会同步", 2400);
@@ -3700,6 +3755,37 @@ function renderTheme() {
 
 /* ================= 奖励屋（扭蛋） ================= */
 const GACHA_COST = 20;
+/* 卡面中明确出现的服装或装饰，会同步进入衣橱。不同闪卡版本对应同一件实物，避免重复解锁。 */
+const STICKER_OUTFIT_LINKS = [
+  ["婚纱","bb_br_1"],["皇冠","bb_crown"],["王冠","bb_crown"],["星帽","bb_wizardhat"],
+  ["魔法帽","bb_wizardhat"],["圣诞暖帽","bb_treehat"],["侦探","bb_beret"],["眼镜","bb_gx_1"],
+  ["墨镜","bb_sunglasses"],["花冠","bb_band"],["花夹","bb_flower"],["蝴蝶结","bb_bow"],
+  ["披风","bb_wedding"],["斗篷","bb_cx_5"],["围巾","bb_nx_6"],["项链","bb_pearlneck"],
+  ["魔杖","bb_wand"],["放大镜","bb_magnifier"],["雨伞","bb_umbrella"],["小伞","bb_umbrella"],
+  ["花束","bb_ix_5"],["灯笼","bb_ix_7"],["相机","bb_ix_9"],["望远镜","bb_ix_9"]
+];
+function stickerOutfit(st) {
+  const plain = String(st.n).replace(/^(晨光|薄荷|星夜|彩虹)·/, "");
+  const hit = STICKER_OUTFIT_LINKS.find(x => plain.includes(x[0]));
+  return hit ? outfitOf(hit[1]) : null;
+}
+function unlockStickerOutfit(st) {
+  const o = stickerOutfit(st);
+  if (!o) return null;
+  const owned = S.pet.outfits || (S.pet.outfits=[]);
+  if (owned.includes(o.id)) return null;
+  owned.push(o.id); return o;
+}
+function claimChineseCards() {
+  const d = cardDaily(), n = Math.min(d.pendingChinese, CARD_DAILY_LIMIT);
+  if (!n) return 0;
+  for (let i=0;i<n;i++) {
+    const st=drawSticker();
+    S.stickers[st.n]=(S.stickers[st.n]||0)+1;
+    unlockStickerOutfit(st);
+  }
+  d.pendingChinese-=n; saveCardDaily(d); save(); return n;
+}
 function drawSticker() {
   const fresh = STICKERS.filter(s => !S.stickers[s.n]);
   if ((S.gachaDup || 0) >= 4 && fresh.length) return fresh[Math.floor(Math.random() * fresh.length)];
@@ -3731,6 +3817,7 @@ function renderReward() {
       <div id="gachaEgg">🥚</div>
       <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-top:6px">白白百变扭蛋机</div>
       <div style="font-size:12px;color:#b8a8c8">每一颗都是白白的新姿势、新故事，集齐 ${STICKERS.length} 款！</div>
+      <div style="font-size:11px;color:#a27b45;margin-top:4px">今日英语卡片 ${cardDaily().english}/5 · 还可获得 ${englishCardLeft()} 张</div>
       <div id="gachaResult"></div>
       <button class="btn" id="gachaBtn">扭一次（🪙${GACHA_COST}）</button>
     </div>
@@ -3751,6 +3838,7 @@ function renderReward() {
   $("#parentLink").onclick = () => go(renderParent);
   $("#toAlbum").onclick = () => go(renderAlbum);
   $("#gachaBtn").onclick = () => {
+    if (!englishCardLeft()) { toast("今天英语的5张白白卡已经收好啦，明天再来遇见新造型！",2800); sndWrong(); return; }
     if (S.coins < GACHA_COST) { toast("金币不够啦，去闯关赚金币吧！💪"); sndWrong(); return; }
     S.coins -= GACHA_COST; updateCoinBox(); save();
     const egg = $("#gachaEgg"), btn = $("#gachaBtn");
@@ -3760,8 +3848,11 @@ function renderReward() {
     setTimeout(() => {
       const st = drawSticker();
       const dup = !!S.stickers[st.n];
+      takeEnglishCardChance();
       S.gachaDup = dup ? (S.gachaDup || 0) + 1 : 0;
-      S.stickers[st.n] = (S.stickers[st.n] || 0) + 1; save();
+      S.stickers[st.n] = (S.stickers[st.n] || 0) + 1;
+      const unlocked = !dup ? unlockStickerOutfit(st) : null;
+      save();
       if (st.r === 3) { confetti(); sndWin(); } else sndCoin();
       const rarTxt = st.r === 3 ? "✨传说✨" : st.r === 2 ? "稀有" : "普通";
       $("#gachaResult").innerHTML = `
@@ -3771,10 +3862,13 @@ function renderReward() {
           ${dup
             ? '<div style="font-size:11px;margin-top:2px">重复啦，返还5金币' + (S.gachaDup >= 4 ? ' · 下一颗保证新卡' : '') + '</div>'
             : '<div style="font-size:11px;margin-top:2px">🎊 新的白白收藏卡！去收藏册看大图吧</div>'}
+          ${unlocked ? `<div class="cardUnlockTip">👗 卡面同款「${unlocked.n}」已放进白白衣橱！</div>` : ""}
+          <button class="btn small ghost" id="seeDrawnCard" style="margin-top:8px">📔 立刻查看这张卡</button>
         </div>`;
       if (dup) { S.coins += 5; save(); updateCoinBox(); }
       if (!dup) checkStickerSets();          // 可能刚好集齐某个稀有度 → 送转盘券
       $("#toAlbum .aSub").textContent = `已收集 ${Object.keys(S.stickers).length}/${STICKERS.length}`;
+      $("#seeDrawnCard").onclick = () => { albumEdition = st.edition || "classic"; go(renderAlbum); };
       btn.disabled = false;
     }, 900);
   };
@@ -3884,6 +3978,7 @@ if (!S.pet.outfits) S.pet.outfits = [];
 if (!S.pet.worn) S.pet.worn = [];
 decayCare();         // 状态随天数自然回落（只会变淡，绝不惩罚）
 walletIn();          // 接入共享钱包（语文App赚的金币在这里也能花）
+const chineseCardsClaimed = claimChineseCards();
 applyTheme();
 updateCoinBox();
 /* 从后台回到前台时重新读钱包：她可能刚在语文App里赚了金币 */
@@ -3908,6 +4003,7 @@ setInterval(() => {
 }, 60000);
 navStack = [renderHome]; navTabs = ["home"];
 renderHome();
+if (chineseCardsClaimed) setTimeout(() => toast("📚 语文探险获得的 "+chineseCardsClaimed+" 张白白卡已点亮收藏册！",3200),900);
 if (!localStorage.getItem(LS_KEY + "_hi")) {
   localStorage.setItem(LS_KEY + "_hi", "1");
   setTimeout(() => toast("🌸 欢迎来到魔法英语乐园！先去完成今日任务吧～", 3000), 600);

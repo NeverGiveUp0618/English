@@ -720,6 +720,41 @@ const PETS = [
   }
 ];
 
+/* 白白姿势册：前 5 个免费，后 25 个用共享金币逐步解锁。
+   装扮坐标按姿势分别保存，因此换姿势不会弄乱已经调好的帽子和披风。 */
+const BAIBAI_POSES = [
+  {id:"p01",n:"乖乖坐好",art:"assets/baibai-base.png",cost:0},
+  {id:"p02",n:"挥爪问好",art:"assets/poses/pose-02.webp",cost:0},
+  {id:"p03",n:"可爱歪头",art:"assets/poses/pose-03.webp",cost:0},
+  {id:"p04",n:"趴下休息",art:"assets/poses/pose-04.webp",cost:0},
+  {id:"p05",n:"开心跳起",art:"assets/poses/pose-05.webp",cost:0},
+  {id:"p06",n:"向前小跑",art:"assets/poses/pose-06.webp",cost:60},
+  {id:"p07",n:"转圈回头",art:"assets/poses/pose-07.webp",cost:70},
+  {id:"p08",n:"伸个懒腰",art:"assets/poses/pose-08.webp",cost:80},
+  {id:"p09",n:"困困哈欠",art:"assets/poses/pose-09.webp",cost:90},
+  {id:"p10",n:"双爪比心",art:"assets/poses/pose-10.webp",cost:100},
+  {id:"p11",n:"开心欢呼",art:"assets/poses/pose-11.webp",cost:110},
+  {id:"p12",n:"侧坐看你",art:"assets/poses/pose-12.webp",cost:120},
+  {id:"p13",n:"抱抱自己",art:"assets/poses/pose-13.webp",cost:130},
+  {id:"p14",n:"认真敬礼",art:"assets/poses/pose-14.webp",cost:140},
+  {id:"p15",n:"俏皮眨眼",art:"assets/poses/pose-15.webp",cost:150},
+  {id:"p16",n:"低头闻花",art:"assets/poses/pose-16.webp",cost:160},
+  {id:"p17",n:"坐得笔直",art:"assets/poses/pose-17.webp",cost:170},
+  {id:"p18",n:"翻翻肚皮",art:"assets/poses/pose-18.webp",cost:180},
+  {id:"p19",n:"侧躺晚安",art:"assets/poses/pose-19.webp",cost:190},
+  {id:"p20",n:"偷偷探头",art:"assets/poses/pose-20.webp",cost:200},
+  {id:"p21",n:"快乐舞步",art:"assets/poses/pose-21.webp",cost:210},
+  {id:"p22",n:"小步走路",art:"assets/poses/pose-22.webp",cost:220},
+  {id:"p23",n:"蹲下准备",art:"assets/poses/pose-23.webp",cost:230},
+  {id:"p24",n:"抬爪思考",art:"assets/poses/pose-24.webp",cost:240},
+  {id:"p25",n:"拍拍肚子",art:"assets/poses/pose-25.webp",cost:250},
+  {id:"p26",n:"耳朵飞起",art:"assets/poses/pose-26.webp",cost:260},
+  {id:"p27",n:"安静趴坐",art:"assets/poses/pose-27.webp",cost:270},
+  {id:"p28",n:"回头挥爪",art:"assets/poses/pose-28.webp",cost:280},
+  {id:"p29",n:"开心踏步",art:"assets/poses/pose-29.webp",cost:290},
+  {id:"p30",n:"团成毛球",art:"assets/poses/pose-30.webp",cost:300}
+];
+
 /* 喂养道具：金币的日常出口，也是每天回来看它的理由 */
 const CARE = [
   { id: "food", n: "投喂", e: "🍖", cost: 5, up: "hunger", bond: 2, say: "白白咂咂嘴：好香呀，我吃饱啦！", fx: "😋" },
@@ -776,6 +811,16 @@ function outfitSeries(prefix, cat, rows, pos) {
   }, pos || {}, x[3] || {}));
 }
 OUTFITS.push(
+  ...outfitSeries("bb_br_", "婚纱", [
+    ["月光珍珠婚纱","🤍",180,{art:"assets/outfits/cape-royal.svg",base:.74,hue:0,group:"body"}],
+    ["樱花花瓣婚纱","🌸",210,{art:"assets/outfits/cape-blossom.svg",base:.74,hue:325,group:"body"}],
+    ["蓝钻星河婚纱","💎",240,{art:"assets/outfits/cape-starry.svg",base:.74,hue:190,group:"body"}],
+    ["紫藤仙境婚纱","🪻",270,{art:"assets/outfits/cape-fairy.svg",base:.74,hue:250,group:"body"}],
+    ["薄荷花园婚纱","🌿",300,{art:"assets/outfits/cape-blossom.svg",base:.74,hue:95,group:"body"}],
+    ["彩虹云朵婚纱","🌈",330,{art:"assets/outfits/cape-fairy.svg",base:.74,hue:55,group:"body"}],
+    ["雪国皇冠婚纱","❄️",370,{art:"assets/outfits/cape-royal.svg",base:.74,hue:185,group:"body"}],
+    ["银河公主婚纱","🌌",420,{art:"assets/outfits/cape-starry.svg",base:.74,hue:275,group:"body"}]
+  ], {pos:{x:50,y:63,s:1,r:0}}),
   ...outfitSeries("bb_gx_", "脸上", [
     ["蜜桃圆框眼镜","👓",90,{art:"assets/outfits/glasses-round.svg",base:.48,hue:0}],
     ["薄荷圆框眼镜","👓",105,{art:"assets/outfits/glasses-round.svg",base:.48,hue:105}],
