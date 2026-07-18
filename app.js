@@ -4018,6 +4018,14 @@ migrateCheckins();
 if (!S.pet || !S.pet.stages && !S.pet.id) S.pet = defState().pet;
 if (!S.pet.wear) S.pet.wear = { hat: "", face: "", item: "" };
 S.pet.id = "baibai"; S.pet.name = "白白"; S.pet.owned = ["baibai"];
+/* v3 白白按实物重建后，旧圆脸母版上的装扮坐标已失效。
+   只重置位置和缩放，已购买、已穿戴、姿势和亲密度全部保留。 */
+if ((S.pet.artModel || 0) < 3) {
+  S.pet.deco = {};
+  S.pet.decoByPose = {};
+  S.pet.artModel = 3;
+  save();
+}
 if (!S.pet.outfits) S.pet.outfits = [];
 if (!S.pet.worn) S.pet.worn = [];
 decayCare();         // 状态随天数自然回落（只会变淡，绝不惩罚）

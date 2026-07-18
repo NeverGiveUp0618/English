@@ -1005,9 +1005,16 @@ const BAIBAI_CAPE_FILTERS = [
 ];
 OUTFITS.filter(o => o.group === "body").forEach((o, i) => {
   o.art = o.cat === "婚纱" ? "assets/outfits/wedding-pearl.webp" : "assets/outfits/cape-velvet-open.webp";
-  o.base = .90;
+  /* 新白白母版与衣服共用完整方形坐标：不再二次缩小造成领口下坠。 */
+  o.base = 1;
   o.pos = { x:50, y:50, s:1, r:0 };
   o.fx = BAIBAI_CAPE_FILTERS[i % BAIBAI_CAPE_FILTERS.length];
+});
+/* 真实白白母版的眼睛和棕色项圈比旧圆脸形象更靠上；统一校准默认锚点。
+   已购装扮不受影响，旧手动坐标由 app.js 的模型迁移一次性清理。 */
+OUTFITS.forEach(o => {
+  if (o.cat === "脸上") o.pos = Object.assign({}, o.pos, { x:50, y:29, s:.76 });
+  if (o.cat === "项圈" || o.cat === "项链") o.pos = Object.assign({}, o.pos, { x:50, y:50, s:.92 });
 });
 
 /* 点白白时的中文鼓励：英语学习发音与角色台词分开，孩子不会混淆。 */

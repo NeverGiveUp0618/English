@@ -83,7 +83,7 @@ function boot() {
   ok(w.eval("OUTFITS.length") >= 28 && ["发饰","帽子","耳饰","项圈","披风","手持"].every(x=>cats.has(x)),
      "★ 至少 28 件白白装扮，覆盖发饰、帽子、耳饰、项圈、披风和手持");
   ok(w.eval("OUTFITS.filter(o=>o.group==='body').every(o=>o.art&&['披风','婚纱'].includes(o.cat))"), "★ 人类裙装已全部替换为适合白白体型的披风/婚纱图片");
-  ok(w.eval("OUTFITS.filter(o=>o.group==='body'&&o.cat==='披风').every(o=>o.art==='assets/outfits/cape-velvet-open.webp'&&o.base===.90)&&OUTFITS.filter(o=>o.cat==='婚纱').every(o=>o.art==='assets/outfits/wedding-pearl.webp')"), "★ 披风使用敞开低领透明层，婚纱使用白白专属礼服图");
+  ok(w.eval("OUTFITS.filter(o=>o.group==='body'&&o.cat==='披风').every(o=>o.art==='assets/outfits/cape-velvet-open.webp'&&o.base===1)&&OUTFITS.filter(o=>o.cat==='婚纱').every(o=>o.art==='assets/outfits/wedding-pearl.webp'&&o.base===1)"), "★ 披风和婚纱使用与新版白白同坐标的低领透明层");
   w.eval("saveWallet({coins:500,tickets:0});updateCoinBox();");
   w.eval("navStack=[renderOutfit];renderOutfit();");
   $("[data-o='bb_crown']").click();

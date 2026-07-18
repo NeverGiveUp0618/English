@@ -85,7 +85,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
   ok($("#coinNum").textContent === "0", "初始金币0");
   const swText = fs.readFileSync(DIR + "/sw.js", "utf8");
-  ok(swText.includes("magic-english-v42") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
+  ok(swText.includes("magic-english-v44") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
   ok(swText.includes("fallback || fresh"), "★ 慢网络二次打开优先显示缓存首页");
 
   console.log("— 地图与锁 —");
@@ -602,6 +602,8 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   // 点已拥有 → 打开收藏大图，不再把另一只动物贴到白白身上
   cells[0].click();
   ok(!!w.document.getElementById("decoPick") && !!$("#decoPick .stickerPreview"), "已拥有的卡片可打开白白大图");
+  const previewCardStyle = w.getComputedStyle($("#decoPick .decoCard"));
+  ok(previewCardStyle.display === "flex" && previewCardStyle.alignItems === "center", "★ 收藏卡大图与外层白框严格水平居中");
   ok(!$("#asHat") && !$("#asBuddy"), "★ 收藏卡不再冒充可穿戴衣服或另一只伙伴");
   $("#decoCancel").click();
   ok(S().hat === null && S().buddy === null, "旧动物头饰和小伙伴槽保持清空");
