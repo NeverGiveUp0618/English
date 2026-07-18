@@ -84,6 +84,9 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#scr-home").classList.contains("on") && $$(".tab").find(t => t.dataset.tab === "home").classList.contains("on"), "★ 页内返回回到英语首页并恢复首页高亮");
   ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
   ok($("#coinNum").textContent === "0", "初始金币0");
+  const swText = fs.readFileSync(DIR + "/sw.js", "utf8");
+  ok(swText.includes("magic-english-v39") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
+  ok(swText.includes("fallback || fresh"), "★ 慢网络二次打开优先显示缓存首页");
 
   console.log("— 地图与锁 —");
   $$('.tab').find(t => t.dataset.tab === "map").click();
