@@ -109,6 +109,15 @@ if (!S.pet.hatFitV2) {
   });
   S.pet.hatFitV2 = true;
 }
+/* 新披风从“背后平面图”升级为完整前置穿戴层，旧版 y=63 的手调坐标会让领口
+   掉到胸口。只迁移一次，之后孩子重新拖动保存的位置会永久保留。 */
+if (!S.pet.capeFitV2) {
+  const bodyIds = new Set(OUTFITS.filter(o => o.group === "body").map(o => o.id));
+  const reset = ds => bodyIds.forEach(id => { if (ds && ds[id]) ds[id] = { x:50, y:50, s:1, r:0 }; });
+  reset(((S.pet.deco || {}).baibai || {}));
+  Object.values(S.pet.decoByPose || {}).forEach(reset);
+  S.pet.capeFitV2 = true;
+}
 /* 老贴纸不是白白：升级时按“已有款数 + 总张数”等量换成白白收藏卡，不清空孩子的收集成果。 */
 const oldStickerEntries = Object.entries(S.stickers || {}).filter(([name]) => !STICKERS.some(s => s.n === name));
 if (oldStickerEntries.length) {
@@ -135,7 +144,7 @@ function sharePetOut() {
   try {
     const items = (S.pet.worn || []).map(id => {
       const o = OUTFITS.find(x => x.id === id), d = decoOf(id);
-      return o ? { id: o.id, e: o.e, n: o.n, art: o.art ? new URL(o.art, location.href).href : "", base: o.base || .3, hue: Number(o.hue) || 0, x: d.x, y: d.y, s: d.s, r: d.r } : null;
+      return o ? { id: o.id, e: o.e, n: o.n, art: o.art ? new URL(o.art, location.href).href : "", base: o.base || .3, hue: Number(o.hue) || 0, fx: o.fx || "", x: d.x, y: d.y, s: d.s, r: d.r } : null;
     }).filter(Boolean);
     localStorage.setItem(SHARED_PET_KEY, JSON.stringify({ v: 2, name: "白白", body: new URL(petVisual(), location.href).href, pose: S.pet.pose, items }));
   } catch (e) {}
@@ -624,14 +633,15 @@ function setDeco(id, v) {
 function decoSizePx(canvasSize, d, o) { return Math.round(canvasSize * ((o && o.base) || .30) * d.s); }
 function outfitVisual(o, cls) {
   const hue = Math.max(0, Math.min(360, Number(o.hue) || 0));
+  const filter = o.fx || (hue ? `hue-rotate(${hue}deg)` : "");
   return o.art
-    ? `<img class="${cls || "outfitArt"}" src="${o.art}" alt="${esc(o.n)}"${hue ? ` style="filter:hue-rotate(${hue}deg)"` : ""}>`
+    ? `<img class="${cls || "outfitArt"}" src="${o.art}" alt="${esc(o.n)}"${filter && filter !== "none" ? ` style="filter:${filter}"` : ""}>`
     : `<span class="${cls || "outfitEmoji"}">${o.e}</span>`;
 }
 function stickerVisual(s, cls) {
-  const style = s.tone ? ` style="filter:${s.tone}"` : "";
+  const cardStyle = s.background ? ` style="background:${s.background};box-shadow:inset 0 0 0 3px ${s.edge || "#dcc7ef"}"` : "";
   return s.art
-    ? `<span class="stickerVisual ${s.edition || "classic"}"><img loading="lazy" class="${cls || "stickerArt"}" src="${s.art}" alt="${esc(s.n)}"${style} onerror="this.onerror=null;this.src='assets/baibai-base.png';this.style.filter='grayscale(1)'"><span class="stickerEdition">${s.badge || "🐾"}</span></span>`
+    ? `<span class="stickerVisual ${s.edition || "classic"}"${cardStyle}><img loading="lazy" class="${cls || "stickerArt"}" src="${s.art}" alt="${esc(s.n)}" onerror="this.onerror=null;this.src='assets/baibai-base.png'"><span class="stickerEdition">${s.badge || "🐾"}</span></span>`
     : `<span>${s.e}</span>`;
 }
 function lockedStickerVisual(s) {
@@ -642,7 +652,8 @@ function petFigure(size, withOutfit) {
   const sz = size || 110;
   const body = `<img class="petImg" src="${petVisual()}" alt="白白" style="position:relative;z-index:2">`;
   const deco = withOutfit === false ? "" : wornOutfits().map(o => {
-    const d = decoOf(o.id), z = o.group === "body" ? 1 : 3;
+    /* 新披风自身带透明胸口开口，必须位于白白前面，领口和前襟才像真正穿上。 */
+    const d = decoOf(o.id), z = 3;
     const sizing = o.art ? `width:${decoSizePx(sz, d, o)}px` : `font-size:${decoSizePx(sz, d, o)}px`;
     return `<span class="petDeco deco-${o.cat}" data-outfit="${o.id}" style="z-index:${z};left:${d.x}%;top:${d.y}%;${sizing};transform:translate(-50%,-50%) rotate(${d.r}deg)">${outfitVisual(o)}</span>`;
   }).join("");
@@ -3387,6 +3398,8 @@ function renderOutfit() {
       }
       save(); sndCoin();
       toast(on ? "白白把「" + o.n + "」收回衣橱啦" : "✨ 白白穿上「" + o.n + "」啦！", 1800);
+      /* 只用已有固定录音，不能把装扮名拼进台词后落到不同的系统合成声线。 */
+      baibaiSpeak(on ? "再玩一次嘛！" : "你最懂我啦！");
       renderOutfit();
     };
   });
@@ -3813,6 +3826,10 @@ function drawSticker() {
   const list = STICKERS.filter(s => s.r === rar);
   return list[Math.floor(Math.random() * list.length)];
 }
+/* 重复卡按稀有度折成金币，并扣除 5 枚“再次制作”成本：普通 +5、稀有 +10、传说 +15。 */
+function duplicateStickerCoins(st) {
+  return Math.max(0, ({ 1:10, 2:15, 3:20 }[Number(st && st.r)] || 10) - 5);
+}
 function renderReward() {
   const got = Object.keys(S.stickers).length;
   const pend = S.vouchers.filter(v => !v.used).length;
@@ -3871,6 +3888,7 @@ function renderReward() {
       S.gachaDup = dup ? (S.gachaDup || 0) + 1 : 0;
       S.stickers[st.n] = (S.stickers[st.n] || 0) + 1;
       const unlocked = !dup ? unlockStickerOutfit(st) : null;
+      const duplicateCoins = dup ? duplicateStickerCoins(st) : 0;
       save();
       if (st.r === 3) { confetti(); sndWin(); } else sndCoin();
       const rarTxt = st.r === 3 ? "✨传说✨" : st.r === 2 ? "稀有" : "普通";
@@ -3879,12 +3897,12 @@ function renderReward() {
           <div class="se">${stickerVisual(st)}</div>
           <div class="sn">${st.n} · ${rarTxt}</div>
           ${dup
-            ? '<div style="font-size:11px;margin-top:2px">重复啦，返还5金币' + (S.gachaDup >= 4 ? ' · 下一颗保证新卡' : '') + '</div>'
+            ? `<div style="font-size:11px;margin-top:2px">重复卡折算：${rarTxt}价值 ${duplicateCoins + 5}，扣除 5 枚后返还 🪙${duplicateCoins}${S.gachaDup >= 4 ? ' · 下一颗保证新卡' : ''}</div>`
             : '<div style="font-size:11px;margin-top:2px">🎊 新的白白收藏卡！去收藏册看大图吧</div>'}
           ${unlocked ? `<div class="cardUnlockTip">👗 卡面同款「${unlocked.n}」已放进白白衣橱！</div>` : ""}
           <button class="btn small ghost" id="seeDrawnCard" style="margin-top:8px">📔 立刻查看这张卡</button>
         </div>`;
-      if (dup) { S.coins += 5; save(); updateCoinBox(); }
+      if (dup) { S.coins += duplicateCoins; save(); updateCoinBox(); }
       if (!dup) checkStickerSets();          // 可能刚好集齐某个稀有度 → 送转盘券
       $("#toAlbum .aSub").textContent = `已收集 ${Object.keys(S.stickers).length}/${STICKERS.length}`;
       $("#seeDrawnCard").onclick = () => { albumEdition = st.edition || "classic"; go(renderAlbum); };

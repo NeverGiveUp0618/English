@@ -34,7 +34,9 @@ const S = () => w.eval("S");
   ok(outfits.length >= 24, "至少 24 件可搭配装扮: " + outfits.length);
   ok(["发饰","帽子","耳饰","项圈","披风","脸上","手持"].every(c => outfits.some(o => o.cat === c)), "★ 白白适配的主要品类全部覆盖");
   ok(outfits.filter(o => o.group === "body").every(o => ["披风","婚纱"].includes(o.cat) && o.art), "★ 所有人类裙装都已原位升级成适合白白的披风/婚纱");
-  ok(outfits.filter(o => o.art).every(o => o.base < .8), "★ 图片装扮裁到物品本身，不用整张透明画布挡住其他配件");
+  ok(outfits.filter(o => o.art && o.group !== "body").every(o => o.base < .8)
+    && outfits.filter(o => o.group === "body").every(o => o.base <= 1),
+    "★ 小配饰保持紧凑画布；披风允许覆盖完整身体轮廓以贴合颈部和两侧");
   ok(S().pet.outfits.includes("bb_bow") && S().pet.outfits.includes("bb_flower"), "★ 送两件免费发饰，打开就能玩");
   $("[data-o='bb_bow']").click();
   ok(S().pet.worn.includes("bb_bow"), "点一下免费蝴蝶结立即穿上");

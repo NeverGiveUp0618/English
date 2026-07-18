@@ -45,6 +45,13 @@ const bbAudios=()=>audios.filter(a=>/audio\/baibai\/[a-f0-9]+\.mp3/.test(a.src))
   ok(bbAudios().at(-1)?.src.includes("audio/baibai/"), "喂食后白白播放动漫角色录音");
 
   spoken.length=0;
+  const beforeDress=plays.filter(a=>/audio\/baibai\//.test(a.src)).length;
+  w.eval("saveWallet({coins:999,tickets:0});S.coins=999;navStack=[renderOutfit];renderOutfit();");
+  $("[data-o='bb_bow']").click();
+  ok(plays.filter(a=>/audio\/baibai\//.test(a.src)).length===beforeDress+1,"换装和首页使用同一套固定白白录音");
+  ok(zhSpoken().length===0,"换装不会因动态装扮名退回系统合成声线");
+
+  spoken.length=0;
   const beforeWait=plays.filter(a=>/audio\/baibai\//.test(a.src)).length;
   w.eval("speak('cake');showBaibaiReaction('right','我等你听完英语再说！');");
   await sleep(260);

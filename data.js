@@ -673,26 +673,26 @@ const BAIBAI_BASE_CARDS = [
    姿势制作十九套独立闪卡版本。它们共用轻量原画，但拥有不同卡面色调、边框、
    名称与稀有度；手机只需缓存 100 幅图，也能长期收集 2000 张而不撑爆流量。 */
 const BAIBAI_CARD_EDITIONS = [
-  { id:"classic", n:"原画", prefix:"", tone:"", badge:"🐾" },
-  { id:"dawn", n:"晨光", prefix:"晨光·", tone:"sepia(.16) saturate(1.12) brightness(1.06)", badge:"☀️" },
-  { id:"mint", n:"薄荷", prefix:"薄荷·", tone:"hue-rotate(58deg) saturate(.88) brightness(1.05)", badge:"🍃" },
-  { id:"night", n:"星夜", prefix:"星夜·", tone:"hue-rotate(205deg) saturate(1.15) brightness(.9)", badge:"🌙" },
-  { id:"rainbow", n:"彩虹", prefix:"彩虹·", tone:"hue-rotate(315deg) saturate(1.28) brightness(1.04)", badge:"🌈" },
-  { id:"peach", n:"蜜桃", prefix:"蜜桃·", tone:"sepia(.18) hue-rotate(320deg) saturate(1.18) brightness(1.08)", badge:"🍑" },
-  { id:"ocean", n:"海洋", prefix:"海洋·", tone:"hue-rotate(155deg) saturate(1.16) brightness(.98)", badge:"🌊" },
-  { id:"aurora", n:"极光", prefix:"极光·", tone:"hue-rotate(95deg) saturate(1.34) contrast(1.05)", badge:"✨" },
-  { id:"candy", n:"糖果", prefix:"糖果·", tone:"hue-rotate(285deg) saturate(1.42) brightness(1.08)", badge:"🍬" },
-  { id:"galaxy", n:"银河", prefix:"银河·", tone:"hue-rotate(225deg) saturate(1.34) brightness(.84) contrast(1.1)", badge:"🌌" },
-  { id:"lavender", n:"薰衣草", prefix:"薰衣草·", tone:"hue-rotate(250deg) saturate(.9) brightness(1.08)", badge:"💜" },
-  { id:"forest", n:"森野", prefix:"森野·", tone:"hue-rotate(78deg) saturate(1.18) brightness(.94)", badge:"🌲" },
-  { id:"sunset", n:"落日", prefix:"落日·", tone:"sepia(.28) hue-rotate(338deg) saturate(1.36) brightness(1.03)", badge:"🌅" },
-  { id:"snow", n:"初雪", prefix:"初雪·", tone:"saturate(.68) brightness(1.18) contrast(.94)", badge:"❄️" },
-  { id:"sakura", n:"樱花", prefix:"樱花·", tone:"sepia(.12) hue-rotate(300deg) saturate(1.16) brightness(1.1)", badge:"🌸" },
-  { id:"lemon", n:"柠檬", prefix:"柠檬·", tone:"sepia(.18) hue-rotate(18deg) saturate(1.28) brightness(1.1)", badge:"🍋" },
-  { id:"jewel", n:"宝石", prefix:"宝石·", tone:"hue-rotate(175deg) saturate(1.48) contrast(1.12)", badge:"💎" },
-  { id:"dream", n:"梦境", prefix:"梦境·", tone:"hue-rotate(275deg) saturate(.82) brightness(1.12) contrast(.92)", badge:"🫧" },
-  { id:"cocoa", n:"可可", prefix:"可可·", tone:"sepia(.52) saturate(.78) brightness(.9)", badge:"🍫" },
-  { id:"pearl", n:"珍珠", prefix:"珍珠·", tone:"saturate(.55) brightness(1.15) contrast(1.04)", badge:"🦪" }
+  { id:"classic", n:"原画", prefix:"", bg:"linear-gradient(145deg,#fffaf3,#f2e8ff)", edge:"#dcc7ef", badge:"🐾" },
+  { id:"dawn", n:"晨光", prefix:"晨光·", bg:"linear-gradient(145deg,#fff4cc,#ffd8bd)", edge:"#f5c96d", badge:"☀️" },
+  { id:"mint", n:"薄荷", prefix:"薄荷·", bg:"linear-gradient(145deg,#ddfff0,#cfefff)", edge:"#77d7b0", badge:"🍃" },
+  { id:"night", n:"星夜", prefix:"星夜·", bg:"linear-gradient(145deg,#292653,#655296)", edge:"#9b8bea", badge:"🌙" },
+  { id:"rainbow", n:"彩虹", prefix:"彩虹·", bg:"linear-gradient(145deg,#ffd9eb,#fff1a8,#ccefff)", edge:"#ff91bd", badge:"🌈" },
+  { id:"peach", n:"蜜桃", prefix:"蜜桃·", bg:"linear-gradient(145deg,#ffe3d4,#ffd1df)", edge:"#f3a58d", badge:"🍑" },
+  { id:"ocean", n:"海洋", prefix:"海洋·", bg:"linear-gradient(145deg,#dff7ff,#b9ddff)", edge:"#6eb6e9", badge:"🌊" },
+  { id:"aurora", n:"极光", prefix:"极光·", bg:"linear-gradient(145deg,#c9ffe5,#d9d0ff,#ffd6f4)", edge:"#75d9bb", badge:"✨" },
+  { id:"candy", n:"糖果", prefix:"糖果·", bg:"linear-gradient(145deg,#ffd8ef,#d9e7ff)", edge:"#eb8fc0", badge:"🍬" },
+  { id:"galaxy", n:"银河", prefix:"银河·", bg:"linear-gradient(145deg,#15163e,#493a78)", edge:"#8d7bd5", badge:"🌌" },
+  { id:"lavender", n:"薰衣草", prefix:"薰衣草·", bg:"linear-gradient(145deg,#eee4ff,#d7c5f5)", edge:"#a98bd4", badge:"💜" },
+  { id:"forest", n:"森野", prefix:"森野·", bg:"linear-gradient(145deg,#e3f3dc,#bcd9bd)", edge:"#78a77b", badge:"🌲" },
+  { id:"sunset", n:"落日", prefix:"落日·", bg:"linear-gradient(145deg,#ffe0bc,#f5b5c5)", edge:"#e78e79", badge:"🌅" },
+  { id:"snow", n:"初雪", prefix:"初雪·", bg:"linear-gradient(145deg,#ffffff,#dcecff)", edge:"#a9c9e9", badge:"❄️" },
+  { id:"sakura", n:"樱花", prefix:"樱花·", bg:"linear-gradient(145deg,#fff0f5,#ffd3e1)", edge:"#ed9fba", badge:"🌸" },
+  { id:"lemon", n:"柠檬", prefix:"柠檬·", bg:"linear-gradient(145deg,#fffbd2,#ffe898)", edge:"#e3c74c", badge:"🍋" },
+  { id:"jewel", n:"宝石", prefix:"宝石·", bg:"linear-gradient(145deg,#d8fff8,#c9d5ff)", edge:"#58b9b0", badge:"💎" },
+  { id:"dream", n:"梦境", prefix:"梦境·", bg:"linear-gradient(145deg,#f3e9ff,#e8dff5)", edge:"#baa0d1", badge:"🫧" },
+  { id:"cocoa", n:"可可", prefix:"可可·", bg:"linear-gradient(145deg,#f0dfd1,#cda98d)", edge:"#9e7458", badge:"🍫" },
+  { id:"pearl", n:"珍珠", prefix:"珍珠·", bg:"linear-gradient(145deg,#fffdf8,#e8edf4)", edge:"#b9c2ce", badge:"🦪" }
 ];
 const STICKERS = BAIBAI_CARD_EDITIONS.flatMap((edition, editionIndex) =>
   BAIBAI_BASE_CARDS.map((card, cardIndex) => Object.assign({}, card, {
@@ -700,7 +700,8 @@ const STICKERS = BAIBAI_CARD_EDITIONS.flatMap((edition, editionIndex) =>
     edition: edition.id,
     editionName: edition.n,
     badge: edition.badge,
-    tone: edition.tone,
+    background: edition.bg,
+    edge: edition.edge,
     /* 后四套每逢 10/25 张提升稀有度，让新系列既有普通卡也有追逐卡。 */
     r: editionIndex === 0 ? card.r : (cardIndex % 25 === 24 ? 3 : cardIndex % 10 === 9 ? 2 : card.r)
   }))
@@ -891,6 +892,24 @@ OUTFITS.push(
     ["银河传奇披风","🌌",340,{art:"assets/outfits/cape-starry.svg",base:.74,hue:280,group:"body"}]
   ], {pos:{x:50,y:63,s:1,r:0}})
 );
+
+/* 披风统一使用按白白坐姿重新制作的透明层：领口扣在颈部，前襟沿胸口两侧
+   打开，披肩自然落在身体两边。旧 id 和价格保持不变，避免已购买装扮丢失。 */
+const BAIBAI_CAPE_FILTERS = [
+  "saturate(0) brightness(1.28)",
+  "hue-rotate(285deg) saturate(.82) brightness(1.18)",
+  "hue-rotate(145deg) saturate(1.22) brightness(.92)",
+  "hue-rotate(230deg) saturate(.92) brightness(1.12)",
+  "hue-rotate(315deg) saturate(1.18) brightness(1.08)",
+  "none",
+  "hue-rotate(165deg) saturate(.92) brightness(1.12)"
+];
+OUTFITS.filter(o => o.group === "body").forEach((o, i) => {
+  o.art = "assets/outfits/cape-velvet.webp";
+  o.base = .90;
+  o.pos = { x:50, y:50, s:1, r:0 };
+  o.fx = BAIBAI_CAPE_FILTERS[i % BAIBAI_CAPE_FILTERS.length];
+});
 
 /* 点白白时的中文鼓励：英语学习发音与角色台词分开，孩子不会混淆。 */
 const PRAISES = [

@@ -85,7 +85,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
   ok($("#coinNum").textContent === "0", "初始金币0");
   const swText = fs.readFileSync(DIR + "/sw.js", "utf8");
-  ok(swText.includes("magic-english-v39") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
+  ok(swText.includes("magic-english-v40") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
   ok(swText.includes("fallback || fresh"), "★ 慢网络二次打开优先显示缓存首页");
 
   console.log("— 地图与锁 —");
@@ -277,6 +277,8 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($$(".albumSeriesBtn").length === 20, "2000张分成20个独立收藏系列");
   ok(w.eval("new Set(STICKERS.map(s=>s.n)).size===2000"), "2000张卡名全部唯一，能独立解锁");
   ok(w.eval("STICKERS.every(s=>s.n.includes('白白')&&s.art)"), "★ 扭蛋奖励全部是白白，没有其他狗或动物");
+  ok(w.eval("STICKERS.every(s=>!s.tone)&&STICKERS.every(s=>!/<img[^>]+style=/.test(stickerVisual(s)))"), "★ 全部20套闪卡都只换卡片底色，不再给白白本体染色");
+  ok(w.eval("duplicateStickerCoins({r:1})===5&&duplicateStickerCoins({r:2})===10&&duplicateStickerCoins({r:3})===15"), "★ 重复卡按稀有度折金币并统一扣除5枚");
   $$('.tab').find(t => t.dataset.tab === "arcade").click();
   ok($$("#scr-arcade .actRow").length === 10, "游戏厅10个入口(含听句子、阶段测验和今日复习)");
   ok(S().daily.t1 === true, "无复习任务时t1(复习)自动完成");
