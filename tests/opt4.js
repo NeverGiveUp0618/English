@@ -83,7 +83,7 @@ function boot() {
   ok(w.eval("OUTFITS.length") >= 28 && ["发饰","帽子","耳饰","项圈","披风","手持"].every(x=>cats.has(x)),
      "★ 至少 28 件白白装扮，覆盖发饰、帽子、耳饰、项圈、披风和手持");
   ok(w.eval("OUTFITS.filter(o=>o.group==='body').every(o=>o.art&&['披风','婚纱'].includes(o.cat))"), "★ 人类裙装已全部替换为适合白白体型的披风/婚纱图片");
-  ok(w.eval("OUTFITS.filter(o=>o.group==='body').every(o=>o.art==='assets/outfits/cape-velvet.webp'&&o.base===.90)"), "★ 所有披风都改用贴合颈部和身体两侧的新透明披风层");
+  ok(w.eval("OUTFITS.filter(o=>o.group==='body').every(o=>o.art==='assets/outfits/cape-velvet-open.webp'&&o.base===.90)"), "★ 所有披风都改用敞开低领、贴合身体两侧的新透明披风层");
   w.eval("saveWallet({coins:500,tickets:0});updateCoinBox();");
   w.eval("navStack=[renderOutfit];renderOutfit();");
   $("[data-o='bb_crown']").click();

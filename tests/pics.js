@@ -48,6 +48,7 @@ const S = () => w.eval("S");
   console.log("\n③ 每件装扮独立拖动，点保存前不改正式造型");
   w.eval("S.pet.worn=['bb_bow','bb_pinkdress'];save();navStack=[renderDecoEdit];renderDecoEdit();");
   ok($$(".decoItem").length === 2 && $$(".decoItem").every(x => x.dataset.outfit), "两件装扮都能单独选中和拖动");
+  ok($("#decoStage [data-outfit='bb_pinkdress']").style.zIndex === "3", "★ 调整页与保存后的正式形象使用同一前置披风层级");
   ok(!!$("#deRemove") && $("#deRemove").textContent.includes("取下"), "★ 编辑页提供明确的取下按钮");
   ok(/aspect-ratio:\s*1\s*\/\s*1/.test(fs.readFileSync(DIR + "/index.html", "utf8")), "编辑器和首页使用同一正方形坐标系");
   const before = w.eval("decoOf('bb_bow')");

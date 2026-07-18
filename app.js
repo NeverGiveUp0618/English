@@ -3604,7 +3604,8 @@ function renderDecoEdit() {
         <div class="decoStage" id="decoStage">
           <img src="${petVisual()}" alt="白白" draggable="false">
           ${worn.map(id => {
-            const d = draft[id], o = outfitOf(id), z = o.group === "body" ? 1 : 3;
+            /* 调整页必须和首页/衣橱/做题反馈使用同一层级，保存前后看到的造型才一致。 */
+            const d = draft[id], o = outfitOf(id), z = 3;
             return `<span class="decoItem ${id === sel ? "sel" : ""}" data-outfit="${id}"
               style="z-index:${z};left:${d.x}%;top:${d.y}%;transform:translate(-50%,-50%) rotate(${d.r}deg)">${outfitVisual(o)}</span>`;
           }).join("")}

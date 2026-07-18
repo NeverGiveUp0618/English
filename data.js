@@ -905,7 +905,7 @@ const BAIBAI_CAPE_FILTERS = [
   "hue-rotate(165deg) saturate(.92) brightness(1.12)"
 ];
 OUTFITS.filter(o => o.group === "body").forEach((o, i) => {
-  o.art = "assets/outfits/cape-velvet.webp";
+  o.art = "assets/outfits/cape-velvet-open.webp";
   o.base = .90;
   o.pos = { x:50, y:50, s:1, r:0 };
   o.fx = BAIBAI_CAPE_FILTERS[i % BAIBAI_CAPE_FILTERS.length];
