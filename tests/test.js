@@ -85,7 +85,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
   ok($("#coinNum").textContent === "0", "初始金币0");
   const swText = fs.readFileSync(DIR + "/sw.js", "utf8");
-  ok(swText.includes("magic-english-v44") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
+  ok(swText.includes("magic-english-v45") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
   ok(swText.includes("fallback || fresh"), "★ 慢网络二次打开优先显示缓存首页");
 
   console.log("— 地图与锁 —");
@@ -695,7 +695,15 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#pTest").textContent === "已关闭", "默认关闭");
   $("#pTest").click();
   ok(S().testMode === true && $("#pTest").textContent === "已开启", "可开启测试模式");
-  ok(!!$("#tCoin") && !!$("#tSkin") && !!$("#tReset"), "测试工具按钮出现");
+  ok(!!$("#tCoin") && !!$("#tSkin") && !!$("#tCards") && !!$("#tReset"), "测试工具按钮出现");
+  const realStickerCount = Object.keys(S().stickers).length;
+  $("#tCards").click();
+  ok($("#scr-album").textContent.includes("2000 / 2000") && $$("#scr-album .albumCell.no").length === 0, "★ 测试模式收藏册显示全部2000张，当前系列100张全部点亮");
+  ok($$("#scr-album .albumSeriesBtn small").every(x => x.textContent === "100/100"), "★ 20个卡片系列在测试模式都显示100/100");
+  $$("#scr-album .albumCell")[99].click();
+  ok(!!$("#decoPick .stickerPreview"), "★ 未真实获得的测试卡也能打开大图校对");
+  $("#decoCancel").click();
+  ok(Object.keys(S().stickers).length === realStickerCount, "★ 校对全部卡片不写入真实收藏存档");
   // 全部单元解锁
   $$('.tab').find(t => t.dataset.tab === "map").click();
   ok($$("#scr-map .unitCard.locked").length === 0, "测试模式下全部单元解锁");
@@ -744,6 +752,8 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   // 关闭测试模式后恢复锁
   $("#pTest").click();
   ok(S().testMode === false, "可关闭测试模式");
+  w.eval("albumEdition='classic';renderAlbum()");
+  ok($$("#scr-album .albumCell.no").length > 0 && !$("#scr-album").textContent.includes("2000 / 2000"), "★ 关闭测试模式后恢复真实收藏与灰色未解锁卡");
   $$('.tab').find(t => t.dataset.tab === "map").click();
   ok($$("#scr-map .unitCard.locked").length === 41, "关闭后重新上锁（九册各第一单元开放）");
   // 还原一份进度供后续断言

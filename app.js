@@ -2248,6 +2248,7 @@ function renderParent() {
         <button class="btn small ghost" id="tCoin">🪙 +1000 金币</button>
         <button class="btn small ghost" id="tTicket">🎟️ +5 转盘券</button>
         <button class="btn small ghost" id="tSkin">🎨 解锁全部皮肤</button>
+        <button class="btn small ghost" id="tCards">🐶 校对全部 2000 张卡</button>
         <button class="btn small ghost" id="tWords">📖 标记全部单词已学</button>
         <button class="btn small ghost" id="tWrong">📕 造 5 个错词</button>
         <button class="btn small ghost" id="tDue">📅 让 10 个词今天到期</button>
@@ -2349,6 +2350,7 @@ function renderParent() {
     $("#tCoin").onclick = () => { addCoins(1000); toast("已加 1000 金币"); renderParent(); };
     $("#tTicket").onclick = () => { S.tickets += 5; save(); toast("已加 5 张转盘券"); renderParent(); };
     $("#tSkin").onclick = () => { S.themesOwned = THEMES.map(t => t.id); save(); toast("全部皮肤已解锁"); };
+    $("#tCards").onclick = () => { albumEdition = "classic"; go(renderAlbum); };
     $("#tWrong").onclick = () => {
       sample(unlockedWords(), 5).forEach(w => { S.wrong[w.w] = 2; });
       save(); toast("已造 5 个错词，可以去测错词本了", 2200);
@@ -3939,18 +3941,19 @@ function checkStickerSets() {
 
 let albumEdition = "classic";
 function renderAlbum() {
-  const got = Object.keys(S.stickers).length;
+  const actualGot = Object.keys(S.stickers).length;
+  const got = S.testMode ? STICKERS.length : actualGot;
   const visible = STICKERS.filter(s => s.edition === albumEdition);
   $("#scr-album").innerHTML = `
     <div class="card" style="text-align:center;padding:12px">
       <div style="font-size:15px;font-weight:700;color:#9b59b6">🐶 白白收藏册　${got} / ${STICKERS.length}</div>
-      <div style="font-size:12px;color:#b8a8c8;line-height:1.6">这里只有白白，没有别的小狗。点亮的卡片可以打开看大图。</div>
+      <div style="font-size:12px;color:#b8a8c8;line-height:1.6">${S.testMode ? `🧪 测试校对：2000 张全部显示并可打开，真实收藏仍是 ${actualGot} 张，退出测试模式会自动恢复。` : "这里只有白白，没有别的小狗。点亮的卡片可以打开看大图。"}</div>
     </div>
 
     <div class="albumSeries" aria-label="收藏系列">
       ${BAIBAI_CARD_EDITIONS.map(e => {
         const cards = STICKERS.filter(s => s.edition === e.id);
-        const have = cards.filter(s => S.stickers[s.n]).length;
+        const have = S.testMode ? cards.length : cards.filter(s => S.stickers[s.n]).length;
         return `<button class="albumSeriesBtn ${albumEdition === e.id ? "on" : ""}" data-edition="${e.id}">${e.badge} ${e.n}<small>${have}/100</small></button>`;
       }).join("")}
     </div>
@@ -3972,17 +3975,18 @@ function renderAlbum() {
     <div class="albumGrid">
       ${visible.map(s => {
         const i = STICKERS.indexOf(s);
-        const have = !!S.stickers[s.n];
+        const ownedCount = S.stickers[s.n] || 0;
+        const have = S.testMode || ownedCount > 0;
         return `<div class="albumCell ${have ? "" : "no"} ${s.r === 3 ? "rr3" : ""}" data-i="${i}">
           <div class="ae">${have ? stickerVisual(s) : lockedStickerVisual(s)}</div>
-          <div class="an">${have ? s.n + (S.stickers[s.n] > 1 ? " ×" + S.stickers[s.n] : "") : "？？？"}</div>
+          <div class="an">${have ? s.n + (ownedCount > 1 ? " ×" + ownedCount : "") : "？？？"}</div>
         </div>`;
       }).join("")}
     </div>`;
   document.querySelectorAll("#scr-album .albumCell").forEach(c => {
     c.onclick = () => {
       const s = STICKERS[+c.dataset.i];
-      if (!S.stickers[s.n]) { toast("这张白白还没出现，去扭蛋机找找它吧！"); sndWrong(); return; }
+      if (!S.testMode && !S.stickers[s.n]) { toast("这张白白还没出现，去扭蛋机找找它吧！"); sndWrong(); return; }
       viewStickerCard(s);
     };
   });
