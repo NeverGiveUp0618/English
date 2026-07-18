@@ -32,6 +32,7 @@ const S = () => w.eval("S");
   w.eval("saveWallet({coins:500,tickets:0});updateCoinBox();navStack=[renderOutfit];renderOutfit();");
   const outfits = w.eval("OUTFITS");
   ok(outfits.length >= 24, "至少 24 件可搭配装扮: " + outfits.length);
+  ok(outfits.every(o => o.art && /assets\/outfits\/.+\.(?:svg|webp)$/.test(o.art)), "★ 衣橱每件装扮都有项目内置图片，不再用 Emoji 文字冒充图片");
   ok(["发饰","帽子","耳饰","项圈","披风","脸上","手持"].every(c => outfits.some(o => o.cat === c)), "★ 白白适配的主要品类全部覆盖");
   ok(outfits.filter(o => o.group === "body").every(o => ["披风","婚纱"].includes(o.cat) && o.art), "★ 所有人类裙装都已原位升级成适合白白的披风/婚纱");
   ok(outfits.filter(o => o.art && o.group !== "body").every(o => o.base < .8)
@@ -104,6 +105,9 @@ const S = () => w.eval("S");
   const linked = w.eval("stickerOf('星帽魔法白白')");
   w.eval("S.pet.outfits=S.pet.outfits.filter(x=>x!=='bb_wizardhat')");
   ok(w.eval("unlockStickerOutfit(stickerOf('星帽魔法白白')).id") === "bb_wizardhat" && S().pet.outfits.includes("bb_wizardhat"), "★ 抽到有装饰的贴纸会解锁卡面同款衣橱物品");
+  ok(w.eval("stickerOutfit(stickerOf('薰衣草·相机白白')).id") === "bb_camera" && w.eval("stickerOutfit(stickerOf('珍珠·绘本时光白白')).id") === "bb_ix_2", "★ 全部20套闪卡版本都能识别相机、绘本等卡面配饰");
+  ok(w.eval("STICKERS.every(s=>s.message&&!s.message.includes('这是陪你学习的白白'))"), "★ 2000张卡片都改为鼓励语、名句或诗句");
+  ok(w.eval("new Set(STICKERS.map(s=>s.message)).size") === 50, "★ 收藏卡准备了50句轮换小纸条，不再千篇一律");
   w.localStorage.removeItem("sharedCardDaily_v1");
   const chances = w.eval("[1,2,3,4,5,6].map(()=>takeEnglishCardChance())");
   ok(chances.filter(Boolean).length === 5 && w.eval("englishCardLeft()") === 0, "★ 英语每日最多获得5张卡");

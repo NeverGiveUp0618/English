@@ -263,7 +263,7 @@ const DIFFS = {
 /* 段位应该反映「当前教材的掌握度」。
    低年级（二年级/三上/三下）的词简单得多，暑假刷一遍就把难度顶到最高是错的——
    所以低年级词只按半个计。 */
-const CORE_BOOKS = ["四上", "四下"];
+const CORE_BOOKS = ["四上", "四下", "五上", "五下", "六上", "六下"];
 function masteredCount() {
   let n = 0;
   UNITS.forEach(u => {
@@ -925,7 +925,7 @@ function isUnlocked(u) {
 }
 /* 「继续闯关」默认跟着当前学期走（四上），而不是从二年级开始。
    低年级那几册是给暑假复习用的，在地图里随时可以点进去。 */
-const LEARN_ORDER = ["四上", "四下", "三上", "三下", "二年级"];
+const LEARN_ORDER = ["四上", "四下", "五上", "五下", "六上", "六下", "三上", "三下", "二年级"];
 function currentUnit() {
   /* 家长指定了学习重点（比如暑假复习三上）就跟着走 */
   const order = (S.focusBook && S.focusBook !== "auto")
@@ -1146,11 +1146,12 @@ function renderCalendar() {
 }
 
 /* ================= 闯关地图 ================= */
-const BOOKS = ["二年级", "三上", "三下", "四上", "四下"];
+const BOOKS = ["二年级", "三上", "三下", "四上", "四下", "五上", "五下", "六上", "六下"];
 const BOOK_TIP = {
   "二年级": "低年级基础词（暑假复习用）",
   "三上": "三年级上册", "三下": "三年级下册",
-  "四上": "四年级上册（现在学的）", "四下": "四年级下册"
+  "四上": "四年级上册（现在学的）", "四下": "四年级下册",
+  "五上": "五年级上册", "五下": "五年级下册", "六上": "六年级上册", "六下": "六年级下册"
 };
 function renderMap() {
   let html = `<div class="card" style="text-align:center;padding:10px;font-size:12px;color:#b8a8c8">
@@ -2265,7 +2266,7 @@ function renderParent() {
         当前：<b style="color:#9b59b6">${currentUnit().book} ${currentUnit().num}</b>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${[["auto", "自动（跟学校）"], ["二年级", "二年级"], ["三上", "三上"], ["三下", "三下"], ["四上", "四上"], ["四下", "四下"]].map(([v, n]) =>
+        ${[["auto", "自动（跟学校）"], ["二年级", "二年级"], ["三上", "三上"], ["三下", "三下"], ["四上", "四上"], ["四下", "四下"], ["五上", "五上"], ["五下", "五下"], ["六上", "六上"], ["六下", "六下"]].map(([v, n]) =>
           `<button class="themeBtn ${String(S.focusBook || "auto") === v ? "cur" : "lock"}" data-focus="${v}">${n}</button>`).join("")}
       </div>
     </div>
@@ -3790,15 +3791,18 @@ function renderTheme() {
 const GACHA_COST = 20;
 /* 卡面中明确出现的服装或装饰，会同步进入衣橱。不同闪卡版本对应同一件实物，避免重复解锁。 */
 const STICKER_OUTFIT_LINKS = [
-  ["婚纱","bb_br_1"],["皇冠","bb_crown"],["王冠","bb_crown"],["星帽","bb_wizardhat"],
-  ["魔法帽","bb_wizardhat"],["圣诞暖帽","bb_treehat"],["侦探","bb_beret"],["眼镜","bb_gx_1"],
+  ["樱花公主","bb_br_2"],["婚纱","bb_br_1"],["皇冠","bb_crown"],["王冠","bb_crown"],["皇家","bb_crown"],["星帽","bb_wizardhat"],
+  ["星空魔法","bb_wizardhat"],["魔法帽","bb_wizardhat"],["圣诞暖帽","bb_treehat"],["圣诞守护","bb_treehat"],["侦探","bb_beret"],["眼镜","bb_gx_1"],
   ["墨镜","bb_sunglasses"],["花冠","bb_band"],["花夹","bb_flower"],["蝴蝶结","bb_bow"],
-  ["披风","bb_wedding"],["斗篷","bb_cx_5"],["围巾","bb_nx_6"],["项链","bb_pearlneck"],
+  ["山野披风","bb_cx_4"],["披风","bb_wedding"],["斗篷","bb_cx_5"],["围巾","bb_nx_6"],["项链","bb_pearlneck"],
   ["魔杖","bb_wand"],["放大镜","bb_magnifier"],["雨伞","bb_umbrella"],["小伞","bb_umbrella"],
-  ["花束","bb_ix_5"],["灯笼","bb_ix_7"],["相机","bb_ix_9"],["望远镜","bb_ix_9"]
+  ["绘本","bb_ix_2"],["魔法书","bb_ix_2"],["阅读","bb_ix_2"],["书本","bb_ix_2"],["小画家","bb_ix_3"],
+  ["泡泡","bb_ix_4"],["花束","bb_ix_5"],["音乐","bb_ix_6"],["提琴","bb_ix_6"],["灯笼","bb_ix_7"],["提灯","bb_ix_7"],
+  ["水晶球","bb_ix_8"],["相机","bb_camera"],["望远镜","bb_ix_9"],["书包","bb_bag"],["背包","bb_bag"],["派对","bb_partyhat"]
 ];
 function stickerOutfit(st) {
-  const plain = String(st.n).replace(/^(晨光|薄荷|星夜|彩虹)·/, "");
+  /* 20 套闪卡都去掉版本前缀后再识别，同一画面只解锁一件实物装扮。 */
+  const plain = String(st.n).replace(/^[^·]+·/, "");
   const hit = STICKER_OUTFIT_LINKS.find(x => plain.includes(x[0]));
   return hit ? outfitOf(hit[1]) : null;
 }
@@ -3809,13 +3813,15 @@ function unlockStickerOutfit(st) {
   if (owned.includes(o.id)) return null;
   owned.push(o.id); return o;
 }
+let lastChineseOutfitUnlocks = [];
 function claimChineseCards() {
+  lastChineseOutfitUnlocks = [];
   const d = cardDaily(), n = Math.min(d.pendingChinese, CARD_DAILY_LIMIT);
   if (!n) return 0;
   for (let i=0;i<n;i++) {
     const st=drawSticker();
     S.stickers[st.n]=(S.stickers[st.n]||0)+1;
-    unlockStickerOutfit(st);
+    const unlocked = unlockStickerOutfit(st); if (unlocked) lastChineseOutfitUnlocks.push(unlocked.n);
   }
   d.pendingChinese-=n; saveCardDaily(d); save(); return n;
 }
@@ -3900,7 +3906,7 @@ function renderReward() {
           ${dup
             ? `<div style="font-size:11px;margin-top:2px">重复卡折算：${rarTxt}价值 ${duplicateCoins + 5}，扣除 5 枚后返还 🪙${duplicateCoins}${S.gachaDup >= 4 ? ' · 下一颗保证新卡' : ''}</div>`
             : '<div style="font-size:11px;margin-top:2px">🎊 新的白白收藏卡！去收藏册看大图吧</div>'}
-          ${unlocked ? `<div class="cardUnlockTip">👗 卡面同款「${unlocked.n}」已放进白白衣橱！</div>` : ""}
+          ${unlocked ? `<div class="cardUnlockTip">🎉 恭喜你！卡片同款「${unlocked.n}」已放入白白衣橱！</div>` : ""}
           <button class="btn small ghost" id="seeDrawnCard" style="margin-top:8px">📔 立刻查看这张卡</button>
         </div>`;
       if (dup) { S.coins += duplicateCoins; save(); updateCoinBox(); }
@@ -3995,7 +4001,7 @@ function viewStickerCard(s) {
     <div class="decoCard">
       ${stickerVisual(s, "stickerPreview")}
       <div style="font-size:15px;font-weight:700;color:#7a5a9a;margin:4px 0 10px">${s.n}　<span style="font-size:12px;color:#b8a8c8">${RARITY[s.r]}</span></div>
-      <div style="font-size:12px;color:#a994bd;margin:-3px 0 10px">这是陪你学习的白白，也是你的专属收藏。</div>
+      <div class="stickerMessage" style="font-size:13px;line-height:1.7;color:#8d75a6;margin:-3px 8px 10px">${esc(s.message || "白白想说：今天又收藏了一份快乐。")}</div>
       <div style="height:8px"></div>
       <button class="btn small ghost" id="decoCancel">收好卡片</button>
     </div>`;
@@ -4041,7 +4047,7 @@ setInterval(() => {
 }, 60000);
 navStack = [renderHome]; navTabs = ["home"];
 renderHome();
-if (chineseCardsClaimed) setTimeout(() => toast("📚 语文探险获得的 "+chineseCardsClaimed+" 张白白卡已点亮收藏册！",3200),900);
+if (chineseCardsClaimed) setTimeout(() => toast("📚 语文探险获得的 "+chineseCardsClaimed+" 张白白卡已点亮收藏册！"+(lastChineseOutfitUnlocks.length ? " 恭喜你，同款「"+lastChineseOutfitUnlocks.join("、")+"」也已放入衣橱！" : ""),4200),900);
 if (!localStorage.getItem(LS_KEY + "_hi")) {
   localStorage.setItem(LS_KEY + "_hi", "1");
   setTimeout(() => toast("🌸 欢迎来到魔法英语乐园！先去完成今日任务吧～", 3000), 600);

@@ -12,7 +12,7 @@
 - 改了 data.js 新增单词/句子后，必须重跑本脚本，否则新内容没有发音。
 - 换声音时会先清空 audio/*.mp3，避免新旧声音混在一起。
 """
-import asyncio, json, re, os, sys, glob, hashlib
+import asyncio, json, re, os, sys, glob, hashlib, subprocess
 import edge_tts
 
 DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,10 +24,19 @@ SENT_RATE = "-10%"
 VOICE_FILE = os.path.join(OUT, ".voice")
 
 os.makedirs(OUT, exist_ok=True)
-data = open(os.path.join(DIR, "data.js"), encoding="utf-8").read()
-
-words = set(re.findall(r'\bw:\s*"([^"]+)"', data))        # 单词、拼读例词
-sents = set(re.findall(r'\ben:\s*"([^"]+)"', data))       # 句型、鼓励语
+data_path = os.path.join(DIR, "data.js")
+data = open(data_path, encoding="utf-8").read()
+# 五六年级内容用数据种子生成，不能只靠正则扫描源码；让 Node 执行唯一内容源后
+# 导出最终 UNITS/PHONICS，确保动态生成的词句也一定有音频。
+node_script = r'''
+const fs=require("fs"),vm=require("vm"),ctx={};vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(process.argv[1],"utf8"),ctx);
+const out=vm.runInContext(`({words:[...UNITS.flatMap(u=>u.words),...PHONICS.flatMap(p=>p.words)].map(x=>x.w),sents:UNITS.flatMap(u=>u.sents).map(x=>x.en)})`,ctx);
+process.stdout.write(JSON.stringify(out));
+'''
+resolved = json.loads(subprocess.check_output(["node", "-e", node_script, data_path], text=True))
+words = set(resolved["words"])
+sents = set(resolved["sents"])
 sents.add("Hello! I am your English pet.")                # 发音自检用
 words -= sents
 

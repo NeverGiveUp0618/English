@@ -507,6 +507,39 @@ const UNITS = [
   }
 ];
 
+/* ---------------- 五、六年级 PEP 主题拓展 ----------------
+   延续现有零依赖结构；每册6单元，每单元都有词汇、中文和可用于听力的完整句型。 */
+function advancedUnit(id, book, num, name, zh, icon, words, sents) {
+  return { id, book, num:"Unit "+num, name, zh, icon,
+    words:words.map(x=>({w:x[0],zh:x[1],e:x[2]})), sents:sents.map(x=>({en:x[0],zh:x[1]})) };
+}
+[
+ ["w51","五上",1,"What's He Like?","人物特点","🙂",[["polite","有礼貌的","🙇"],["hard-working","勤奋的","📚"],["helpful","有帮助的","🤝"],["clever","聪明的","💡"],["shy","害羞的","☺️"],["strict","严厉的","📏"]],[["What's he like?","他什么样？"],["He is kind and funny.","他亲切又有趣。"],["Is she strict?","她严厉吗？"]]],
+ ["w52","五上",2,"My Week","我的一周","📅",[["Monday","星期一","1️⃣"],["Tuesday","星期二","2️⃣"],["Wednesday","星期三","3️⃣"],["Thursday","星期四","4️⃣"],["Friday","星期五","5️⃣"],["weekend","周末","🎈"]],[["What do you have on Mondays?","你星期一有什么课？"],["I have Chinese and English.","我有语文课和英语课。"],["Do you often read books?","你经常读书吗？"]]],
+ ["w53","五上",3,"What Would You Like?","想吃什么","🥗",[["sandwich","三明治","🥪"],["salad","沙拉","🥗"],["hamburger","汉堡包","🍔"],["ice cream","冰激凌","🍨"],["fresh","新鲜的","🌿"],["delicious","美味的","😋"]],[["What would you like to eat?","你想吃什么？"],["I'd like a sandwich.","我想要一个三明治。"],["My favourite food is salad.","我最喜欢的食物是沙拉。"]]],
+ ["w54","五上",4,"What Can You Do?","你会做什么","🎵",[["dance","跳舞","💃"],["sing English songs","唱英文歌","🎤"],["play the pipa","弹琵琶","🪕"],["draw cartoons","画漫画","🎨"],["swim","游泳","🏊"],["speak English","说英语","🗣️"]],[["What can you do?","你会做什么？"],["I can draw cartoons.","我会画漫画。"],["Can you swim?","你会游泳吗？"]]],
+ ["w55","五上",5,"There Is a Big Bed","房间物品","🛏️",[["clock","时钟","🕰️"],["plant","植物","🪴"],["bike","自行车","🚲"],["photo","照片","🖼️"],["between","在中间","↔️"],["beside","在旁边","📍"]],[["There is a big bed.","有一张大床。"],["There are so many pictures.","有很多图片。"],["The plant is beside the window.","植物在窗户旁边。"]]],
+ ["w56","五上",6,"In a Nature Park","自然公园","🏞️",[["forest","森林","🌲"],["river","河流","🏞️"],["lake","湖泊","🌊"],["mountain","高山","⛰️"],["village","村庄","🏘️"],["bridge","桥","🌉"]],[["Is there a river in the forest?","森林里有河吗？"],["Yes, there is.","是的，有。"],["Are there any tall buildings?","有高楼吗？"]]],
+ ["w5d1","五下",1,"My Day","我的一天","⏰",[["do morning exercises","做早操","🤸"],["eat breakfast","吃早饭","🥣"],["have class","上课","🏫"],["play sports","做运动","⚽"],["eat dinner","吃晚饭","🍽️"],["go for a walk","散步","🚶"]],[["When do you finish class?","你什么时候下课？"],["We finish class at one o'clock.","我们一点下课。"],["I often play sports after school.","我经常放学后运动。"]]],
+ ["w5d2","五下",2,"My Favourite Season","最喜欢的季节","🍂",[["spring","春天","🌸"],["summer","夏天","☀️"],["autumn","秋天","🍂"],["winter","冬天","❄️"],["picnic","野餐","🧺"],["snowman","雪人","⛄"]],[["Which season do you like best?","你最喜欢哪个季节？"],["I like spring best.","我最喜欢春天。"],["Because there are beautiful flowers.","因为有美丽的花。"]]],
+ ["w5d3","五下",3,"My School Calendar","学校日历","🗓️",[["January","一月","1️⃣"],["February","二月","2️⃣"],["March","三月","3️⃣"],["April","四月","4️⃣"],["May","五月","5️⃣"],["June","六月","6️⃣"]],[["When is the school trip?","学校旅行在什么时候？"],["It's in May.","在五月。"],["We have a sports meet in April.","我们四月有运动会。"]]],
+ ["w5d4","五下",4,"When Is the Art Show?","日期与活动","🎨",[["first","第一","🥇"],["second","第二","🥈"],["third","第三","🥉"],["fourth","第四","4️⃣"],["twelfth","第十二","1️⃣2️⃣"],["twentieth","第二十","2️⃣0️⃣"]],[["When is the art show?","美术展在什么时候？"],["It's on May first.","在五月一日。"],["My birthday is on April fourth.","我的生日在四月四日。"]]],
+ ["w5d5","五下",5,"Whose Dog Is It?","物品归属","🐶",[["mine","我的","🙋"],["yours","你的","👉"],["his","他的","👦"],["hers","她的","👧"],["theirs","他们的","👨‍👩‍👧"],["ours","我们的","🫶"]],[["Whose dog is it?","它是谁的狗？"],["It's mine.","它是我的。"],["The yellow picture is yours.","黄色的画是你的。"]]],
+ ["w5d6","五下",6,"Work Quietly!","行为规则","🤫",[["climbing","正在攀爬","🧗"],["eating","正在吃","🍽️"],["playing","正在玩","🎮"],["jumping","正在跳","🤾"],["keep to the right","靠右","➡️"],["take turns","按顺序来","🔁"]],[["What are they doing?","他们在做什么？"],["They are eating lunch.","他们正在吃午饭。"],["Please take turns.","请按顺序来。"]]],
+ ["s61","六上",1,"How Can I Get There?","问路","🗺️",[["science museum","科学博物馆","🏛️"],["post office","邮局","📮"],["bookstore","书店","📚"],["cinema","电影院","🎬"],["hospital","医院","🏥"],["crossing","十字路口","🚦"]],[["Where is the museum shop?","博物馆商店在哪里？"],["It's near the door.","它在门附近。"],["How can we get there?","我们怎样到那里？"]]],
+ ["s62","六上",2,"Ways to Go to School","交通方式","🚌",[["on foot","步行","🚶"],["by bus","乘公共汽车","🚌"],["by plane","乘飞机","✈️"],["by taxi","乘出租车","🚕"],["by subway","乘地铁","🚇"],["slow down","慢下来","🐢"]],[["How do you come to school?","你怎样来学校？"],["Usually, I come on foot.","通常我步行来。"],["Slow down and stop at a yellow light.","黄灯时减速并停下。"]]],
+ ["s63","六上",3,"My Weekend Plan","周末计划","📝",[["visit my grandparents","看望祖父母","👵"],["see a film","看电影","🎞️"],["take a trip","去旅行","🧳"],["go to the supermarket","去超市","🛒"],["tonight","今晚","🌙"],["tomorrow","明天","🌅"]],[["What are you going to do tomorrow?","你明天打算做什么？"],["I'm going to see a film.","我打算去看电影。"],["Where are you going?","你打算去哪里？"]]],
+ ["s64","六上",4,"I Have a Pen Pal","笔友与爱好","✉️",[["studies Chinese","学习汉语","📖"],["does word puzzles","猜字谜","🧩"],["goes hiking","去远足","🥾"],["cooks Chinese food","做中国菜","🥟"],["pen pal","笔友","✉️"],["hobby","爱好","🎯"]],[["What are his hobbies?","他的爱好是什么？"],["He likes reading stories.","他喜欢读故事。"],["Does he live in Sydney?","他住在悉尼吗？"]]],
+ ["s65","六上",5,"What Does He Do?","职业","👩‍🚀",[["factory worker","工厂工人","🏭"],["postman","邮递员","📬"],["businessman","商人","💼"],["police officer","警察","👮"],["fisherman","渔民","🎣"],["scientist","科学家","🔬"]],[["What does he do?","他是做什么的？"],["He is a businessman.","他是一名商人。"],["Where does she work?","她在哪里工作？"]]],
+ ["s66","六上",6,"How Do You Feel?","情绪与建议","💗",[["angry","生气的","😠"],["afraid","害怕的","😨"],["sad","难过的","😢"],["worried","担心的","😟"],["happy","开心的","😊"],["wear warm clothes","穿暖和衣服","🧥"]],[["How do you feel?","你感觉怎么样？"],["I'm worried.","我很担心。"],["You should take a deep breath.","你应该深呼吸。"]]],
+ ["s6d1","六下",1,"How Tall Are You?","身高比较","📏",[["younger","更年轻的","🧒"],["older","年龄更大的","👵"],["taller","更高的","🦒"],["shorter","更矮的","🐭"],["longer","更长的","📏"],["stronger","更强壮的","💪"]],[["How tall are you?","你多高？"],["I'm 1.61 metres.","我身高1.61米。"],["You're older than me.","你比我年龄大。"]]],
+ ["s6d2","六下",2,"Last Weekend","上个周末","🧹",[["cleaned my room","打扫房间","🧹"],["washed my clothes","洗衣服","🧺"],["stayed at home","待在家","🏠"],["watched TV","看电视","📺"],["read a book","读书","📕"],["slept","睡觉","😴"]],[["How was your weekend?","你周末过得怎么样？"],["It was good.","很好。"],["What did you do last weekend?","你上周末做了什么？"]]],
+ ["s6d3","六下",3,"Where Did You Go?","假期旅行","🏕️",[["went camping","去野营","⛺"],["went fishing","去钓鱼","🎣"],["rode a horse","骑马","🐎"],["rode a bike","骑自行车","🚴"],["took pictures","拍照","📷"],["bought gifts","买礼物","🎁"]],[["Where did you go?","你去了哪里？"],["I went to a forest park.","我去了森林公园。"],["Did you go to Turpan?","你去吐鲁番了吗？"]]],
+ ["s6d4","六下",4,"Then and Now","过去与现在","⌛",[["dining hall","饭厅","🍽️"],["grass","草坪","🌱"],["gym","体育馆","🏟️"],["ago","以前","⌛"],["cycling","骑车运动","🚴"],["ice-skate","滑冰","⛸️"]],[["There was no library in my old school.","我以前的学校没有图书馆。"],["There were no computers then.","那时没有电脑。"],["Now I go cycling every day.","现在我每天骑车。"]]],
+ ["s6d5","六下",5,"Our Changes","我们的变化","🌱",[["before","以前","◀️"],["now","现在","▶️"],["different","不同的","🔄"],["active","活跃的","🏃"],["quiet","安静的","🤫"],["dream","梦想","🌟"]],[["Before, I was quiet.","以前我很安静。"],["Now, I'm very active.","现在我很活跃。"],["We are all different now.","现在我们都不一样了。"]]],
+ ["s6d6","六下",6,"A Farewell Party","毕业告别","🎓",[["farewell","告别","👋"],["message","留言","💌"],["memory","回忆","📷"],["future","未来","🚀"],["middle school","中学","🏫"],["keep in touch","保持联系","📱"]],[["We will have a farewell party.","我们将举行告别会。"],["Thank you for helping me.","谢谢你帮助我。"],["Let's keep in touch.","让我们保持联系。"]]]
+].forEach(x=>UNITS.push(advancedUnit(...x)));
+
 /* ============================================================
  * 自然拼读 Phonics（对应教材 Let's spell 板块）
  * 前4条=魔法e规则(四上)，后4条=元音字母组合(四下)
@@ -702,6 +735,33 @@ const STICKERS = BAIBAI_CARD_EDITIONS.flatMap((edition, editionIndex) =>
     badge: edition.badge,
     background: edition.bg,
     edge: edition.edge,
+    message: [
+      "白白想说：好奇一点点，今天就会发现一点点。","白白想说：不用和别人比，找到自己的节奏就很好。",
+      "白白想说：答错也没关系，它在告诉我们下一步往哪里走。","白白想说：先试一小步，难题就不再那么大啦。",
+      "白白想说：你认真想过的每一分钟，都不会白费。","白白想说：会提问题的人，也是在认真学习。",
+      "白白想说：休息一下再回来，脑袋也会重新亮起来。","白白想说：今天学会一个词，也是一件值得开心的事。",
+      "白白想说：慢慢读，藏在句子里的线索会自己出现。","白白想说：把自己的想法说出来，就是很棒的开始。",
+      "欲穷千里目，更上一层楼。——王之涣《登鹳雀楼》","读书破万卷，下笔如有神。——杜甫《奉赠韦左丞丈二十二韵》",
+      "纸上得来终觉浅，绝知此事要躬行。——陆游《冬夜读书示子聿》","不积跬步，无以至千里。——《荀子·劝学》",
+      "知之为知之，不知为不知，是知也。——《论语·为政》","三人行，必有我师焉。——《论语·述而》",
+      "温故而知新，可以为师矣。——《论语·为政》","学而时习之，不亦说乎？——《论语·学而》",
+      "敏而好学，不耻下问。——《论语·公冶长》","博学之，审问之，慎思之，明辨之，笃行之。——《礼记·中庸》",
+      "白白想说：先完成，再回头修改，好作品都是慢慢长出来的。","白白想说：你的想法很珍贵，写下来就不会跑丢。",
+      "白白想说：遇到不会的，查一查、问一问，也是一种本领。","白白想说：每次开口读，英语都会和你更熟一点。",
+      "白白想说：别急，我陪你把长句拆成一小段一小段。","白白想说：能发现自己哪里没懂，是很厉害的能力。",
+      "好雨知时节，当春乃发生。——杜甫《春夜喜雨》","随风潜入夜，润物细无声。——杜甫《春夜喜雨》",
+      "小荷才露尖尖角，早有蜻蜓立上头。——杨万里《小池》","停车坐爱枫林晚，霜叶红于二月花。——杜牧《山行》",
+      "春色满园关不住，一枝红杏出墙来。——叶绍翁《游园不值》","儿童急走追黄蝶，飞入菜花无处寻。——杨万里《宿新市徐公店》",
+      "白白想说：大胆猜一猜，再回原文找证据。","白白想说：声音、颜色、气味，都可以装进作文里。",
+      "白白想说：一句话多读一遍，常常会发现新的意思。","白白想说：你可以有不同答案，只要能说出自己的理由。",
+      "会当凌绝顶，一览众山小。——杜甫《望岳》","两岸猿声啼不住，轻舟已过万重山。——李白《早发白帝城》",
+      "飞流直下三千尺，疑是银河落九天。——李白《望庐山瀑布》","横看成岭侧成峰，远近高低各不同。——苏轼《题西林壁》",
+      "山重水复疑无路，柳暗花明又一村。——陆游《游山西村》","白白想说：换个角度看，难题也许会露出新入口。",
+      "白白想说：读得慢不代表学得慢，想清楚更重要。","白白想说：学习不是赶路，是一路捡起喜欢的东西。",
+      "白白想说：今天不必完美，今天只要有一点新收获。","问渠那得清如许？为有源头活水来。——朱熹《观书有感》",
+      "尺有所短，寸有所长。——屈原《卜居》","千磨万击还坚劲，任尔东西南北风。——郑燮《竹石》",
+      "白白想说：你负责探索，我负责在旁边摇尾巴。","白白想说：收好这张卡，也收好今天的小小成就。"
+    ][cardIndex % 50],
     /* 后四套每逢 10/25 张提升稀有度，让新系列既有普通卡也有追逐卡。 */
     r: editionIndex === 0 ? card.r : (cardIndex % 25 === 24 ? 3 : cardIndex % 10 === 9 ? 2 : card.r)
   }))
@@ -893,6 +953,45 @@ OUTFITS.push(
   ], {pos:{x:50,y:63,s:1,r:0}})
 );
 
+/* 早期部分装扮直接使用 Emoji；在缺少彩色字体的手机上会退化成灰字。
+   现在每一件衣橱物品都绑定项目内置图片，彻底摆脱系统字体差异。 */
+OUTFITS.push({ id:"bb_camera", cat:"手持", n:"探险相机", e:"📷", art:"assets/outfits/hand-camera.svg", base:.52, cost:180, pos:{x:78,y:66,s:1,r:-8} });
+function outfitArtFor(o) {
+  const n = o.n;
+  if (o.cat === "发饰") {
+    if (/花|樱/.test(n)) return ["assets/outfits/hair-flower.svg",.24];
+    if (/蝴蝶/.test(n)) return ["assets/outfits/hair-butterfly.svg",.26];
+    if (/发箍|发篦|星星|彩虹|皇冠|雪花|月牙|糖果/.test(n)) return ["assets/outfits/hair-band.svg",.38];
+    return ["assets/outfits/hair-bow.svg",.27];
+  }
+  if (o.cat === "耳饰") {
+    if (/珍珠/.test(n)) return ["assets/outfits/earring-pearl.svg",.18];
+    if (/宝石|晶/.test(n)) return ["assets/outfits/earring-gem.svg",.19];
+    return ["assets/outfits/earring-charm.svg",.20];
+  }
+  if (o.cat === "项链") return ["assets/outfits/necklace-charm.svg",.43];
+  if (o.cat === "脸上") return [o.id === "bb_sunglasses" ? "assets/outfits/glasses-sunglasses.svg" : "assets/outfits/glasses-round.svg",.48];
+  if (o.cat === "手持") {
+    const rows = [
+      [/放大镜/,"hand-magnifier.svg",.34],[/魔法棒|魔杖|权杖/,"hand-wand.svg",.34],[/包/,"hand-bag.svg",.34],
+      [/伞/,"hand-umbrella.svg",.42],[/绘本|书/,"hand-book.svg",.42],[/画板/,"hand-palette.svg",.38],
+      [/泡泡/,"hand-bubbles.svg",.30],[/花束/,"hand-bouquet.svg",.34],[/提琴/,"hand-violin.svg",.30],
+      [/灯笼/,"hand-lantern.svg",.31],[/水晶球/,"hand-orb.svg",.38],[/望远镜/,"hand-binoculars.svg",.40],
+      [/相机/,"hand-camera.svg",.40],[/奶昔|饮品/,"hand-bubbles.svg",.30]
+    ];
+    const hit = rows.find(x => x[0].test(n));
+    if (hit) return ["assets/outfits/" + hit[1], hit[2]];
+  }
+  return null;
+}
+OUTFITS.forEach((o, i) => {
+  if (o.art) return;
+  const hit = outfitArtFor(o);
+  if (!hit) return;
+  o.art = hit[0]; o.base = hit[1];
+  if (!o.hue && i % 4) o.hue = (i * 47) % 360;
+});
+
 /* 披风统一使用按白白坐姿重新制作的透明层：领口扣在颈部，前襟沿胸口两侧
    打开，披肩自然落在身体两边。旧 id 和价格保持不变，避免已购买装扮丢失。 */
 const BAIBAI_CAPE_FILTERS = [
@@ -905,7 +1004,7 @@ const BAIBAI_CAPE_FILTERS = [
   "hue-rotate(165deg) saturate(.92) brightness(1.12)"
 ];
 OUTFITS.filter(o => o.group === "body").forEach((o, i) => {
-  o.art = "assets/outfits/cape-velvet-open.webp";
+  o.art = o.cat === "婚纱" ? "assets/outfits/wedding-pearl.webp" : "assets/outfits/cape-velvet-open.webp";
   o.base = .90;
   o.pos = { x:50, y:50, s:1, r:0 };
   o.fx = BAIBAI_CAPE_FILTERS[i % BAIBAI_CAPE_FILTERS.length];

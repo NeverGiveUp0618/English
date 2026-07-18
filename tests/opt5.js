@@ -28,15 +28,15 @@ const S = () => w.eval("S");
   const books = {};
   UNITS.forEach(u => books[u.book] = (books[u.book] || 0) + u.words.length);
   ok(!!books["二年级"] && !!books["三上"] && !!books["三下"], "★ 新增 二年级 / 三上 / 三下");
-  ok(UNITS.reduce((a, u) => a + u.words.length, 0) === 273, "★ 单词总数 139 → 273（翻倍）");
+  ok(UNITS.reduce((a, u) => a + u.words.length, 0) === 417, "★ 二至六年级共417个课内词条");
   console.log("     各册单词数:", JSON.stringify(books));
   const AM = w.eval("AUDIO_MAP");
   const noAudio = UNITS.flatMap(u => u.words).filter(x => !AM[x.w]);
-  ok(noAudio.length === 0, "★ 273 个单词全部有真人发音（新词已重新合成）");
+  ok(noAudio.length === 0, "★ 417 个单词全部有真人发音（新词已重新合成）");
   w.eval("navStack=[renderMap];renderMap();");
   ok($("#scr-map").innerHTML.includes("二年级") && $("#scr-map").innerHTML.includes("三上"), "★ 地图上能看到低年级各册");
   ok($("#scr-map").innerHTML.includes("暑假想复习旧词"), "★ 提示可以直接点低年级复习");
-  ok($$("#scr-map .unitCard").length === 26, "26 个单元");
+  ok($$("#scr-map .unitCard").length === 50, "50 个单元（含五、六年级上下册）");
   // 每册第一个单元都默认解锁 → 暑假可以直接进去
   const cards = $$("#scr-map .unitCard");
   const firstOfBooks = ["b1", "t1", "x1", "u1", "d1"];

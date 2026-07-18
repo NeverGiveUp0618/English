@@ -89,7 +89,7 @@ const S = () => w.eval("S");
   // 家长设置里能改
   w.eval("parentOK=true;S.focusBook='auto';save();navStack=[renderParent];renderParent();");
   ok($("#scr-parent").innerHTML.includes("学习重点"), "★ 家长设置里有「学习重点」");
-  ok($$("#scr-parent [data-focus]").length === 6, "可选：自动/二年级/三上/三下/四上/四下");
+  ok($$("#scr-parent [data-focus]").length === 10, "可选：自动及二至六年级上下册");
   $$("#scr-parent [data-focus]").find(b => b.dataset.focus === "三下").click();
   ok(S().focusBook === "三下", "★ 家长可切换学习重点");
 

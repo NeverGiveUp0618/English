@@ -28,7 +28,7 @@ console.log(pool.length === 8 && pool.every(x => learned.includes(x))
   ? "  ✓ 学够8词后，游戏厅只考真正学过的词"
   : "  ⚠️ 题库混入未学词");
 
-console.log("\n═══ 疑点2：难度段位阈值还合理吗？（词库从139→273） ═══");
+console.log("\n═══ 疑点2：难度段位阈值还合理吗？（词库已扩展到六年级） ═══");
 const DIFFS = w.eval("DIFFS");
 console.log("  升段门槛：1段→2段 =", DIFFS[1].next, "词　2段→3段 =", DIFFS[2].next, "词");
 console.log("  但现在总词库 =", w.eval("UNITS.reduce((a,u)=>a+u.words.length,0)"), "词");

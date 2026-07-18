@@ -85,7 +85,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
   ok($("#coinNum").textContent === "0", "初始金币0");
   const swText = fs.readFileSync(DIR + "/sw.js", "utf8");
-  ok(swText.includes("magic-english-v41") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
+  ok(swText.includes("magic-english-v42") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
   ok(swText.includes("fallback || fresh"), "★ 慢网络二次打开优先显示缓存首页");
 
   console.log("— 地图与锁 —");
@@ -93,7 +93,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#scr-map").classList.contains("on") && $("#hubLink").style.display !== "none" && $("#backBtn").style.visibility === "hidden", "地图同级大菜单显示学习导航，不显示页内返回");
   let cards = $$("#scr-map .unitCard");
   const cardOf = id => cards.find(c => c.dataset.uid === id);
-  ok(cards.length === 26, "26个单元卡片（新增二年级/三上/三下）");
+  ok(cards.length === 50, "50个单元卡片（已覆盖二至六年级）");
   ok(!cardOf("u1").classList.contains("locked") && cardOf("u2").classList.contains("locked"), "四上U1解锁 U2锁定");
   ok(!cardOf("d1").classList.contains("locked") && !cardOf("b1").classList.contains("locked") && !cardOf("t1").classList.contains("locked"),
      "★ 每册第一单元默认解锁（暑假可直接复习低年级）");
@@ -473,7 +473,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#scr-audio").classList.contains("on"), "发音自检页显示");
   const ah = $("#scr-audio").innerHTML;
   ok(ah.includes("真人发音包") && ah.includes("音效通道"), "自检项齐全(含真人发音包状态)");
-  ok(ah.includes("静音开关") && ah.includes("422"), "含排查清单 + 422条发音就绪");
+  ok(ah.includes("静音开关") && ah.includes("620"), "含排查清单 + 620条发音就绪");
   const before = played.length;
   $("#acTest").click();
   await sleep(120);
@@ -743,7 +743,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   $("#pTest").click();
   ok(S().testMode === false, "可关闭测试模式");
   $$('.tab').find(t => t.dataset.tab === "map").click();
-  ok($$("#scr-map .unitCard.locked").length === 21, "关闭后重新上锁（每册第一单元开放）");
+  ok($$("#scr-map .unitCard.locked").length === 41, "关闭后重新上锁（九册各第一单元开放）");
   // 还原一份进度供后续断言
   ok(w.eval("importCode(" + JSON.stringify(code) + ")") === true, "恢复测试前进度");
 
