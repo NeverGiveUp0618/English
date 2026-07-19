@@ -871,7 +871,7 @@ function setActiveTab(tab) {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.tab === tab));
 }
 function show(id, title) {
-  if (id !== "design" && designTimer) { clearInterval(designTimer); designTimer=null; if(designSessionSave)designSessionSave(); designSessionSave=null; }
+  if (id !== "design") { if(designTimer)clearInterval(designTimer);designTimer=null;if(designSessionSave)designSessionSave();designSessionSave=null; }
   const isRoot = !!ROOT_TABS[id];
   if (isRoot) setActiveTab(ROOT_TABS[id]);
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("on"));
@@ -3895,14 +3895,15 @@ function designSvg(kind, main, trim, mark) {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 function renderDesignStudio() {
+  if(designTimer){clearInterval(designTimer);designTimer=null;}
   const done=taskDone();
-  if(!(done.t1&&done.t2&&done.t3&&done.t4)){
+  if(!S.testMode&&!(done.t1&&done.t2&&done.t3&&done.t4)){
     $("#scr-design").innerHTML=`<div class="card" style="text-align:center;padding:28px 18px"><div style="font-size:42px">🔒</div><b style="display:block;color:#835aa2;margin:8px 0">完成今天的英语任务后开放</b><div style="font-size:12px;color:#aa94b8;line-height:1.7">复习、新学8个单词、玩5局游戏、完成3条自然拼读后，<br>就能来这里自由设计30分钟。</div><button class="btn ghost" id="designBack" style="margin-top:14px">先去完成今日任务</button></div>`;
     $("#designBack").onclick=()=>{navStack=[renderReward];renderReward()};show("design","🎨 设计工坊");return;
   }
   S.designPlay=S.designPlay||{date:"",used:0};if(S.designPlay.date!==todayStr())S.designPlay={date:todayStr(),used:0};
   let left=Math.max(0,1800-(Number(S.designPlay.used)||0));
-  if(!left){$("#scr-design").innerHTML=`<div class="card" style="text-align:center;padding:30px 18px"><div style="font-size:44px">💾</div><b style="display:block;color:#835aa2;margin:8px 0">今天的设计已经保存</b><div style="font-size:13px;color:#aa94b8">今天的30分钟创作时间结束啦，下次打开继续吧。</div></div>`;show("design","🎨 设计工坊");return;}
+  if(!S.testMode&&!left){$("#scr-design").innerHTML=`<div class="card" style="text-align:center;padding:30px 18px"><div style="font-size:44px">💾</div><b style="display:block;color:#835aa2;margin:8px 0">今天的设计已经保存</b><div style="font-size:13px;color:#aa94b8">今天的30分钟创作时间结束啦，下次打开继续吧。</div></div>`;show("design","🎨 设计工坊");return;}
   let kind="cape", main="#8f65d8", trim="#ffd56a", mark="star";
   if(S.designDraft){kind=S.designDraft.kind||kind;main=S.designDraft.main||main;trim=S.designDraft.trim||trim;mark=S.designDraft.mark||mark;}
   const renderWorkbench = () => {
@@ -3928,7 +3929,7 @@ function renderDesignStudio() {
       S.pet.worn.push(id);save();confetti();sndWin();toast("🎨 设计完成！已经穿上并放进衣橱",2400);renderWorkbench();
     };
   };
-  $("#scr-design").innerHTML=`<div class="card designIntro"><b>🎨 角色与装扮设计工坊</b><span>涂色、画画、创造自己的学习伙伴。每一下操作都会马上显示结果。</span><div class="designClock">今日创作时间还剩 <strong id="designClock">${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}</strong></div></div>
+  $("#scr-design").innerHTML=`<div class="card designIntro"><b>🎨 角色与装扮设计工坊</b><span>涂色、画画、创造自己的学习伙伴。每一下操作都会马上显示结果。</span><div class="designClock">${S.testMode?'🧪 测试模式：不限时，不扣今日额度':`今日创作时间还剩 <strong id="designClock">${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}</strong>`}</div></div>
     <div class="sectionTitle">👗 装扮涂色操作台</div><div class="card" id="designOutfit"></div>
     <div class="sectionTitle">🖍️ 自创角色画板</div><div class="card"><div class="drawTools"><button class="drawColor on" data-color="#7b4b2a" style="--c:#7b4b2a"></button><button class="drawColor" data-color="#ffffff" style="--c:#ffffff"></button><button class="drawColor" data-color="#f08eb5" style="--c:#f08eb5"></button><button class="drawColor" data-color="#7667d8" style="--c:#7667d8"></button><button class="drawColor" data-color="#41a98a" style="--c:#41a98a"></button><button class="drawSize on" data-size="10">细</button><button class="drawSize" data-size="24">粗</button><button class="drawSize" data-size="44">大</button></div><div class="drawBoard"><canvas id="characterCanvas" width="300" height="300" aria-label="自创角色画板"></canvas></div><div class="drawActions"><button class="btn small ghost" id="drawUndo">↶ 撤销</button><button class="btn small ghost" id="drawClear">🧽 清空</button></div><label class="roleName">角色名字<input id="roleName" maxlength="8" placeholder="点击后起名字" autocomplete="off"></label><button class="btn wide" id="saveCharacter">🌟 保存并让这个角色陪我</button>${S.pet.customCharacter?`<button class="btn ghost wide" id="useBaibai">🐶 切回白白</button>`:""}<div class="note">画作只保存在这台设备和备份码里，不会上传到公开网站。</div></div>`;
   renderWorkbench();
@@ -3947,7 +3948,7 @@ function renderDesignStudio() {
   if($("#useBaibai"))$("#useBaibai").onclick=()=>{S.pet.useCustom=false;S.pet.worn=(S.pet.baibaiWorn||[]).filter(outfitOf);save();sndCoin();toast("白白回来陪你啦");renderDesignStudio()};
   show("design","🎨 设计工坊");
   designSessionSave=()=>{try{S.designDraft={kind,main,trim,mark,name:$("#roleName")?$("#roleName").value:"",canvas:hasInk?canvas.toDataURL("image/png"):(S.designDraft&&S.designDraft.canvas)||""};save();}catch(_){save();}};
-  let ticks=0;designTimer=setInterval(()=>{if(document.hidden)return;left--;S.designPlay.used=1800-left;ticks++;const el=$("#designClock");if(el)el.textContent=Math.floor(left/60)+":"+String(left%60).padStart(2,"0");if(ticks%10===0)designSessionSave();if(left<=0){designSessionSave();clearInterval(designTimer);designTimer=null;designSessionSave=null;toast("💾 今天的设计已经保存，下次打开继续吧",3500);navStack=[renderReward];renderReward();}},1000);
+  if(!S.testMode){let ticks=0;designTimer=setInterval(()=>{if(document.hidden)return;left--;S.designPlay.used=1800-left;ticks++;const el=$("#designClock");if(el)el.textContent=Math.floor(left/60)+":"+String(left%60).padStart(2,"0");if(ticks%10===0)designSessionSave();if(left<=0){designSessionSave();clearInterval(designTimer);designTimer=null;designSessionSave=null;toast("💾 今天的设计已经保存，下次打开继续吧",3500);navStack=[renderReward];renderReward();}},1000);}
 }
 function renderReward() {
   const got = Object.keys(S.stickers).length;
