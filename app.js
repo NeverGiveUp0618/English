@@ -1175,7 +1175,7 @@ const BOOK_GROUPS = [
   { grade:"六年级", books:["六上","六下"] }
 ];
 const gradeOfBook = book => book === "二年级" ? "二年级" : `${book.charAt(0)}年级`;
-let mapOpenGrades = new Set([gradeOfBook(S.focusBook === "auto" ? "四上" : S.focusBook)]);
+let mapOpenGrades = new Set();
 const BOOK_TIP = {
   "二年级": "低年级基础词（暑假复习用）",
   "三上": "三年级上册", "三下": "三年级下册",
@@ -2529,7 +2529,7 @@ function renderPhonicsList() {
       <span class="aGo">▶</span>
     </div>` : ""}
     ${["三","四","五","六"].map(grade => {
-      const books=[grade+"上",grade+"下"], open=grade==="四";
+      const books=[grade+"上",grade+"下"], open=false;
       return `<button class="gradeFold phonicsGrade" data-grade="${grade}" aria-expanded="${open}"><span>✨ ${grade}年级自然拼读<small>上册 · 下册</small></span><span class="foldArrow">›</span></button><div class="gradeFoldBody ${open?"":"collapsed"}" data-phonics-body="${grade}">${books.map(bk => `
       <div class="bookLabel">—— ${bk} · Let's spell ——</div>
       ${PHONICS.filter(p => p.book === bk).map(p => {

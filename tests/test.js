@@ -95,7 +95,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   let cards = $$("#scr-map .unitCard");
   const cardOf = id => cards.find(c => c.dataset.uid === id);
   ok(cards.length === 50, "50个单元卡片（已覆盖二至六年级）");
-  ok($$("#scr-map .gradeFold").length === 5 && $$("#scr-map .gradeFoldBody.collapsed").length === 4, "★ 地图按五个年级折叠，默认展开当前四年级");
+  ok($$("#scr-map .gradeFold").length === 5 && $$("#scr-map .gradeFoldBody.collapsed").length === 5, "★ 地图按五个年级折叠，默认全部收起");
   ok(!cardOf("u1").classList.contains("locked") && cardOf("u2").classList.contains("locked"), "四上U1解锁 U2锁定");
   ok(!cardOf("d1").classList.contains("locked") && !cardOf("b1").classList.contains("locked") && !cardOf("t1").classList.contains("locked"),
      "★ 每册第一单元默认解锁（暑假可直接复习低年级）");
@@ -386,7 +386,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   $$('.tab').find(t => t.dataset.tab === "phonics").click();
   ok($("#scr-phonics").classList.contains("on"), "拼读学院显示");
   ok(w.eval("['三上','三下','四上','四下','五上','五下','六上','六下'].every(b=>PHONICS.some(p=>p.book===b))"), "★ 三至六年级上下册都有自然拼读内容");
-  ok($$("#scr-phonics .phonicsGrade").length === 4 && $$("#scr-phonics .gradeFoldBody.collapsed").length === 3, "★ 自然拼读按四个年级折叠");
+  ok($$("#scr-phonics .phonicsGrade").length === 4 && $$("#scr-phonics .gradeFoldBody.collapsed").length === 4, "★ 自然拼读按四个年级折叠且默认全部收起");
   $("#scr-phonics .actRow[data-pid='ph1']").click();
   ok($("#scr-phonic").classList.contains("on"), "规则页显示(a-e)");
   ok($$("#phWords .phRow").length === 8, "8个例词可点读（音节+音标行）");
