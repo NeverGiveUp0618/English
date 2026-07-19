@@ -3603,7 +3603,7 @@ function renderDecoEdit() {
     $("#scr-anchor").innerHTML = `
       <div class="card" style="text-align:center;padding:10px">
         <div style="font-size:13px;color:#7a5a9a;line-height:1.6">
-          <b>先在下方点选一件，再按住它拖动</b> · 手指按在哪里，就从哪里抓住，不会突然跳位<br>
+          <b>先在下方点选一件，再按住紫色“拖”按钮移动</b> · 衣服会从当前位置跟着手指走<br>
           <span style="font-size:11px;color:#b8a8c8">一次只操作选中的装扮，大披风不会再挡住帽子和发夹</span>
         </div>
       </div>
@@ -3618,7 +3618,7 @@ function renderDecoEdit() {
           }).join("")}
           <button class="decoGrab" id="decoGrab" type="button"
             style="left:${draft[sel].x}%;top:${draft[sel].y}%"
-            aria-label="拖动${selected.n}"><span>✥</span></button>
+            aria-label="按住拖动${selected.n}"><span>拖</span></button>
         </div>
       </div>
 
@@ -3685,14 +3685,31 @@ function renderDecoEdit() {
       };
       const end = () => { if (dragging) { dragging = false; tone(760, .05); const s=$("#decoStatus");if(s)s.textContent=`当前：${outfitOf(id).n}　大小 ${Math.round(draft[id].s*100)}%　角度 ${draft[id].r}°`; } };
 
-      grab.onmousedown = start;
-      grab.ontouchstart = start;
-      /* 监听整个舞台，手指拖出饰品范围也不会断 */
-      stage.addEventListener("mousemove", move);
-      stage.addEventListener("touchmove", move, { passive: false });
-      stage.addEventListener("mouseup", end);
-      stage.addEventListener("touchend", end);
-      stage.addEventListener("mouseleave", end);
+      /* Pointer Events 在 iPhone/安卓上最稳定，抓住后移出舞台也不断；旧浏览器保留触摸降级。 */
+      if (window.PointerEvent) {
+        const pointerMove = ev => move(ev);
+        const pointerEnd = ev => {
+          end();
+          window.removeEventListener("pointermove", pointerMove);
+          window.removeEventListener("pointerup", pointerEnd);
+          window.removeEventListener("pointercancel", pointerEnd);
+        };
+        grab.addEventListener("pointerdown", ev => {
+          start(ev);
+          if (grab.setPointerCapture) try { grab.setPointerCapture(ev.pointerId); } catch (_) {}
+          window.addEventListener("pointermove", pointerMove, { passive:false });
+          window.addEventListener("pointerup", pointerEnd);
+          window.addEventListener("pointercancel", pointerEnd);
+        });
+      } else {
+        grab.onmousedown = start;
+        grab.ontouchstart = start;
+        stage.addEventListener("mousemove", move);
+        stage.addEventListener("touchmove", move, { passive:false });
+        stage.addEventListener("mouseup", end);
+        stage.addEventListener("touchend", end);
+        stage.addEventListener("mouseleave", end);
+      }
     }
 
     /* 放大 / 缩小 / 旋转 / 复位 */
