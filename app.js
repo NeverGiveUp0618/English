@@ -2206,10 +2206,13 @@ function renderVoucher() {
 
 /* ================= 家长设置 ================= */
 const PARENT_PIN = "223826";
-let parentOK = false;
+const PARENT_AUTH_KEY = "learningParentAuth_v1";
+let parentOK = sessionStorage.getItem(PARENT_AUTH_KEY) === "1";
 function renderParent() {
+  const parentBack = `<a class="parentBackHub" href="https://nevergiveup0618.github.io/learning/?parent=1">← 返回统一家长中心</a>`;
   if (!parentOK) {
     $("#scr-parent").innerHTML = `
+      ${parentBack}
       <div class="card" style="text-align:center;padding:24px 16px">
         <div style="font-size:34px">🔐</div>
         <div style="font-size:15px;font-weight:700;color:#9b59b6;margin:8px 0">家长验证</div>
@@ -2222,7 +2225,7 @@ function renderParent() {
         <div id="pGateMsg" style="font-size:12px;color:#c0a8d0;margin-top:10px">这里是爸爸妈妈的设置，小朋友先去玩吧～</div>
       </div>`;
     const tryIn = () => {
-      if ($("#pGate").value.trim() === PARENT_PIN) { parentOK = true; sndCoin(); renderParent(); }
+      if ($("#pGate").value.trim() === PARENT_PIN) { parentOK = true; sessionStorage.setItem(PARENT_AUTH_KEY,"1"); sndCoin(); renderParent(); }
       else {
         sndWrong();
         $("#pGateMsg").textContent = "密码不对哦～";
@@ -2236,6 +2239,7 @@ function renderParent() {
   }
   const prizes = getWheel();
   $("#scr-parent").innerHTML = `
+    ${parentBack}
     <div class="card" style="${S.testMode ? "background:#fff3d6" : ""}">
       <div class="actRow">
         <span class="aIcon">🧪</span>
@@ -3599,8 +3603,8 @@ function renderDecoEdit() {
     $("#scr-anchor").innerHTML = `
       <div class="card" style="text-align:center;padding:10px">
         <div style="font-size:13px;color:#7a5a9a;line-height:1.6">
-          <b>按住任意装扮直接拖</b> · 每一件都能放大、缩小、旋转<br>
-          <span style="font-size:11px;color:#b8a8c8">调整满意后点“保存造型”，首页和语文会一起换成最新的白白</span>
+          <b>先在下方点选一件，再按住它拖动</b> · 手指按在哪里，就从哪里抓住，不会突然跳位<br>
+          <span style="font-size:11px;color:#b8a8c8">一次只操作选中的装扮，大披风不会再挡住帽子和发夹</span>
         </div>
       </div>
       <div class="card" style="padding:12px">
@@ -3612,6 +3616,9 @@ function renderDecoEdit() {
             return `<span class="decoItem ${id === sel ? "sel" : ""}" data-outfit="${id}"
               style="z-index:${z};left:${d.x}%;top:${d.y}%;transform:translate(-50%,-50%) rotate(${d.r}deg)">${outfitVisual(o)}</span>`;
           }).join("")}
+          <button class="decoGrab" id="decoGrab" type="button"
+            style="left:${draft[sel].x}%;top:${draft[sel].y}%"
+            aria-label="拖动${selected.n}"><span>✥</span></button>
         </div>
       </div>
 
@@ -3628,7 +3635,7 @@ function renderDecoEdit() {
           <button class="decoBtn" data-act="cw">↻<span>右转</span></button>
           <button class="decoBtn" data-act="reset">🔄<span>复位</span></button>
         </div>
-        <div style="font-size:11px;color:#c0b0d0;text-align:center;margin-top:8px">
+        <div id="decoStatus" style="font-size:11px;color:#c0b0d0;text-align:center;margin-top:8px">
           当前：${selected.n}　大小 ${Math.round(draft[sel].s * 100)}%　角度 ${draft[sel].r}°
         </div>
         <button class="btn small ghost" id="deRemove" style="display:block;margin:10px auto 0;color:#d75f72">🧺 取下「${selected.n}」</button>
@@ -3646,22 +3653,28 @@ function renderDecoEdit() {
       const o = outfitOf(el.dataset.outfit), px = decoSizePx(stageSize, draft[el.dataset.outfit], o) + "px";
       if (o.art) el.style.width = px; else el.style.fontSize = px;
     });
-    $$("#scr-anchor .decoItem").forEach(el => {
-      const id = el.dataset.outfit;
-      let dragging = false;
+    const grab = $("#decoGrab");
+    const selectedEl = $(`#scr-anchor .decoItem[data-outfit="${sel}"]`);
+    {
+      const id = sel;
+      let dragging = false, grabX = 0, grabY = 0;
 
       const moveTo = (cx, cy) => {
         const r = stage.getBoundingClientRect();
-        const x = Math.max(0, Math.min(100, ((cx - r.left) / r.width) * 100));
-        const y = Math.max(0, Math.min(100, ((cy - r.top) / r.height) * 100));
+        const x = Math.max(0, Math.min(100, ((cx - grabX - r.left) / r.width) * 100));
+        const y = Math.max(0, Math.min(100, ((cy - grabY - r.top) / r.height) * 100));
         const d = draft[id];
         d.x = Math.round(x); d.y = Math.round(y);
-        el.style.left = d.x + "%";
-        el.style.top = d.y + "%";
+        selectedEl.style.left = d.x + "%";
+        selectedEl.style.top = d.y + "%";
+        grab.style.left = d.x + "%";
+        grab.style.top = d.y + "%";
       };
       const start = ev => {
+        const t = ev.touches ? ev.touches[0] : ev, r = stage.getBoundingClientRect(), d = draft[id];
         dragging = true; sel = id;
-        $$("#scr-anchor .decoItem").forEach(x => x.classList.toggle("sel", x === el));
+        grabX = t.clientX - (r.left + d.x / 100 * r.width);
+        grabY = t.clientY - (r.top + d.y / 100 * r.height);
         ev.preventDefault();
       };
       const move = ev => {
@@ -3670,17 +3683,17 @@ function renderDecoEdit() {
         moveTo(t.clientX, t.clientY);
         ev.preventDefault();
       };
-      const end = () => { if (dragging) { dragging = false; tone(760, .05); draw(); } };
+      const end = () => { if (dragging) { dragging = false; tone(760, .05); const s=$("#decoStatus");if(s)s.textContent=`当前：${outfitOf(id).n}　大小 ${Math.round(draft[id].s*100)}%　角度 ${draft[id].r}°`; } };
 
-      el.onmousedown = start;
-      el.ontouchstart = start;
+      grab.onmousedown = start;
+      grab.ontouchstart = start;
       /* 监听整个舞台，手指拖出饰品范围也不会断 */
       stage.addEventListener("mousemove", move);
       stage.addEventListener("touchmove", move, { passive: false });
       stage.addEventListener("mouseup", end);
       stage.addEventListener("touchend", end);
       stage.addEventListener("mouseleave", end);
-    });
+    }
 
     /* 放大 / 缩小 / 旋转 / 复位 */
     $$("#scr-anchor .decoBtn").forEach(b => {
@@ -4057,8 +4070,8 @@ setInterval(() => {
     toast("👀 已经玩了30分钟啦，休息一下眼睛，看看远处再回来～", 4000);
   }
 }, 60000);
-navStack = [renderHome]; navTabs = ["home"];
-renderHome();
+if (new URLSearchParams(location.search).get("parent") === "1") { navStack=[renderHome,renderParent];navTabs=["home","home"];renderParent(); }
+else { navStack = [renderHome]; navTabs = ["home"]; renderHome(); }
 if (chineseCardsClaimed) setTimeout(() => toast("📚 语文探险获得的 "+chineseCardsClaimed+" 张白白卡已点亮收藏册！"+(lastChineseOutfitUnlocks.length ? " 恭喜你，同款「"+lastChineseOutfitUnlocks.join("、")+"」也已放入衣橱！" : ""),4200),900);
 if (!localStorage.getItem(LS_KEY + "_hi")) {
   localStorage.setItem(LS_KEY + "_hi", "1");
