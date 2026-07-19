@@ -867,7 +867,7 @@ let currentScreenId = "";
 let activeTab = "home";
 let designTimer = null, designSessionSave = null, designMode = "";
 const ROOT_TABS = { home: "home", map: "map", phonics: "phonics", arcade: "arcade", reward: "reward" };
-function restoreScreenScroll(top){top=Math.max(0,Number(top)||0);const el=$("#screens"),restore=()=>{el.scrollTop=top};restore();requestAnimationFrame(()=>{restore();requestAnimationFrame(restore)});}
+function restoreScreenScroll(top){top=Math.max(0,Number(top)||0);$("#screens").scrollTop=top;}
 function setActiveTab(tab) {
   if (!tab) return;
   activeTab = tab;
@@ -987,6 +987,13 @@ function renderHome() {
   const dc = dueCount();
   const mt = memoryTiers();
   const lv = levelNum(), df = D(), mc = masteredCount();
+  const smart = dc || wc
+    ? { icon:"📕", title:"先把快忘的词接回来", sub:`${dc + wc} 个词值得再见一面`, action:"去复习", run:()=>startDueReview() }
+    : S.daily.ph < DAILY_PHONICS_TARGET
+      ? { icon:"🔮", title:"白白建议练一小段拼读", sub:`今天已完成 ${S.daily.ph}/${DAILY_PHONICS_TARGET} 条`, action:"去拼读", run:()=>goTab(renderPhonicsList,"phonics") }
+      : S.daily.g < df.games
+        ? { icon:"🎧", title:"听一句完整英语", sub:"学校听力常考整句，练完马上有回应", action:"听句子", run:()=>startSentenceListen(unlockedSents()) }
+        : { icon:"✨", title:"今天没有必须补的内容", sub:"选一个自己好奇的地方就很好", action:"随便逛逛", run:()=>goTab(renderArcade,"arcade") };
   const rankTip = S.diff !== "auto"
     ? "（家长已锁定难度）"
     : df.next ? "再学会 " + Math.max(0, df.next - mc) + " 个单词就能升段！" : "已是最高段位，太厉害了！";
@@ -1014,6 +1021,9 @@ function renderHome() {
       <div class="xpbarWrap" style="margin-top:12px"><div class="xpbar" style="width:${pct}%"></div></div>
       <div id="xpText">${nx ? "距离白白成为【" + (nx.title || nx.n) + "】还差 " + (nx.xp - S.xp) + " 魔法值" : "白白已经是传奇伙伴啦！"}</div>
       <div id="rankChip">${df.rank}　<span style="font-weight:400;color:#c0a8d0">${rankTip}</span></div>
+    </div>
+    <div class="card smartRecommend" id="smartRecommend" style="display:flex;align-items:center;gap:10px;padding:12px 14px">
+      <span style="font-size:28px">${smart.icon}</span><span style="flex:1"><b style="display:block;color:#76548a;font-size:14px">白白的小建议：${smart.title}</b><small style="color:#a18caf;line-height:1.5">${smart.sub}</small></span><button class="btn small" id="smartGo" style="width:auto;white-space:nowrap">${smart.action}</button>
     </div>
     <div class="sectionTitle">📋 今日任务 · 按顺序做（全完成 +20🪙+🎟️）　<span style="font-weight:400;color:#c0a8d0;font-size:12px">点任一行直接开始</span></div>
     <div class="card">
@@ -1066,6 +1076,7 @@ function renderHome() {
     cheer.style.cursor = "pointer";
     cheer.onclick = () => baibaiSpeak(cheer.textContent);
   }
+  $("#smartGo").onclick = smart.run;
   /* 每一行任务都能直接点进对应模块（不用自己找） */
   $$("#scr-home .taskRow.clickable").forEach(r => {
     r.onclick = () => {
@@ -2942,17 +2953,24 @@ function startStageExam() {
   const learned = learnedWords(), info = stageExamInfo(learned.length);
   if (!info.no) { toast("学会20个词，就能参加第一阶段测验啦！", 2400); goBack(); return; }
   const sents = unlockedSents();
-  const wordQs = stageExamItems(learned, sents.length ? 20 : 25);
+  const phonicPool = PHONICS.filter(p => phS(p.id).learned), phonicN = Math.min(3, phonicPool.length);
+  const wordQs = stageExamItems(learned, sents.length ? 20 - phonicN : 25 - phonicN);
   const types = ["listen", "enzh", "zhen", "holes"];
   let qs = wordQs.map((w, i) => ({ kind: types[i % types.length], w }));
   if (sents.length) qs = qs.concat(stageExamItems(sents, 5).map(s => ({ kind: "sent", s })));
+  if (phonicN) qs = qs.concat(stageExamItems(phonicPool, phonicN).map(p => ({ kind:"phonic", p, sample:p.words[Math.floor(Math.random()*p.words.length)] })));
   qs = shuffle(qs);
   let qi = 0, right = 0;
   function q() {
     if (qi >= qs.length) return finish();
     const cur = qs[qi];
     let head = "", opts = [], answer = "", speakText = "";
-    if (cur.kind === "sent") {
+    if (cur.kind === "phonic") {
+      const p=cur.p;
+      opts=shuffle([p].concat(sample(PHONICS.filter(x=>x.id!==p.id),D().opts-1)));
+      answer=p.id;
+      head='<div class="qText">'+esc(cur.sample.w)+'</div><div class="qSub">这个词用了哪条拼读规律？</div>';
+    } else if (cur.kind === "sent") {
       const s = cur.s;
       opts = shuffle([s].concat(sample(sents.filter(x => x.en !== s.en), D().opts - 1)));
       answer = s.en; speakText = s.en;
@@ -2976,7 +2994,7 @@ function startStageExam() {
         head = '<div class="qText stageHoles">' + esc(shown) + '</div><div class="qSub">双字母补空：选出完整拼写</div>';
       }
     }
-    const labels = opts.map(o => cur.kind === "sent" ? esc(o.zh) : (cur.kind === "zhen" || cur.kind === "holes" ? esc(o.w) : '<span class="oEmoji">' + o.e + '</span>' + o.zh));
+    const labels = opts.map(o => cur.kind === "phonic" ? esc(o.label)+"　"+esc(o.ipa) : cur.kind === "sent" ? esc(o.zh) : (cur.kind === "zhen" || cur.kind === "holes" ? esc(o.w) : '<span class="oEmoji">' + o.e + '</span>' + o.zh));
     $("#scr-play").innerHTML =
       '<div id="playHead"><div id="playProg">🎓 第 ' + info.no + ' 阶段 ' + (qi + 1) + ' / ' + qs.length + '　答对 ' + right + '</div></div>' +
       '<div class="card" id="playQ">' + head + '</div>' +
@@ -2985,7 +3003,7 @@ function startStageExam() {
     let locked = false;
     $$("#scr-play .optBtn").forEach(b => b.onclick = () => {
       if (locked) return; locked = true;
-      const o = opts[+b.dataset.i], got = cur.kind === "sent" ? o.en : o.w;
+      const o = opts[+b.dataset.i], got = cur.kind === "phonic" ? o.id : cur.kind === "sent" ? o.en : o.w;
       if (got === answer) {
         b.classList.add("right"); right++; sndRight();
         if (cur.w) recordRight(cur.w.w);
@@ -2993,7 +3011,7 @@ function startStageExam() {
         b.classList.add("wrong"); sndWrong();
         if (cur.w) recordWrong(cur.w.w);
         $$("#scr-play .optBtn").forEach(x => {
-          const z = opts[+x.dataset.i], v = cur.kind === "sent" ? z.en : z.w;
+          const z = opts[+x.dataset.i], v = cur.kind === "phonic" ? z.id : cur.kind === "sent" ? z.en : z.w;
           if (v === answer) x.classList.add("right");
         });
       }
@@ -3688,7 +3706,7 @@ function renderDecoEdit() {
     const selectedEl = $(`#scr-anchor .decoItem[data-outfit="${sel}"]`);
     {
       const id = sel;
-      let dragging = false, grabX = 0, grabY = 0;
+      let dragging = false, grabX = 0, grabY = 0, dragScroll = 0;
 
       const moveTo = (cx, cy) => {
         const r = stage.getBoundingClientRect();
@@ -3703,7 +3721,7 @@ function renderDecoEdit() {
       };
       const start = ev => {
         const t = ev.touches ? ev.touches[0] : ev, r = stage.getBoundingClientRect(), d = draft[id];
-        dragging = true; sel = id;
+        dragging = true; sel = id; dragScroll = $("#screens").scrollTop;
         grabX = t.clientX - (r.left + d.x / 100 * r.width);
         grabY = t.clientY - (r.top + d.y / 100 * r.height);
         ev.preventDefault();
@@ -3712,12 +3730,13 @@ function renderDecoEdit() {
         if (!dragging) return;
         const t = ev.touches ? ev.touches[0] : ev;
         moveTo(t.clientX, t.clientY);
+        $("#screens").scrollTop = dragScroll;
         ev.preventDefault();
       };
-      const end = () => { if (dragging) { dragging = false; tone(760, .05); const s=$("#decoStatus");if(s)s.textContent=`当前：${outfitOf(id).n}　大小 ${Math.round(draft[id].s*100)}%　角度 ${draft[id].r}°`; } };
+      const end = () => { if (dragging) { dragging = false; $("#screens").scrollTop=dragScroll; tone(760, .05); const s=$("#decoStatus");if(s)s.textContent=`当前：${outfitOf(id).n}　大小 ${Math.round(draft[id].s*100)}%　角度 ${draft[id].r}°`; } };
 
       /* Pointer Events 在 iPhone/安卓上最稳定，抓住后移出舞台也不断；旧浏览器保留触摸降级。 */
-      if (window.PointerEvent) {
+      {
         const pointerMove = ev => move(ev);
         const pointerEnd = ev => {
           end();
@@ -3732,7 +3751,8 @@ function renderDecoEdit() {
           window.addEventListener("pointerup", pointerEnd);
           window.addEventListener("pointercancel", pointerEnd);
         });
-      } else {
+      }
+      if (!window.PointerEvent) {
         grab.onmousedown = start;
         grab.ontouchstart = start;
         stage.addEventListener("mousemove", move);

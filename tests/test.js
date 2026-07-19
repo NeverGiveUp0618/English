@@ -75,6 +75,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
 
   console.log("— 首页 —");
   ok($("#scr-home").classList.contains("on"), "首页显示");
+  ok($("#smartRecommend") && $("#smartGo"), "★ 首页有基于当前学习状态的白白建议入口");
   ok($("#hubLink").href === "https://nevergiveup0618.github.io/learning/#englishPortal" && $("#hubLink").style.display !== "none", "★ 首页返回学习导航时带英语位置锚点");
   ok($("#backBtn").style.visibility === "hidden", "★ 英语首页不显示无意义的页内返回箭头");
   $("#homeAlbum").click();
@@ -85,7 +86,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
   ok($("#coinNum").textContent === "0", "初始金币0");
   const swText = fs.readFileSync(DIR + "/sw.js", "utf8");
-  ok(swText.includes("magic-english-v61") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
+  ok(swText.includes("magic-english-v62") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
   ok(swText.includes("fallback || fresh"), "★ 慢网络二次打开优先显示缓存首页");
 
   console.log("— 地图与锁 —");

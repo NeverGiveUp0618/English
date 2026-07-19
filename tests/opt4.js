@@ -56,7 +56,7 @@ function boot() {
   ok(PH[0].words[0].ipa === "/keɪk/", "例词带音标: cake " + PH[0].words[0].ipa);
   ok(JSON.stringify(PH[5].words[7].syl) === '["tea","cher"]', "多音节词已拆分: teacher → tea·cher");
   const withIpa = PH.reduce((a, p) => a + p.words.filter(x => x.ipa && x.syl).length, 0);
-  ok(withIpa === 64, "64 个例词全部有音标和音节");
+  ok(withIpa === PH.reduce((a,p)=>a+p.words.length,0) && withIpa >= 100, "全部拼读例词都有音标和音节");
   w.eval("navStack=[()=>renderPhonicRule(PHONICS[0])];renderPhonicRule(PHONICS[0]);");
   const ph = $("#scr-phonic").innerHTML;
   ok(ph.includes("phKey"), "★ 规则字母上色（红色）");
