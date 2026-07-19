@@ -85,7 +85,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
   ok($("#coinNum").textContent === "0", "初始金币0");
   const swText = fs.readFileSync(DIR + "/sw.js", "utf8");
-  ok(swText.includes("magic-english-v54") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
+  ok(swText.includes("magic-english-v55") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
   ok(swText.includes("fallback || fresh"), "★ 慢网络二次打开优先显示缓存首页");
 
   console.log("— 地图与锁 —");
@@ -109,11 +109,11 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   console.log("— 难度：新手段位（刚上四年级） —");
   ok(w.eval("levelNum()") === 1, "0词时=1段(小小魔法学徒)");
   ok(w.eval("D().rank") === "🌱 小小魔法学徒", "段位名正确");
-  ok(w.eval("D().newWords") === 3, "新手每日只学3个新词");
+  ok(w.eval("D().newWords") === 8, "每日新学8个单词");
   ok(w.eval("D().opts") === 3, "新手3选1");
   ok(w.eval("D().timer") === 0, "新手闪电轮不倒计时");
   ok($("#scr-home").innerHTML.includes("小小魔法学徒") && $("#scr-home").innerHTML.includes("再学会 25"), "首页显示段位+升段进度");
-  ok($("#scr-home").innerHTML.includes("学 3 个新单词"), "每日任务显示3个新词");
+  ok($("#scr-home").innerHTML.includes("学 8 个新单词"), "每日任务显示8个新词");
 
   console.log("— 学单词：魔法孵化(翻卡→三连击→连击轮) —");
   cardOf("u1").click();
@@ -121,9 +121,9 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   $$("#scr-unit .actRow")[0].click();
   ok($("#scr-learn").classList.contains("on"), "进入魔法孵化");
   ok(!!$("#flipCard") && !!$(".flipBack"), "翻卡背面显示");
-  ok($$("#wordLights .wl").length === 3, "新手段位：3盏单词进度灯");
+  ok($$("#wordLights .wl").length === 8, "每日8盏单词进度灯");
 
-  const NW = 3;
+  const NW = 8;
   for (let n = 0; n < NW; n++) {
     // 翻卡
     ok($("#lcGo").style.visibility === "hidden", "词" + (n + 1) + ": 翻开前不能开始");
@@ -184,8 +184,8 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
     await sleep(850);
   }
   ok($("#scr-result").classList.contains("on"), "闪电轮结算(共" + lq + "题)");
-  ok(S().units.u1.learned.length === 3, "3个单词全部记入已学");
-  ok(S().daily.w === 3, "每日任务·学词计数=3");
+  ok(S().units.u1.learned.length === 8, "8个单词全部记入已学");
+  ok(S().daily.w === 8, "每日任务·学词计数=8");
   ok(S().coins > 0, "获得金币(含连击倍率): " + S().coins);
   ok(S().daily.t2 === true, "★ 学新词任务(t2)已自动发奖");
   ok(w.eval("liveTimer") === null, "闪电轮结束后计时器已清理");
@@ -240,7 +240,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   }
   ok($("#scr-result").classList.contains("on"), "挑战结算");
   ok(S().units.u1.stars === 3, "u1拿到3星");
-  ok(S().daily.g === 3 && S().daily.t3 === true, "3局后玩游戏任务(t3)完成");
+  ok(S().daily.g === 3 && S().daily.t3 === false, "3局尚未完成5局游戏任务");
   $("#resBack").click();
 
   console.log("— 解锁验证 —");
@@ -258,6 +258,8 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   }
   ok($("#scr-result").classList.contains("on"), "听音8题结算");
   ok(S().daily.g === 4, "游戏厅再玩1局 g=4");
+  w.eval("bumpDaily('g')");
+  ok(S().daily.g === 5 && S().daily.t3 === true, "5局后玩游戏任务完成");
   $("#resBack").click();
 
   console.log("— 扭蛋机 —");
@@ -282,7 +284,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   $$('.tab').find(t => t.dataset.tab === "arcade").click();
   ok($$("#scr-arcade .actRow").length === 10, "游戏厅10个入口(含听句子、阶段测验和今日复习)");
   ok(S().daily.t1 === true, "无复习任务时t1(复习)自动完成");
-  w.eval("bumpDaily('ph')");
+  w.eval("bumpDaily('ph',3)");
   ok(S().daily.t4 === true, "★ 拼读任务(t4)完成");
   ok(S().daily.bonus === true && S().streak === 1, "★ 四项任务齐→bonus+连续1天");
 
@@ -407,6 +409,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
 
   console.log("— 魔法大考 —");
   // 词数不足8时应拒绝进入
+  w.eval("S.units.u1.learned=S.units.u1.learned.slice(0,7);save()");
   arcade("魔法大考");
   ok(!$("#scr-play").classList.contains("on"), "已学词<8时不能进大考");
   // 补足已学单词后再考
@@ -741,7 +744,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok(d.t1 === false && d.t2 === false && d.t3 === false && d.t4 === false && d.bonus === false, "任务标记归零");
   ok(S().streak === streakBefore, "连续天数不受影响: " + S().streak);
   $$('.tab').find(t => t.dataset.tab === "home").click();
-  ok($("#scr-home").innerHTML.includes("0/5") || $("#scr-home").innerHTML.includes("0/2"), "首页任务重新显示为未完成");
+  ok($("#scr-home").innerHTML.includes("0/8") || $("#scr-home").innerHTML.includes("0/2"), "首页任务重新显示为未完成");
   $$('.tab').find(t => t.dataset.tab === "reward").click();
   $("#parentLink").click();
   // 清空

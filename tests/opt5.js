@@ -75,11 +75,11 @@ const S = () => w.eval("S");
   ok(w.eval("taskDone().t4") === false, "没做拼读 → 任务4 未完成");
   ok(w.eval("wheelReady()") === false, "★ 没学拼读 → 转盘锁定");
   w.eval("navStack=[renderWheel];renderWheel();");
-  ok($("#scr-wheel").innerHTML.includes("学一条自然拼读"), "★ 转盘清单里列出「学一条自然拼读」");
+  ok($("#scr-wheel").innerHTML.includes("完成3条自然拼读"), "★ 转盘清单里列出「完成3条自然拼读」");
   ok($("#spinBtn").disabled === true, "转盘按钮锁定");
-  // 做一个拼读关卡
-  w.eval("bumpDaily('ph')");
-  ok(w.eval("taskDone().t4") === true, "★ 完成 1 个拼读关卡 → 任务4 完成");
+  // 做三个拼读关卡
+  w.eval("bumpDaily('ph',3)");
+  ok(w.eval("taskDone().t4") === true, "★ 完成 3 个拼读关卡 → 任务4 完成");
   ok(w.eval("wheelReady()") === true, "★ 四项齐了 → 转盘解锁");
 
   console.log("\n④ 复习选词 = 昨天学的 + 之前的随机");

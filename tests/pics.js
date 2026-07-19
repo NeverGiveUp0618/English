@@ -51,6 +51,7 @@ const S = () => w.eval("S");
   w.eval("S.pet.worn=['bb_bow','bb_pinkdress'];save();navStack=[renderDecoEdit];renderDecoEdit();");
   ok($$(".decoItem").length === 2 && $$(".decoItem").every(x => x.dataset.outfit), "两件装扮都能单独选中和拖动");
   ok(!!$("#decoGrab") && $$(".decoItem").every(x => w.getComputedStyle(x).pointerEvents === "none"), "★ 独立抓取点负责拖动，披风透明画布不再遮住帽子");
+  ok(w.getComputedStyle($("#decoGrab")).width === "44px" && w.getComputedStyle($("#decoGrab span")).width === "26px", "★ 拖动热区够大，但可见移动点很小，不遮住衣服落点");
   ok($("#decoStage [data-outfit='bb_pinkdress']").style.zIndex === "3", "★ 调整页与保存后的正式形象使用同一前置披风层级");
   ok(!!$("#deRemove") && $("#deRemove").textContent.includes("取下"), "★ 编辑页提供明确的取下按钮");
   ok(/aspect-ratio:\s*1\s*\/\s*1/.test(fs.readFileSync(DIR + "/index.html", "utf8")), "编辑器和首页使用同一正方形坐标系");
@@ -112,8 +113,8 @@ const S = () => w.eval("S");
   ok(w.eval("STICKERS.every(s=>s.message&&!s.message.includes('这是陪你学习的白白'))"), "★ 2000张卡片都改为鼓励语、名句或诗句");
   ok(w.eval("new Set(STICKERS.map(s=>s.message)).size") === 50, "★ 收藏卡准备了50句轮换小纸条，不再千篇一律");
   w.localStorage.removeItem("sharedCardDaily_v1");
-  const chances = w.eval("[1,2,3,4,5,6].map(()=>takeEnglishCardChance())");
-  ok(chances.filter(Boolean).length === 5 && w.eval("englishCardLeft()") === 0, "★ 英语每日最多获得5张卡");
+  const chances = w.eval("[1,2,3,4,5,6,7,8,9].map(()=>takeEnglishCardChance())");
+  ok(chances.filter(Boolean).length === 8 && w.eval("englishCardLeft()") === 0, "★ 英语每日最多获得8张卡");
 
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
   process.exit(fail ? 1 : 0);

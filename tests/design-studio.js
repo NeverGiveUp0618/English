@@ -1,0 +1,31 @@
+const {JSDOM}=require("jsdom"),fs=require("fs"),path=require("path");
+const DIR=path.resolve(__dirname,"..");let pass=0,fail=0;
+const ok=(c,m)=>{c?pass++:fail++;console.log(`  ${c?"✓":"✗ FAIL"} ${m}`)};
+const dom=new JSDOM(fs.readFileSync(DIR+"/index.html","utf8").replace(/<script src="[^"]+"><\/script>/g,""),{runScripts:"dangerously",url:"https://nevergiveup0618.github.io/English/",pretendToBeVisual:true});
+const w=dom.window,$=s=>w.document.querySelector(s),$$=s=>[...w.document.querySelectorAll(s)];
+w.SpeechSynthesisUtterance=function(t){this.text=t};w.speechSynthesis={cancel(){},speak(){},getVoices:()=>[]};w.Audio=function(){return{play:()=>Promise.resolve(),pause(){}}};
+w.HTMLCanvasElement.prototype.getContext=function(){return{beginPath(){},moveTo(){},lineTo(){},stroke(){},clearRect(){},drawImage(){},getImageData(){return{}},putImageData(){}}};
+w.HTMLCanvasElement.prototype.toDataURL=()=>"data:image/png;base64,VEVTVA==";
+for(const f of ["audio/manifest.js","data.js","app.js"]){const s=w.document.createElement("script");s.textContent=fs.readFileSync(DIR+"/"+f,"utf8");w.document.body.appendChild(s)}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+(async()=>{
+ console.log("角色与装扮设计工坊");
+ w.eval("navStack=[renderReward];renderReward();$('#toDesign').click()");
+ ok($("#scr-design").textContent.includes("完成今天的英语任务后开放"),"每日任务未完成时设计工坊锁定");
+ w.eval("S.daily.w=8;S.daily.g=5;S.daily.r=9;S.daily.ph=3;S.wrong={};S.srs={};checkTasks();navStack=[renderReward];renderReward();$('#toDesign').click()");
+ ok($("#designClock").textContent==="30:00","完成任务后获得30分钟创作时间");
+ ok($$("[data-shape]").length===3&&$("#designMain").type==="color","装扮操作台支持三种版型和即时涂色");
+ const coins=w.eval("loadWallet().coins");$("#makeDesign").click();
+ ok(w.eval("S.pet.customOutfits.length")===1&&w.eval("S.pet.worn.some(x=>x.startsWith('my_design_'))"),"第一件自创装扮免费制作并直接进入衣橱");
+ ok(w.eval("loadWallet().coins")===coins,"第一件设计不扣金币");
+ ok(w.document.activeElement!==$("#roleName"),"角色名字输入框不自动聚焦或弹键盘");
+ const c=$("#characterCanvas");c.getBoundingClientRect=()=>({left:0,top:0,width:300,height:300});
+ c.dispatchEvent(new w.MouseEvent("pointerdown",{bubbles:true,clientX:30,clientY:30}));c.dispatchEvent(new w.MouseEvent("pointermove",{bubbles:true,clientX:80,clientY:80}));c.dispatchEvent(new w.MouseEvent("pointerup",{bubbles:true}));
+ $("#roleName").value="星星伙伴";$("#saveCharacter").click();
+ ok(w.eval("petName()") === "星星伙伴" && w.eval("S.pet.useCustom")===true,"自绘角色可命名并取代白白的位置");
+ ok(JSON.parse(w.localStorage.getItem("sharedPet_v1")).name==="星星伙伴","自创角色同步给语文端共享伙伴");
+ $("#useBaibai").click();ok(w.eval("petName()") === "白白","白白没有被删除，可以一键切回来");
+ w.eval("S.designPlay={date:todayStr(),used:1799};save();renderDesignStudio()");await sleep(1150);
+ ok($("#scr-reward").classList.contains("on"),"30分钟结束自动保存并退出操作台");
+ console.log(`\n结果: ${pass} 通过, ${fail} 失败`);process.exit(fail?1:0);
+})().catch(e=>{console.error(e);process.exit(1)});

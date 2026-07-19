@@ -22,7 +22,8 @@ const WALLET_KEY = "sharedWallet_v1";
 /* 白白的最新装扮也跨科目共享：语文只读取展示，不从这里扣钱。 */
 const SHARED_PET_KEY = "sharedPet_v1";
 const CARD_DAILY_KEY = "sharedCardDaily_v1";
-const CARD_DAILY_LIMIT = 5;
+const CARD_DAILY_LIMIT = 8;
+const DAILY_PHONICS_TARGET = 3;
 function defState() {
   return {
     coins: 0, xp: 0, streak: 0, lastDaily: "",
@@ -44,6 +45,7 @@ function defState() {
       wear: { hat: "", face: "", item: "" }, // 兼容旧存档，不再用于白白
       worn: [],               // 白白当前穿戴的多件装扮 id
       outfits: ["bb_bow", "bb_flower"], // 两件免费发饰，打开就能玩
+      customOutfits: [],        // 孩子在设计工坊制作的装扮（仅存本机存档）
       pics: {},               // 家长自己上传的伙伴形象：petId -> dataURI（只存本机，不进仓库、不上传）
       anchors: {},            // 兼容旧存档
       deco: { baibai: {} },   // outfitId -> {x,y,s,r}
@@ -72,12 +74,15 @@ function defState() {
     bestExam: 0,   // 魔法大考最高分
     stageExams: {}, // 阶段测验：stageKey -> {best, passed, date}
     gachaDup: 0     // 连续重复保护：4次重复后下一颗必出新卡
+    ,designPlay: {date:"",used:0}, // 每日任务后30分钟自由设计时间
+    designDraft: null
   };
 }
 let S = defState();
 try { const raw = localStorage.getItem(LS_KEY); if (raw) S = Object.assign(defState(), JSON.parse(raw)); } catch (e) {}
 S.daily = Object.assign(defState().daily, S.daily);
 S.pet = Object.assign(defState().pet, S.pet || {});
+S.pet.customOutfits = Array.isArray(S.pet.customOutfits) ? S.pet.customOutfits.slice(0, 20) : [];
 S.stageExams = Object.assign({}, S.stageExams || {});
 S.pet.wear = Object.assign(defState().pet.wear, S.pet.wear || {});
 /* 老伙伴存档只隐藏不删除学习/金币数据；首次升级时让白白以裸狗形象登场。 */
@@ -92,7 +97,7 @@ if (!S.pet.baibaiV1) {
 S.pet.id = "baibai";
 S.pet.name = "白白";
 S.pet.owned = ["baibai"];
-S.pet.worn = Array.isArray(S.pet.worn) ? S.pet.worn.filter(id => OUTFITS.some(o => o.id === id)) : [];
+S.pet.worn = Array.isArray(S.pet.worn) ? S.pet.worn.filter(id => OUTFITS.some(o => o.id === id) || S.pet.customOutfits.some(o => o.id === id)) : [];
 S.pet.outfits = Array.isArray(S.pet.outfits) ? S.pet.outfits : [];
 S.pet.pose = BAIBAI_POSES.some(p => p.id === S.pet.pose) ? S.pet.pose : "p01";
 S.pet.posesOwned = Array.isArray(S.pet.posesOwned) ? S.pet.posesOwned.filter(id => BAIBAI_POSES.some(p => p.id === id)) : [];
@@ -146,7 +151,7 @@ function sharePetOut() {
       const o = OUTFITS.find(x => x.id === id), d = decoOf(id);
       return o ? { id: o.id, e: o.e, n: o.n, art: o.art ? new URL(o.art, location.href).href : "", base: o.base || .3, hue: Number(o.hue) || 0, fx: o.fx || "", x: d.x, y: d.y, s: d.s, r: d.r } : null;
     }).filter(Boolean);
-    localStorage.setItem(SHARED_PET_KEY, JSON.stringify({ v: 2, name: "白白", body: new URL(petVisual(), location.href).href, pose: S.pet.pose, items }));
+    localStorage.setItem(SHARED_PET_KEY, JSON.stringify({ v: 2, name: petName(), body: new URL(petVisual(), location.href).href, pose: S.pet.pose, items }));
   } catch (e) {}
 }
 
@@ -231,7 +236,7 @@ function migrateSRS() {
 const DIFFS = {
   1: {
     rank: "🌱 小小魔法学徒", next: 25,
-    newWords: 3, games: 2, reviews: 2,      // 每日任务量（约10分钟）
+    newWords: 8, games: 5, reviews: 2,
     opts: 3,                                 // 3选1，先建立信心
     timer: 0,                                // 闪电轮不倒计时
     blanks: 1,                               // 补字母只挖1个
@@ -241,7 +246,7 @@ const DIFFS = {
   },
   2: {
     rank: "✨ 魔法师", next: 60,
-    newWords: 4, games: 3, reviews: 3,
+    newWords: 8, games: 5, reviews: 3,
     opts: 4,
     timer: 12000,                            // 开始有时间感，但很宽松
     blanks: 2,                               // 进入第二段后一次补两个字母
@@ -251,7 +256,7 @@ const DIFFS = {
   },
   3: {
     rank: "🦄 大魔法师", next: 0,
-    newWords: 5, games: 3, reviews: 3,
+    newWords: 8, games: 5, reviews: 3,
     opts: 4,
     timer: 8000,                             // 正常的闪电轮
     blanks: 2,
@@ -566,7 +571,7 @@ function petDef() { return PETS[0]; }
 function petStages() { return petDef().stages; }
 function petStage(xp) { let st = petStages()[0]; petStages().forEach(p => { if (xp >= p.xp) st = p; }); return st; }
 function petNext(xp) { return petStages().find(p => p.xp > xp) || null; }
-function petName() { return "白白"; }
+function petName() { return S.pet.useCustom && S.pet.customCharacter ? (S.pet.customCharacter.name || "我的伙伴") : "白白"; }
 
 /* 每天状态自然回落一点（不惩罚，只是"它有点想你了"） */
 function decayCare() {
@@ -592,7 +597,8 @@ function careMood() {
 }
 /* 亲密度等级：1~5 心 */
 function bondLv() { const b = S.pet.bond || 0; return Math.min(5, Math.floor(b / 60) + (b > 0 ? 1 : 0)); }
-function outfitOf(id) { return OUTFITS.find(x => x.id === id); }
+function allOutfits() { return OUTFITS.concat(S.pet.customOutfits || []); }
+function outfitOf(id) { return allOutfits().find(x => x.id === id); }
 function poseDecoMap() {
   if (!S.pet.decoByPose) S.pet.decoByPose = {};
   return S.pet.decoByPose[S.pet.pose] || (S.pet.decoByPose[S.pet.pose] = {});
@@ -602,7 +608,7 @@ function wornOutfits() { return (S.pet.worn || []).map(outfitOf).filter(Boolean)
 /* 旧版本的本机图片仍留在存档中，但白白上线后不再显示或上传。 */
 function petPic(id) { return (S.pet.pics || {})[id || S.pet.id] || ""; }
 function currentPose() { return BAIBAI_POSES.find(p => p.id === S.pet.pose) || BAIBAI_POSES[0]; }
-function petVisual() { return currentPose().art; }
+function petVisual() { return S.pet.useCustom && S.pet.customCharacter && S.pet.customCharacter.art ? S.pet.customCharacter.art : currentPose().art; }
 
 function petCheer() {
   const d = taskDone();
@@ -650,7 +656,7 @@ function lockedStickerVisual(s) {
 /* 白白的完整形象：裸狗底图 + 所有已保存装扮；任何页面调用都会得到最新造型。 */
 function petFigure(size, withOutfit) {
   const sz = size || 110;
-  const body = `<img class="petImg" src="${petVisual()}" alt="白白" style="position:relative;z-index:2">`;
+  const body = `<img class="petImg" src="${petVisual()}" alt="${esc(petName())}" style="position:relative;z-index:2">`;
   const deco = withOutfit === false ? "" : wornOutfits().map(o => {
     /* 新披风自身带透明胸口开口，必须位于白白前面，领口和前襟才像真正穿上。 */
     const d = decoOf(o.id), z = 3;
@@ -704,8 +710,8 @@ function taskDone() {
     t2: S.daily.w >= d.newWords || (noFreshWords() && S.daily.g >= 2),
     /* ③ 玩游戏 */
     t3: S.daily.g >= d.games,
-    /* ④ 自然拼读：每天至少完成 1 个拼读关卡 */
-    t4: S.daily.ph >= 1
+    /* ④ 自然拼读：每天完成 3 个拼读关卡 */
+    t4: S.daily.ph >= DAILY_PHONICS_TARGET
   };
 }
 function checkTasks() {
@@ -857,6 +863,7 @@ let navScrolls = [];
 let pendingScroll = null;
 let currentScreenId = "";
 let activeTab = "home";
+let designTimer = null, designSessionSave = null;
 const ROOT_TABS = { home: "home", map: "map", phonics: "phonics", arcade: "arcade", reward: "reward" };
 function setActiveTab(tab) {
   if (!tab) return;
@@ -864,6 +871,7 @@ function setActiveTab(tab) {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.tab === tab));
 }
 function show(id, title) {
+  if (id !== "design" && designTimer) { clearInterval(designTimer); designTimer=null; if(designSessionSave)designSessionSave(); designSessionSave=null; }
   const isRoot = !!ROOT_TABS[id];
   if (isRoot) setActiveTab(ROOT_TABS[id]);
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("on"));
@@ -1024,7 +1032,7 @@ function renderHome() {
       <div class="taskRow clickable ${d.t4 ? "done" : ""}" data-jump="phonics">
         <span class="tIcon">4️⃣</span>
         <span class="tName">🔮 <b>学一条自然拼读</b><span class="tHint">会拼就会写——这是地基，每天一条</span></span>
-        <span class="tProg">${Math.min(S.daily.ph, 1)}/1</span>
+        <span class="tProg">${Math.min(S.daily.ph, DAILY_PHONICS_TARGET)}/${DAILY_PHONICS_TARGET}</span>
       </div>
     </div>
     <div style="text-align:center;font-size:11px;color:#c0b0d0;margin:-4px 0 12px">四项全部完成，才能转今天的转盘 🎡</div>
@@ -2100,7 +2108,7 @@ function renderWheel() {
 
   let btnTxt, hint;
   if (spun) { btnTxt = "今天已经转过啦，明天再来 🌙"; hint = "转盘每天只能转 <b>1 次</b>——这样它才珍贵。"; }
-  else if (!ready) { btnTxt = "🔒 先完成今天的学习和复习"; hint = "转盘是<b>终极奖励</b>：把今天的三个任务全做完，才能转。"; }
+  else if (!ready) { btnTxt = "🔒 先完成今天的学习和复习"; hint = "转盘是<b>终极奖励</b>：把今天的四项任务全做完，才能转。"; }
   else if (S.tickets < 1) { btnTxt = "还没有转盘券"; hint = "完成今日任务就会得到转盘券。"; }
   else { btnTxt = "🎡 开始转！（今天的唯一一次）"; hint = "今天的学习和复习都完成了——<b>这一转是你应得的</b>。"; }
 
@@ -2119,13 +2127,13 @@ function renderWheel() {
 
       <div class="card" style="margin:8px 0;padding:10px;background:${ready ? "#eefae8" : "#fff6fb"}">
         <div style="font-size:12px;font-weight:700;color:${ready ? "#5a9a4a" : "#b08ac0"};margin-bottom:4px">
-          ${ready ? "✅ 今天的任务全部完成，可以转啦！" : "🔒 完成下面三件事才能转："}
+          ${ready ? "✅ 今天的任务全部完成，可以转啦！" : "🔒 完成下面四件事才能转："}
         </div>
         <div style="font-size:12px;color:#8a7a9a;text-align:left;line-height:1.9">
           ${d.t1 ? "✅" : "⬜"} <b>做完今天的复习</b><br>
           ${d.t2 ? "✅" : "⬜"} 学会今天的新单词<br>
           ${d.t3 ? "✅" : "⬜"} 完成今天的小游戏<br>
-          ${d.t4 ? "✅" : "⬜"} <b>学一条自然拼读</b>
+          ${d.t4 ? "✅" : "⬜"} <b>完成3条自然拼读</b>
         </div>
       </div>
 
@@ -2476,13 +2484,13 @@ function startPhonicMix() {
 
 function renderPhonicsList() {
   const learnedN = PHONICS.filter(p => phS(p.id).learned).length;
-  const doneToday = S.daily.ph >= 1;
+  const doneToday = S.daily.ph >= DAILY_PHONICS_TARGET;
   $("#scr-phonics").innerHTML = `
     <div class="card" style="text-align:center;padding:12px">
       <div style="font-size:15px;font-weight:700;color:#9b59b6">🔮 拼读魔法学院</div>
       <div style="font-size:12px;color:#b8a8c8;margin-top:2px">学会拼读规则，看到生词也能自己念出来！</div>
       <div style="font-size:12px;margin-top:6px;color:${doneToday ? "#7cc576" : "#e8842d"};font-weight:700">
-        ${doneToday ? "✅ 今天的拼读任务已完成" : "⬜ 今天还没做拼读（每天 1 条，转盘要用）"}
+        ${doneToday ? "✅ 今天的拼读任务已完成" : `⬜ 今天完成 ${DAILY_PHONICS_TARGET} 条拼读（已完成 ${Math.min(S.daily.ph,DAILY_PHONICS_TARGET)} 条）`}
       </div>
     </div>
     ${learnedN >= 2 ? `<div class="card actRow" id="phMix" style="background:linear-gradient(135deg,#fff3d6,#ffe0ef)">
@@ -3359,7 +3367,8 @@ function renderCare() {
 /* 装扮衣橱 */
 function renderOutfit() {
   const owned = S.pet.outfits || [];
-  const cats = [...new Set(OUTFITS.map(o => o.cat))];
+  const outfits = allOutfits();
+  const cats = [...new Set(outfits.map(o => o.cat))];
   $("#scr-outfit").innerHTML = `
     <div class="card outfitHero" style="text-align:center">
       <div class="petShow">${petFigure(155)}</div>
@@ -3374,8 +3383,8 @@ function renderOutfit() {
     ${cats.map(cat => `
       <div class="sectionTitle">${cat}</div>
       <div class="outfitGrid">
-        ${OUTFITS.filter(o => o.cat === cat).map(o => {
-          const has = owned.includes(o.id);
+        ${outfits.filter(o => o.cat === cat).map(o => {
+          const has = owned.includes(o.id) || o.custom;
           const on = (S.pet.worn || []).includes(o.id);
           return `<div class="outfitCell ${has ? "" : "lock"} ${on ? "on" : ""}" data-o="${o.id}">
             <div class="oe">${outfitVisual(o)}</div>
@@ -3389,7 +3398,7 @@ function renderOutfit() {
   $("#toPoses").onclick = () => go(renderPoses);
   $$("#scr-outfit .outfitCell").forEach(c => {
     c.onclick = () => {
-      const o = OUTFITS.find(x => x.id === c.dataset.o);
+      const o = outfitOf(c.dataset.o);
       const owned2 = S.pet.outfits || (S.pet.outfits = []);
       if (!owned2.includes(o.id)) {
         const wal = loadWallet();
@@ -3603,7 +3612,7 @@ function renderDecoEdit() {
     $("#scr-anchor").innerHTML = `
       <div class="card" style="text-align:center;padding:10px">
         <div style="font-size:13px;color:#7a5a9a;line-height:1.6">
-          <b>先在下方点选一件，再按住紫色“拖”按钮移动</b> · 衣服会从当前位置跟着手指走<br>
+          <b>先在下方点选一件，再按住紫色小圆点移动</b> · 衣服会从当前位置跟着手指走<br>
           <span style="font-size:11px;color:#b8a8c8">一次只操作选中的装扮，大披风不会再挡住帽子和发夹</span>
         </div>
       </div>
@@ -3618,7 +3627,7 @@ function renderDecoEdit() {
           }).join("")}
           <button class="decoGrab" id="decoGrab" type="button"
             style="left:${draft[sel].x}%;top:${draft[sel].y}%"
-            aria-label="按住拖动${selected.n}"><span>拖</span></button>
+            aria-label="按住拖动${selected.n}"><span>✥</span></button>
         </div>
       </div>
 
@@ -3869,6 +3878,77 @@ function drawSticker() {
 function duplicateStickerCoins(st) {
   return Math.max(0, ({ 1:10, 2:15, 3:20 }[Number(st && st.r)] || 10) - 5);
 }
+
+/* ================= 白白设计工坊：装扮涂色 + 自创角色画板 ================= */
+const DESIGN_SHAPES = {
+  cape:{n:"宠物披风",cat:"我的设计",group:"body",base:1,pos:{x:50,y:60,s:1,r:0}},
+  hat:{n:"小礼帽",cat:"我的设计",group:"head",base:.42,pos:{x:50,y:17,s:1,r:0}},
+  collar:{n:"闪亮项圈",cat:"我的设计",group:"neck",base:.48,pos:{x:50,y:48,s:1,r:0}}
+};
+function designSvg(kind, main, trim, mark) {
+  const motif = mark === "star" ? "★" : mark === "heart" ? "♥" : mark === "flower" ? "✿" : "";
+  let art = "";
+  if (kind === "hat") art = `<path d="M66 145h168l-22 35H88z" fill="${trim}"/><path d="M96 55h108l17 94H79z" rx="18" fill="${main}" stroke="${trim}" stroke-width="10"/>`;
+  else if (kind === "collar") art = `<path d="M55 105 Q150 175 245 105 L228 148 Q150 210 72 148Z" fill="${main}" stroke="${trim}" stroke-width="10"/><circle cx="150" cy="173" r="25" fill="${trim}"/>`;
+  else art = `<path d="M44 92 Q150 40 256 92 L274 264 Q226 288 188 238 L150 272 L112 238 Q74 288 26 264Z" fill="${main}" stroke="${trim}" stroke-width="12"/><path d="M78 88 Q150 145 222 88" fill="none" stroke="${trim}" stroke-width="18" stroke-linecap="round"/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">${art}${motif?`<text x="150" y="${kind==='hat'?128:kind==='collar'?145:205}" text-anchor="middle" font-size="54" fill="${trim}" font-family="sans-serif">${motif}</text>`:""}</svg>`;
+  return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+}
+function renderDesignStudio() {
+  const done=taskDone();
+  if(!(done.t1&&done.t2&&done.t3&&done.t4)){
+    $("#scr-design").innerHTML=`<div class="card" style="text-align:center;padding:28px 18px"><div style="font-size:42px">🔒</div><b style="display:block;color:#835aa2;margin:8px 0">完成今天的英语任务后开放</b><div style="font-size:12px;color:#aa94b8;line-height:1.7">复习、新学8个单词、玩5局游戏、完成3条自然拼读后，<br>就能来这里自由设计30分钟。</div><button class="btn ghost" id="designBack" style="margin-top:14px">先去完成今日任务</button></div>`;
+    $("#designBack").onclick=()=>{navStack=[renderReward];renderReward()};show("design","🎨 设计工坊");return;
+  }
+  S.designPlay=S.designPlay||{date:"",used:0};if(S.designPlay.date!==todayStr())S.designPlay={date:todayStr(),used:0};
+  let left=Math.max(0,1800-(Number(S.designPlay.used)||0));
+  if(!left){$("#scr-design").innerHTML=`<div class="card" style="text-align:center;padding:30px 18px"><div style="font-size:44px">💾</div><b style="display:block;color:#835aa2;margin:8px 0">今天的设计已经保存</b><div style="font-size:13px;color:#aa94b8">今天的30分钟创作时间结束啦，下次打开继续吧。</div></div>`;show("design","🎨 设计工坊");return;}
+  let kind="cape", main="#8f65d8", trim="#ffd56a", mark="star";
+  if(S.designDraft){kind=S.designDraft.kind||kind;main=S.designDraft.main||main;trim=S.designDraft.trim||trim;mark=S.designDraft.mark||mark;}
+  const renderWorkbench = () => {
+    const shape=DESIGN_SHAPES[kind], preview={id:"preview",n:shape.n,art:designSvg(kind,main,trim,mark),base:shape.base,pos:shape.pos};
+    $("#designOutfit").innerHTML=`<div class="designStage"><div class="petFig">${`<img class="petImg" src="${petVisual()}" alt="${esc(petName())}">`}<span class="petDeco" style="z-index:3;left:${shape.pos.x}%;top:${shape.pos.y}%;width:${Math.round(280*shape.base)}px;transform:translate(-50%,-50%)">${outfitVisual(preview)}</span></div></div>
+      <div class="designTabs">${Object.entries(DESIGN_SHAPES).map(([id,x])=>`<button class="designChoice ${id===kind?'on':''}" data-shape="${id}">${id==='cape'?'🧥':id==='hat'?'🎩':'📿'}<b>${x.n}</b></button>`).join("")}</div>
+      <div class="colorDesk"><label>主体色<input type="color" id="designMain" value="${main}"></label><label>包边色<input type="color" id="designTrim" value="${trim}"></label></div>
+      <div class="motifDesk"><span>装饰</span>${[["none","不要"],["star","★"],["heart","♥"],["flower","✿"]].map(([id,t])=>`<button class="motif ${id===mark?'on':''}" data-mark="${id}">${t}</button>`).join("")}</div>
+      <div class="note">第一件免费，之后每件制作需要 🪙30。做好的装扮会永久放进“我的设计”衣橱。</div>
+      <button class="btn wide" id="makeDesign">✨ 制作这件装扮${(S.pet.customOutfits||[]).length?'（🪙30）':'（首次免费）'}</button>`;
+    $$("#designOutfit [data-shape]").forEach(b=>b.onclick=()=>{kind=b.dataset.shape;renderWorkbench()});
+    $("#designMain").oninput=e=>{main=e.target.value;renderWorkbench()};
+    $("#designTrim").oninput=e=>{trim=e.target.value;renderWorkbench()};
+    $$("#designOutfit [data-mark]").forEach(b=>b.onclick=()=>{mark=b.dataset.mark;renderWorkbench()});
+    $("#makeDesign").onclick=()=>{
+      const cost=(S.pet.customOutfits||[]).length?30:0,wal=loadWallet();
+      if(wal.coins<cost){toast("还差 "+(cost-wal.coins)+" 金币，闯一小关就能继续设计啦");sndWrong();return;}
+      if((S.pet.customOutfits||[]).length>=20){toast("设计衣橱已经有20件啦，先穿起来看看吧");return;}
+      wal.coins-=cost;saveWallet(wal);S.coins=wal.coins;updateCoinBox();
+      const shape=DESIGN_SHAPES[kind],id="my_design_"+Date.now(),o={id,n:"我的"+shape.n,cat:"我的设计",group:shape.group,base:shape.base,pos:Object.assign({},shape.pos),art:designSvg(kind,main,trim,mark),custom:true,cost:0};
+      S.pet.customOutfits.push(o);S.pet.outfits.push(id);
+      if(shape.group)S.pet.worn=(S.pet.worn||[]).filter(x=>!outfitOf(x)||outfitOf(x).group!==shape.group);
+      S.pet.worn.push(id);save();confetti();sndWin();toast("🎨 设计完成！已经穿上并放进衣橱",2400);renderWorkbench();
+    };
+  };
+  $("#scr-design").innerHTML=`<div class="card designIntro"><b>🎨 角色与装扮设计工坊</b><span>涂色、画画、创造自己的学习伙伴。每一下操作都会马上显示结果。</span><div class="designClock">今日创作时间还剩 <strong id="designClock">${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}</strong></div></div>
+    <div class="sectionTitle">👗 装扮涂色操作台</div><div class="card" id="designOutfit"></div>
+    <div class="sectionTitle">🖍️ 自创角色画板</div><div class="card"><div class="drawTools"><button class="drawColor on" data-color="#7b4b2a" style="--c:#7b4b2a"></button><button class="drawColor" data-color="#ffffff" style="--c:#ffffff"></button><button class="drawColor" data-color="#f08eb5" style="--c:#f08eb5"></button><button class="drawColor" data-color="#7667d8" style="--c:#7667d8"></button><button class="drawColor" data-color="#41a98a" style="--c:#41a98a"></button><button class="drawSize on" data-size="10">细</button><button class="drawSize" data-size="24">粗</button><button class="drawSize" data-size="44">大</button></div><div class="drawBoard"><canvas id="characterCanvas" width="300" height="300" aria-label="自创角色画板"></canvas></div><div class="drawActions"><button class="btn small ghost" id="drawUndo">↶ 撤销</button><button class="btn small ghost" id="drawClear">🧽 清空</button></div><label class="roleName">角色名字<input id="roleName" maxlength="8" placeholder="点击后起名字" autocomplete="off"></label><button class="btn wide" id="saveCharacter">🌟 保存并让这个角色陪我</button>${S.pet.customCharacter?`<button class="btn ghost wide" id="useBaibai">🐶 切回白白</button>`:""}<div class="note">画作只保存在这台设备和备份码里，不会上传到公开网站。</div></div>`;
+  renderWorkbench();
+  const canvas=$("#characterCanvas"),ctx=canvas.getContext("2d"),history=[];let drawing=false,color="#7b4b2a",size=10,hasInk=false;
+  if(S.designDraft&&S.designDraft.canvas){const im=new Image();im.onload=()=>{ctx.drawImage(im,0,0,300,300);hasInk=true};im.src=S.designDraft.canvas;}
+  if(S.designDraft&&S.designDraft.name)$("#roleName").value=S.designDraft.name;
+  const point=e=>{const r=canvas.getBoundingClientRect(),t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)*canvas.width/r.width,y:(t.clientY-r.top)*canvas.height/r.height}};
+  const begin=e=>{history.push(ctx.getImageData(0,0,300,300));if(history.length>12)history.shift();drawing=true;hasInk=true;const p=point(e);ctx.beginPath();ctx.moveTo(p.x,p.y);e.preventDefault()};
+  const move=e=>{if(!drawing)return;const p=point(e);ctx.lineTo(p.x,p.y);ctx.strokeStyle=color;ctx.lineWidth=size;ctx.lineCap="round";ctx.lineJoin="round";ctx.stroke();e.preventDefault()};
+  const end=()=>drawing=false;
+  canvas.addEventListener("pointerdown",begin);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",end);canvas.addEventListener("pointercancel",end);canvas.addEventListener("pointerleave",end);
+  $$(".drawColor").forEach(b=>b.onclick=()=>{color=b.dataset.color;$$(".drawColor").forEach(x=>x.classList.toggle("on",x===b))});
+  $$(".drawSize").forEach(b=>b.onclick=()=>{size=+b.dataset.size;$$(".drawSize").forEach(x=>x.classList.toggle("on",x===b))});
+  $("#drawUndo").onclick=()=>{const x=history.pop();if(x)ctx.putImageData(x,0,0)};$("#drawClear").onclick=()=>{history.push(ctx.getImageData(0,0,300,300));ctx.clearRect(0,0,300,300)};
+  $("#saveCharacter").onclick=()=>{if(!hasInk){toast("先在画板上画几笔吧～");return;}const name=$("#roleName").value.trim()||"我的伙伴";S.pet.baibaiWorn=(S.pet.worn||[]).slice();S.pet.customCharacter={name,art:canvas.toDataURL("image/png")};S.pet.useCustom=true;S.pet.worn=[];save();confetti();sndWin();toast("🌟 "+name+"成为你的新伙伴啦！",2400);renderDesignStudio()};
+  if($("#useBaibai"))$("#useBaibai").onclick=()=>{S.pet.useCustom=false;S.pet.worn=(S.pet.baibaiWorn||[]).filter(outfitOf);save();sndCoin();toast("白白回来陪你啦");renderDesignStudio()};
+  show("design","🎨 设计工坊");
+  designSessionSave=()=>{try{S.designDraft={kind,main,trim,mark,name:$("#roleName")?$("#roleName").value:"",canvas:hasInk?canvas.toDataURL("image/png"):(S.designDraft&&S.designDraft.canvas)||""};save();}catch(_){save();}};
+  let ticks=0;designTimer=setInterval(()=>{if(document.hidden)return;left--;S.designPlay.used=1800-left;ticks++;const el=$("#designClock");if(el)el.textContent=Math.floor(left/60)+":"+String(left%60).padStart(2,"0");if(ticks%10===0)designSessionSave();if(left<=0){designSessionSave();clearInterval(designTimer);designTimer=null;designSessionSave=null;toast("💾 今天的设计已经保存，下次打开继续吧",3500);navStack=[renderReward];renderReward();}},1000);
+}
 function renderReward() {
   const got = Object.keys(S.stickers).length;
   const pend = S.vouchers.filter(v => !v.used).length;
@@ -3892,7 +3972,7 @@ function renderReward() {
       <div id="gachaEgg">🥚</div>
       <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-top:6px">白白百变扭蛋机</div>
       <div style="font-size:12px;color:#b8a8c8">每一颗都是白白的新姿势、新故事，集齐 ${STICKERS.length} 款！</div>
-      <div style="font-size:11px;color:#a27b45;margin-top:4px">今日英语卡片 ${cardDaily().english}/5 · 还可获得 ${englishCardLeft()} 张</div>
+      <div style="font-size:11px;color:#a27b45;margin-top:4px">今日英语卡片 ${cardDaily().english}/${CARD_DAILY_LIMIT} · 还可获得 ${englishCardLeft()} 张</div>
       <div id="gachaResult"></div>
       <button class="btn" id="gachaBtn">扭一次（🪙${GACHA_COST}）</button>
     </div>
@@ -3906,14 +3986,18 @@ function renderReward() {
       <span class="aName">白白的魔法背景<span class="aSub">已拥有 ${S.themesOwned.length}/${THEMES.length} 套乐园皮肤</span></span>
       <span class="aGo">▶</span>
     </div>
+    <div class="card actRow" id="toDesign" style="background:linear-gradient(135deg,#eefcff,#fff0fa)">
+      <span class="aIcon">🖍️</span><span class="aName">角色与装扮设计工坊<span class="aSub">给装扮涂色，或亲手画一个新伙伴</span></span><span class="aGo">▶</span>
+    </div>
     <div id="parentLink">家长设置</div>`;
   $("#toTheme").onclick = () => go(renderTheme);
+  $("#toDesign").onclick = () => go(renderDesignStudio);
   $("#toWheel").onclick = () => go(renderWheel);
   $("#toVoucher").onclick = () => go(renderVoucher);
   $("#parentLink").onclick = () => go(renderParent);
   $("#toAlbum").onclick = () => go(renderAlbum);
   $("#gachaBtn").onclick = () => {
-    if (!englishCardLeft()) { toast("今天英语的5张白白卡已经收好啦，明天再来遇见新造型！",2800); sndWrong(); return; }
+    if (!englishCardLeft()) { toast(`今天英语的${CARD_DAILY_LIMIT}张白白卡已经收好啦，明天再来遇见新造型！`,2800); sndWrong(); return; }
     if (S.coins < GACHA_COST) { toast("金币不够啦，去闯关赚金币吧！💪"); sndWrong(); return; }
     S.coins -= GACHA_COST; updateCoinBox(); save();
     const egg = $("#gachaEgg"), btn = $("#gachaBtn");

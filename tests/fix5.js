@@ -68,7 +68,7 @@ const S = () => w.eval("S");
   w.eval("navStack=[renderPhonicsList];renderPhonicsList();");
   ok(!!$("#phMix"), "★ 学过2条以上规则 → 出现「拼读大挑战」");
   ok($("#scr-phonics").innerHTML.includes("混在一起考"), "说明是混合复习");
-  ok($("#scr-phonics").innerHTML.includes("今天还没做拼读"), "★ 提示今天的拼读任务状态");
+  ok($("#scr-phonics").innerHTML.includes("今天完成 3 条拼读"), "★ 提示今天的拼读任务状态");
   $("#phMix").click();
   await sleep(50);
   ok($("#scr-play").innerHTML.includes("拼读大挑战"), "★ 可以进入混合挑战");

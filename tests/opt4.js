@@ -97,9 +97,9 @@ function boot() {
   w.eval("navStack=[renderWheel];renderWheel();");
   ok($("#spinBtn").disabled === true, "★ 没做完任务 → 转盘锁定");
   ok($("#spinBtn").textContent.includes("先完成今天的学习和复习"), "★ 明确告诉她要先学完复习完");
-  ok($("#scr-wheel").innerHTML.includes("做完今天的复习") && $("#scr-wheel").innerHTML.includes("学一条自然拼读"), "★ 列出四个前置条件（含复习和拼读）");
+  ok($("#scr-wheel").innerHTML.includes("做完今天的复习") && $("#scr-wheel").innerHTML.includes("完成3条自然拼读"), "★ 列出四个前置条件（含复习和拼读）");
   // 完成今日任务
-  w.eval("S.daily.t1=true;S.daily.t2=true;S.daily.t3=true;S.daily.t4=true;S.daily.w=9;S.daily.g=9;S.daily.r=9;S.daily.ph=1;save();navStack=[renderWheel];renderWheel();");
+  w.eval("S.daily.t1=true;S.daily.t2=true;S.daily.t3=true;S.daily.t4=true;S.daily.w=9;S.daily.g=9;S.daily.r=9;S.daily.ph=3;save();navStack=[renderWheel];renderWheel();");
   ok(w.eval("wheelReady()") === true, "★ 四项任务全完成(含拼读) → 转盘解锁");
   ok($("#spinBtn").disabled === false, "★ 可以转了");
   ok($("#spinBtn").textContent.includes("今天的唯一一次"), "★ 强调是今天唯一一次");
