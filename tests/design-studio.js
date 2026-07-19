@@ -4,7 +4,7 @@ const ok=(c,m)=>{c?pass++:fail++;console.log(`  ${c?"✓":"✗ FAIL"} ${m}`)};
 const dom=new JSDOM(fs.readFileSync(DIR+"/index.html","utf8").replace(/<script src="[^"]+"><\/script>/g,""),{runScripts:"dangerously",url:"https://nevergiveup0618.github.io/English/",pretendToBeVisual:true});
 const w=dom.window,$=s=>w.document.querySelector(s),$$=s=>[...w.document.querySelectorAll(s)];
 w.SpeechSynthesisUtterance=function(t){this.text=t};w.speechSynthesis={cancel(){},speak(){},getVoices:()=>[]};w.Audio=function(){return{play:()=>Promise.resolve(),pause(){}}};
-w.HTMLCanvasElement.prototype.getContext=function(){return{beginPath(){},moveTo(){},lineTo(){},stroke(){},clearRect(){},drawImage(){},getImageData(){return{}},putImageData(){}}};
+w.HTMLCanvasElement.prototype.getContext=function(){return{beginPath(){},moveTo(){},lineTo(){},arc(){},ellipse(){},rect(){},quadraticCurveTo(){},closePath(){},fill(){},stroke(){},clearRect(){},drawImage(){},getImageData(){return{}},putImageData(){}}};
 w.HTMLCanvasElement.prototype.toDataURL=()=>"data:image/png;base64,VEVTVA==";
 for(const f of ["audio/manifest.js","data.js","app.js"]){const s=w.document.createElement("script");s.textContent=fs.readFileSync(DIR+"/"+f,"utf8");w.document.body.appendChild(s)}
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -18,6 +18,9 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
  w.eval("S.daily.w=8;S.daily.g=5;S.daily.r=9;S.daily.ph=3;S.wrong={};S.srs={};checkTasks();navStack=[renderReward];renderReward();$('#toDesign').click()");
  ok($("#designClock").textContent==="30:00","完成任务后获得30分钟创作时间");
  ok($$("[data-shape]").length===3&&$("#designMain").type==="color","装扮操作台支持三种版型和即时涂色");
+ ok($$(".drawSize").map(x=>+x.dataset.size).join(",")==="3,6,12","儿童画板默认细笔且三档笔触不过粗");
+ ok($("#drawEraser")&&$("#drawStarter")&&$("#drawCustomColor"),"画板提供橡皮、起步轮廓和自选颜色");
+ ok($$(".drawShape").map(x=>x.dataset.tool).join(",")==="free,line,circle,rect,star","画板提供曲线、直线、圆形、方形和五角星工具");
  const coins=w.eval("loadWallet().coins");$("#makeDesign").click();
  ok(w.eval("S.pet.customOutfits.length")===1&&w.eval("S.pet.worn.some(x=>x.startsWith('my_design_'))"),"第一件自创装扮免费制作并直接进入衣橱");
  ok(w.eval("loadWallet().coins")===coins,"第一件设计不扣金币");
