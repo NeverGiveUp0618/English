@@ -75,7 +75,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
 
   console.log("— 首页 —");
   ok($("#scr-home").classList.contains("on"), "首页显示");
-  ok($("#hubLink").href === "https://nevergiveup0618.github.io/learning/" && $("#hubLink").style.display !== "none", "★ 首页显示返回学习导航");
+  ok($("#hubLink").href === "https://nevergiveup0618.github.io/learning/#englishPortal" && $("#hubLink").style.display !== "none", "★ 首页返回学习导航时带英语位置锚点");
   ok($("#backBtn").style.visibility === "hidden", "★ 英语首页不显示无意义的页内返回箭头");
   $("#homeAlbum").click();
   ok($$(".tab").find(t => t.dataset.tab === "reward").classList.contains("on"), "★ 从首页进白白收藏册时，高亮白白礼物而不是首页");
@@ -85,7 +85,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   ok($("#petShow .petImg")?.src.endsWith("/assets/baibai-base.png"), "★ 首页默认伙伴是无服装的白白");
   ok($("#coinNum").textContent === "0", "初始金币0");
   const swText = fs.readFileSync(DIR + "/sw.js", "utf8");
-  ok(swText.includes("magic-english-v60") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
+  ok(swText.includes("magic-english-v61") && swText.includes("const CORE") && !swText.includes("STICKER_V2_FILES"), "★ 启动只预缓存8个核心文件，贴纸和语音按需缓存");
   ok(swText.includes("fallback || fresh"), "★ 慢网络二次打开优先显示缓存首页");
 
   console.log("— 地图与锁 —");
@@ -94,6 +94,7 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   let cards = $$("#scr-map .unitCard");
   const cardOf = id => cards.find(c => c.dataset.uid === id);
   ok(cards.length === 50, "50个单元卡片（已覆盖二至六年级）");
+  ok($$("#scr-map .gradeFold").length === 5 && $$("#scr-map .gradeFoldBody.collapsed").length === 4, "★ 地图按五个年级折叠，默认展开当前四年级");
   ok(!cardOf("u1").classList.contains("locked") && cardOf("u2").classList.contains("locked"), "四上U1解锁 U2锁定");
   ok(!cardOf("d1").classList.contains("locked") && !cardOf("b1").classList.contains("locked") && !cardOf("t1").classList.contains("locked"),
      "★ 每册第一单元默认解锁（暑假可直接复习低年级）");
@@ -383,8 +384,9 @@ function ok(cond, name) { if (cond) { pass++; console.log("  ✓", name); } else
   console.log("— 自然拼读 —");
   $$('.tab').find(t => t.dataset.tab === "phonics").click();
   ok($("#scr-phonics").classList.contains("on"), "拼读学院显示");
-  ok($$("#scr-phonics .actRow").length === 8, "8条拼读规则");
-  $$("#scr-phonics .actRow")[0].click();
+  ok(w.eval("['三上','三下','四上','四下','五上','五下','六上','六下'].every(b=>PHONICS.some(p=>p.book===b))"), "★ 三至六年级上下册都有自然拼读内容");
+  ok($$("#scr-phonics .phonicsGrade").length === 4 && $$("#scr-phonics .gradeFoldBody.collapsed").length === 3, "★ 自然拼读按四个年级折叠");
+  $("#scr-phonics .actRow[data-pid='ph1']").click();
   ok($("#scr-phonic").classList.contains("on"), "规则页显示(a-e)");
   ok($$("#phWords .phRow").length === 8, "8个例词可点读（音节+音标行）");
   ok($("#scr-phonic").innerHTML.includes("phKey") && $("#scr-phonic").innerHTML.includes("phIpa"), "★ 例词显示音节色块+音标");

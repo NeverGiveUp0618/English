@@ -114,7 +114,7 @@ const S = () => w.eval("S");
   ok(w.eval("new Set(STICKERS.map(s=>s.message)).size") === 50, "★ 收藏卡准备了50句轮换小纸条，不再千篇一律");
   w.localStorage.removeItem("sharedCardDaily_v1");
   const chances = w.eval("[1,2,3,4,5,6,7,8,9].map(()=>takeEnglishCardChance())");
-  ok(chances.filter(Boolean).length === 8 && w.eval("englishCardLeft()") === 0, "★ 英语每日最多获得8张卡");
+  ok(chances.filter(Boolean).length === 5 && w.eval("englishCardLeft()") === 0, "★ 英语每日最多获得5张卡");
 
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
   process.exit(fail ? 1 : 0);

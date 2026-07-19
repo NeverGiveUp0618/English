@@ -22,7 +22,7 @@ const WALLET_KEY = "sharedWallet_v1";
 /* 白白的最新装扮也跨科目共享：语文只读取展示，不从这里扣钱。 */
 const SHARED_PET_KEY = "sharedPet_v1";
 const CARD_DAILY_KEY = "sharedCardDaily_v1";
-const CARD_DAILY_LIMIT = 8;
+const CARD_DAILY_LIMIT = 5;
 const DAILY_PHONICS_TARGET = 3;
 function defState() {
   return {
@@ -173,10 +173,12 @@ function saveWallet(w) {
 function cardDaily() {
   let d = null;
   try { d = JSON.parse(localStorage.getItem(CARD_DAILY_KEY) || "null"); } catch (e) {}
-  if (!d || d.date !== todayStr()) d = { date: todayStr(), english: 0, chinese: 0, pendingChinese: 0 };
+  if (!d || d.date !== todayStr()) d = { date: todayStr(), english: 0, chinese: 0, math: 0, pendingChinese: 0, pendingMath: 0 };
   d.english = Math.max(0, Number(d.english) || 0);
   d.chinese = Math.max(0, Number(d.chinese) || 0);
+  d.math = Math.max(0, Number(d.math) || 0);
   d.pendingChinese = Math.max(0, Number(d.pendingChinese) || 0);
+  d.pendingMath = Math.max(0, Number(d.pendingMath) || 0);
   return d;
 }
 function saveCardDaily(d) { try { localStorage.setItem(CARD_DAILY_KEY, JSON.stringify(d)); } catch (e) {} }
@@ -1156,6 +1158,13 @@ function renderCalendar() {
 
 /* ================= 闯关地图 ================= */
 const BOOKS = ["二年级", "三上", "三下", "四上", "四下", "五上", "五下", "六上", "六下"];
+const BOOK_GROUPS = [
+  { grade:"二年级", books:["二年级"] }, { grade:"三年级", books:["三上","三下"] },
+  { grade:"四年级", books:["四上","四下"] }, { grade:"五年级", books:["五上","五下"] },
+  { grade:"六年级", books:["六上","六下"] }
+];
+const gradeOfBook = book => book === "二年级" ? "二年级" : `${book.charAt(0)}年级`;
+let mapOpenGrades = new Set([gradeOfBook(S.focusBook === "auto" ? "四上" : S.focusBook)]);
 const BOOK_TIP = {
   "二年级": "低年级基础词（暑假复习用）",
   "三上": "三年级上册", "三下": "三年级下册",
@@ -1167,12 +1176,14 @@ function renderMap() {
     共 ${UNITS.length} 个单元 · ${UNITS.reduce((a, u) => a + u.words.length, 0)} 个单词<br>
     <b style="color:#9b59b6">暑假想复习旧词？直接点「二年级 / 三上 / 三下」——每一册都是独立解锁的</b>
   </div>`;
-  BOOKS.forEach(bk => {
-    const us = UNITS.filter(u => u.book === bk);
-    if (!us.length) return;
-    const done = us.filter(u => unitS(u.id).stars >= 1).length;
-    html += `<div class="bookLabel">—— 🌈 ${bk} ——<span style="display:block;font-size:11px;color:#c0a8d0;font-weight:400">${BOOK_TIP[bk]}　${done}/${us.length} 单元已通关</span></div>`;
-    bookUnits(bk).forEach(u => {
+  BOOK_GROUPS.forEach(group => {
+    const all = group.books.flatMap(bookUnits), doneAll = all.filter(u => unitS(u.id).stars >= 1).length;
+    const openGrade = mapOpenGrades.has(group.grade);
+    html += `<button class="gradeFold" data-grade="${group.grade}" aria-expanded="${openGrade}"><span>📚 ${group.grade}<small>${group.books.length === 2 ? "上册 · 下册　" : "综合册　"}${doneAll}/${all.length} 单元已通关</small></span><span class="foldArrow">›</span></button><div class="gradeFoldBody ${openGrade ? "" : "collapsed"}" data-grade-body="${group.grade}">`;
+    group.books.forEach(bk => {
+      const us = bookUnits(bk), done = us.filter(u => unitS(u.id).stars >= 1).length;
+      html += `<div class="bookLabel">—— 🌈 ${bk} ——<span style="display:block;font-size:11px;color:#c0a8d0;font-weight:400">${BOOK_TIP[bk]}　${done}/${us.length} 单元已通关</span></div>`;
+      us.forEach(u => {
       const us = unitS(u.id), open = isUnlocked(u);
       const stars = "★".repeat(us.stars) + "☆".repeat(3 - us.stars);
       html += `
@@ -1185,7 +1196,9 @@ function renderMap() {
         </div>
         <div class="unitStars" style="color:#ffb830">${stars}</div>
       </div>`;
+      });
     });
+    html += `</div>`;
   });
   $("#scr-map").innerHTML = html;
   document.querySelectorAll("#scr-map .unitCard").forEach(c => {
@@ -1194,6 +1207,11 @@ function renderMap() {
       if (!isUnlocked(u)) { toast("先在上一单元挑战中拿到 ⭐ 才能解锁哦"); sndWrong(); return; }
       go(() => renderUnit(u));
     };
+  });
+  document.querySelectorAll("#scr-map .gradeFold").forEach(b => b.onclick = () => {
+    const grade=b.dataset.grade, body=document.querySelector(`[data-grade-body="${grade}"]`), opening=!mapOpenGrades.has(grade);
+    if(opening) mapOpenGrades.add(grade); else mapOpenGrades.delete(grade);
+    b.setAttribute("aria-expanded", String(opening)); body.classList.toggle("collapsed", !opening);
   });
   show("map", "🗺️ 闯关地图");
 }
@@ -2499,8 +2517,10 @@ function renderPhonicsList() {
       <span class="aName">拼读大挑战<span class="aSub">把学过的 ${learnedN} 条规则混在一起考 · 也算每日拼读任务</span></span>
       <span class="aGo">▶</span>
     </div>` : ""}
-    ${["四上", "四下"].map(bk => `
-      <div class="bookLabel">—— ✨ ${bk}册 · Let's spell ——</div>
+    ${["三","四","五","六"].map(grade => {
+      const books=[grade+"上",grade+"下"], open=grade==="四";
+      return `<button class="gradeFold phonicsGrade" data-grade="${grade}" aria-expanded="${open}"><span>✨ ${grade}年级自然拼读<small>上册 · 下册</small></span><span class="foldArrow">›</span></button><div class="gradeFoldBody ${open?"":"collapsed"}" data-phonics-body="${grade}">${books.map(bk => `
+      <div class="bookLabel">—— ${bk} · Let's spell ——</div>
       ${PHONICS.filter(p => p.book === bk).map(p => {
         const ps = phS(p.id);
         return `<div class="card actRow" data-pid="${p.id}">
@@ -2508,12 +2528,13 @@ function renderPhonicsList() {
           <span class="aName">${esc(p.label)} <span style="color:#b98ff0">${esc(p.ipa)}</span><span class="aSub">${ps.learned ? "已学过" : "还没学"} · ${p.words.length}个例词</span></span>
           <span class="unitStars" style="color:#ffb830">${"★".repeat(ps.stars) + "☆".repeat(3 - ps.stars)}</span>
         </div>`;
-      }).join("")}`).join("")}`;
+      }).join("")}`).join("")}</div>`;}).join("")}`;
   const mix = $("#phMix");
   if (mix) mix.onclick = () => go(startPhonicMix);
   document.querySelectorAll("#scr-phonics .actRow[data-pid]").forEach(c => {
     c.onclick = () => go(() => renderPhonicRule(PHONICS.find(p => p.id === c.dataset.pid)));
   });
+  document.querySelectorAll("#scr-phonics .phonicsGrade").forEach(b=>b.onclick=()=>{const body=document.querySelector(`[data-phonics-body="${b.dataset.grade}"]`),opening=body.classList.contains("collapsed");body.classList.toggle("collapsed",!opening);b.setAttribute("aria-expanded",String(opening));});
   show("phonics", "🔮 拼读魔法学院");
 }
 
@@ -3856,16 +3877,16 @@ function unlockStickerOutfit(st) {
   owned.push(o.id); return o;
 }
 let lastChineseOutfitUnlocks = [];
-function claimChineseCards() {
+function claimSubjectCards() {
   lastChineseOutfitUnlocks = [];
-  const d = cardDaily(), n = Math.min(d.pendingChinese, CARD_DAILY_LIMIT);
+  const d = cardDaily(), chineseN = Math.min(d.pendingChinese, CARD_DAILY_LIMIT), mathN = Math.min(d.pendingMath, CARD_DAILY_LIMIT), n=chineseN+mathN;
   if (!n) return 0;
   for (let i=0;i<n;i++) {
     const st=drawSticker();
     S.stickers[st.n]=(S.stickers[st.n]||0)+1;
     const unlocked = unlockStickerOutfit(st); if (unlocked) lastChineseOutfitUnlocks.push(unlocked.n);
   }
-  d.pendingChinese-=n; saveCardDaily(d); save(); return n;
+  d.pendingChinese-=chineseN; d.pendingMath-=mathN; saveCardDaily(d); save(); return {total:n,chinese:chineseN,math:mathN};
 }
 function drawSticker() {
   const fresh = STICKERS.filter(s => !S.stickers[s.n]);
@@ -4187,7 +4208,7 @@ if (!S.pet.outfits) S.pet.outfits = [];
 if (!S.pet.worn) S.pet.worn = [];
 decayCare();         // 状态随天数自然回落（只会变淡，绝不惩罚）
 walletIn();          // 接入共享钱包（语文App赚的金币在这里也能花）
-const chineseCardsClaimed = claimChineseCards();
+const subjectCardsClaimed = claimSubjectCards();
 applyTheme();
 updateCoinBox();
 /* 从后台回到前台时重新读钱包：她可能刚在语文App里赚了金币 */
@@ -4212,7 +4233,7 @@ setInterval(() => {
 }, 60000);
 if (new URLSearchParams(location.search).get("parent") === "1") { navStack=[renderHome,renderParent];navTabs=["home","home"];renderParent(); }
 else { navStack = [renderHome]; navTabs = ["home"]; renderHome(); }
-if (chineseCardsClaimed) setTimeout(() => toast("📚 语文探险获得的 "+chineseCardsClaimed+" 张白白卡已点亮收藏册！"+(lastChineseOutfitUnlocks.length ? " 恭喜你，同款「"+lastChineseOutfitUnlocks.join("、")+"」也已放入衣橱！" : ""),4200),900);
+if (subjectCardsClaimed.total) setTimeout(() => toast("🐾 学习获得的 "+subjectCardsClaimed.total+" 张白白卡已点亮收藏册（语文 "+subjectCardsClaimed.chinese+"、数学 "+subjectCardsClaimed.math+"）！"+(lastChineseOutfitUnlocks.length ? " 同款「"+lastChineseOutfitUnlocks.join("、")+"」也已放入衣橱！" : ""),4200),900);
 if (!localStorage.getItem(LS_KEY + "_hi")) {
   localStorage.setItem(LS_KEY + "_hi", "1");
   setTimeout(() => toast("🌸 欢迎来到魔法英语乐园！先去完成今日任务吧～", 3000), 600);
