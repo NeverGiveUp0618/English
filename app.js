@@ -16,6 +16,7 @@ UNITS.forEach(u => u.words.forEach(w => { WORD_INDEX[w.w] = w; }));
 
 /* ---------------- 存档 ---------------- */
 const LS_KEY = "magicEnglish_v1";
+const JOURNEY_KEY = "sharedLearningJourney_v1";
 /* 跨科目共享钱包：语文《寻宝作文记》和英语在同一个域下，localStorage 互通。
    学英语和学语文赚的是同一份金币和转盘券，喂的是同一只宠物。 */
 const WALLET_KEY = "sharedWallet_v1";
@@ -859,6 +860,9 @@ function priorityPick(pool, n) {
 }
 
 /* ---------------- 导航 ---------------- */
+let journeyScreen="",journeyAt=Date.now();
+function flushJourney(){if(!journeyScreen)return;const seconds=Math.min(1800,Math.round((Date.now()-journeyAt)/1000));if(seconds<2)return;try{const rows=JSON.parse(localStorage.getItem(JOURNEY_KEY)||"[]");rows.push({subject:"en",screen:journeyScreen,day:todayStr(),seconds,at:Date.now()});localStorage.setItem(JOURNEY_KEY,JSON.stringify(rows.slice(-500)));}catch(e){}journeyAt=Date.now();}
+function journeyView(id){if(id===journeyScreen)return;flushJourney();journeyScreen=id;journeyAt=Date.now();}
 let navStack = [];
 let navTabs = [];
 let navScrolls = [];
@@ -874,6 +878,7 @@ function setActiveTab(tab) {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("on", x.dataset.tab === tab));
 }
 function show(id, title) {
+  journeyView(id);
   if (id !== "design") { if(designTimer)clearInterval(designTimer);designTimer=null;if(designSessionSave)designSessionSave();designSessionSave=null; }
   const isRoot = !!ROOT_TABS[id];
   if (isRoot) setActiveTab(ROOT_TABS[id]);
@@ -4245,6 +4250,7 @@ applyTheme();
 updateCoinBox();
 /* 从后台回到前台时重新读钱包：她可能刚在语文App里赚了金币 */
 document.addEventListener("visibilitychange", () => {
+  if(document.hidden)flushJourney();else journeyAt=Date.now();
   if (!document.hidden) {
     const before = S.coins;
     walletIn();
