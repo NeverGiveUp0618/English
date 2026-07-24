@@ -23,6 +23,7 @@ const WALLET_KEY = "sharedWallet_v1";
 /* 白白的最新装扮也跨科目共享：语文只读取展示，不从这里扣钱。 */
 const SHARED_PET_KEY = "sharedPet_v1";
 const CARD_DAILY_KEY = "sharedCardDaily_v1";
+const SUBJECT_BALANCE_KEY = "sharedSubjectBalance_v1";
 const CARD_DAILY_LIMIT = 5;
 const DAILY_PHONICS_TARGET = 3;
 function defState() {
@@ -75,7 +76,8 @@ function defState() {
     bestExam: 0,   // 魔法大考最高分
     stageExams: {}, // 阶段测验：stageKey -> {best, passed, date}
     gachaDup: 0     // 连续重复保护：4次重复后下一颗必出新卡
-    ,designPlay: {date:"",used:0}, // 每日任务后30分钟自由设计时间
+    ,designMinutes: 30, // 家长设定的每日自由设计时间（5/10/20/30分钟）
+    designPlay: {date:"",used:0}, // 当日已使用的自由设计时间（秒）
     designDraft: null
   };
 }
@@ -85,6 +87,7 @@ S.daily = Object.assign(defState().daily, S.daily);
 S.pet = Object.assign(defState().pet, S.pet || {});
 S.pet.customOutfits = Array.isArray(S.pet.customOutfits) ? S.pet.customOutfits.slice(0, 20) : [];
 S.stageExams = Object.assign({}, S.stageExams || {});
+S.designMinutes = [5,10,20,30].includes(Number(S.designMinutes)) ? Number(S.designMinutes) : 30;
 S.pet.wear = Object.assign(defState().pet.wear, S.pet.wear || {});
 /* 老伙伴存档只隐藏不删除学习/金币数据；首次升级时让白白以裸狗形象登场。 */
 if (!S.pet.baibaiV1) {
@@ -105,6 +108,11 @@ S.pet.posesOwned = Array.isArray(S.pet.posesOwned) ? S.pet.posesOwned.filter(id 
 BAIBAI_POSES.slice(0, 5).forEach(p => { if (!S.pet.posesOwned.includes(p.id)) S.pet.posesOwned.push(p.id); });
 S.pet.decoByPose = Object.assign({}, S.pet.decoByPose || {});
 ["bb_bow", "bb_flower"].forEach(id => { if (!S.pet.outfits.includes(id)) S.pet.outfits.push(id); });
+/* 自绘角色不再替换学习伙伴：旧存档自动切回白白，已保存的画作仍保留。 */
+if (S.pet.useCustom) {
+  S.pet.useCustom = false;
+  S.pet.worn = (S.pet.baibaiWorn || S.pet.worn || []).filter(outfitOf);
+}
 /* v31 修复旧帽子坐标：早期默认中心在脸上，且舞台会裁掉顶部。
    只迁移一次；孩子之后手动保存的位置不再被系统改动。 */
 if (!S.pet.hatFitV2) {
@@ -180,9 +188,18 @@ function cardDaily() {
   d.math = Math.max(0, Number(d.math) || 0);
   d.pendingChinese = Math.max(0, Number(d.pendingChinese) || 0);
   d.pendingMath = Math.max(0, Number(d.pendingMath) || 0);
+  d.pendingBalance = Math.max(0, Number(d.pendingBalance) || 0);
   return d;
 }
 function saveCardDaily(d) { try { localStorage.setItem(CARD_DAILY_KEY, JSON.stringify(d)); } catch (e) {} }
+function markBalancedSubject(subject) {
+  let d=null;try{d=JSON.parse(localStorage.getItem(SUBJECT_BALANCE_KEY)||"null")}catch(e){}
+  if(!d||d.date!==todayStr())d={date:todayStr(),en:false,cn:false,ma:false,two:false,three:false};
+  const first=!d[subject];d[subject]=true;const count=[d.en,d.cn,d.ma].filter(Boolean).length;
+  const two=count>=2&&!d.two,three=count===3&&!d.three;if(two)d.two=true;if(three)d.three=true;
+  try{localStorage.setItem(SUBJECT_BALANCE_KEY,JSON.stringify(d))}catch(e){}return{first,two,three,count};
+}
+function queueBalancedCard(){const d=cardDaily();d.pendingBalance++;saveCardDaily(d)}
 function englishCardLeft() { return Math.max(0, CARD_DAILY_LIMIT - cardDaily().english); }
 function takeEnglishCardChance() {
   const d = cardDaily();
@@ -574,7 +591,7 @@ function petDef() { return PETS[0]; }
 function petStages() { return petDef().stages; }
 function petStage(xp) { let st = petStages()[0]; petStages().forEach(p => { if (xp >= p.xp) st = p; }); return st; }
 function petNext(xp) { return petStages().find(p => p.xp > xp) || null; }
-function petName() { return S.pet.useCustom && S.pet.customCharacter ? (S.pet.customCharacter.name || "我的伙伴") : "白白"; }
+function petName() { return "白白"; }
 
 /* 每天状态自然回落一点（不惩罚，只是"它有点想你了"） */
 function decayCare() {
@@ -611,7 +628,7 @@ function wornOutfits() { return (S.pet.worn || []).map(outfitOf).filter(Boolean)
 /* 旧版本的本机图片仍留在存档中，但白白上线后不再显示或上传。 */
 function petPic(id) { return (S.pet.pics || {})[id || S.pet.id] || ""; }
 function currentPose() { return BAIBAI_POSES.find(p => p.id === S.pet.pose) || BAIBAI_POSES[0]; }
-function petVisual() { return S.pet.useCustom && S.pet.customCharacter && S.pet.customCharacter.art ? S.pet.customCharacter.art : currentPose().art; }
+function petVisual() { return currentPose().art; }
 
 function petCheer() {
   const d = taskDone();
@@ -730,6 +747,9 @@ function checkTasks() {
     addCoins(20); confetti(); sndWin();
     setTimeout(() => toast("🔥 今日全部任务完成！奖励20金币，连续 " + S.streak + " 天！", 2800), 400);
     addTicket(1, "完成今日全部任务");
+    const balance=markBalancedSubject("en");
+    if(balance.two)addTicket(1, "今天已探索两个学科");
+    if(balance.three){queueBalancedCard();setTimeout(()=>toast("🌟 三科探索完成！限定白白卡已送到收藏册",3000),1800)}
     if (S.streak > 0 && S.streak % 3 === 0) setTimeout(() => addTicket(1, "连续学习" + S.streak + "天"), 1600);
     checkCycle();
   }
@@ -2330,6 +2350,15 @@ function renderParent() {
       </div>
     </div>
     <div class="card">
+      <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-bottom:4px">🎨 设计工坊娱乐时间</div>
+      <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">
+        孩子完成当天英语任务后，每天可以自由创作 <b style="color:#9b59b6">${S.designMinutes} 分钟</b>。修改后立即生效。
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${[5,10,20,30].map(v => `<button class="themeBtn ${S.designMinutes === v ? "cur" : "lock"}" data-design-minutes="${v}">${v}分钟</button>`).join("")}
+      </div>
+    </div>
+    <div class="card">
       <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-bottom:4px">🎡 转盘奖品（${prizes.length}项）</div>
       <div style="font-size:12px;margin-bottom:4px;font-weight:700;color:${wheelStale() ? "#e8842d" : "#b8a8c8"}">${wheelAgeDays() === 0 ? "✅ 今天刚更换过奖品" : "距上次更换奖品已 " + wheelAgeDays() + " 天" + (wheelStale() ? "，建议换1~2个孩子当下最想要的，保持新鲜感！" : "（建议每14天上新）")}</div>
       <div style="font-size:12px;color:#b8a8c8;margin-bottom:8px">奖品里写「XX金币」会自动发金币，写「再转一次」会返还转盘券，其余都会变成孩子的实物奖励券。建议2~12项，保留「50金币」和「再转一次」两格可以让实物大奖更有期待感。</div>
@@ -2376,6 +2405,14 @@ function renderParent() {
       S.diff = b.dataset.diff === "auto" ? "auto" : +b.dataset.diff;
       save(); sndCoin();
       toast(b.dataset.diff === "auto" ? "已设为自动升段" : "难度已锁定为 " + DIFFS[+b.dataset.diff].rank, 2000);
+      renderParent();
+    };
+  });
+  document.querySelectorAll("#scr-parent [data-design-minutes]").forEach(b => {
+    b.onclick = () => {
+      S.designMinutes = +b.dataset.designMinutes;
+      save(); sndCoin();
+      toast("设计工坊娱乐时间已设为 " + S.designMinutes + " 分钟", 2000);
       renderParent();
     };
   });
@@ -3904,14 +3941,15 @@ function unlockStickerOutfit(st) {
 let lastChineseOutfitUnlocks = [];
 function claimSubjectCards() {
   lastChineseOutfitUnlocks = [];
-  const d = cardDaily(), chineseN = Math.min(d.pendingChinese, CARD_DAILY_LIMIT), mathN = Math.min(d.pendingMath, CARD_DAILY_LIMIT), n=chineseN+mathN;
+  const d = cardDaily(), chineseN = Math.min(d.pendingChinese, CARD_DAILY_LIMIT), mathN = Math.min(d.pendingMath, CARD_DAILY_LIMIT), balanceN=Math.min(d.pendingBalance||0,1), n=chineseN+mathN+balanceN;
   if (!n) return 0;
   for (let i=0;i<n;i++) {
     const st=drawSticker();
     S.stickers[st.n]=(S.stickers[st.n]||0)+1;
+    if(balanceN&&i===n-1){S.balanceCards=S.balanceCards||{};S.balanceCards[st.n]=(S.balanceCards[st.n]||0)+1}
     const unlocked = unlockStickerOutfit(st); if (unlocked) lastChineseOutfitUnlocks.push(unlocked.n);
   }
-  d.pendingChinese-=chineseN; d.pendingMath-=mathN; saveCardDaily(d); save(); return {total:n,chinese:chineseN,math:mathN};
+  d.pendingChinese-=chineseN; d.pendingMath-=mathN; d.pendingBalance-=balanceN; saveCardDaily(d); save(); return {total:n,chinese:chineseN,math:mathN,balance:balanceN};
 }
 function drawSticker() {
   const fresh = STICKERS.filter(s => !S.stickers[s.n]);
@@ -3944,7 +3982,8 @@ function designSvg(kind, main, trim, mark) {
 function startDesignTimer(left, onSave) {
   designSessionSave=onSave||(()=>save());
   if(S.testMode)return;
-  let ticks=0;designTimer=setInterval(()=>{if(document.hidden)return;left--;S.designPlay.used=1800-left;ticks++;const el=$("#designClock");if(el)el.textContent=Math.floor(left/60)+":"+String(left%60).padStart(2,"0");if(ticks%10===0)designSessionSave();if(left<=0){designSessionSave();clearInterval(designTimer);designTimer=null;designSessionSave=null;designMode="";toast("💾 今天的设计已经保存，下次打开继续吧",3500);navStack=[renderReward];renderReward();}},1000);
+  const total=S.designMinutes*60;
+  let ticks=0;designTimer=setInterval(()=>{if(document.hidden)return;left--;S.designPlay.used=total-left;ticks++;const el=$("#designClock");if(el)el.textContent=Math.floor(left/60)+":"+String(left%60).padStart(2,"0");if(ticks%10===0)designSessionSave();if(left<=0){designSessionSave();clearInterval(designTimer);designTimer=null;designSessionSave=null;designMode="";toast("💾 今天的设计已经保存，下次打开继续吧",3500);navStack=[renderReward];renderReward();}},1000);
 }
 function renderCardStudio(left) {
   const poses=["assets/baibai-base.png","assets/poses/pose-03.webp","assets/poses/pose-05.webp","assets/poses/pose-10.webp","assets/poses/pose-15.webp","assets/poses/pose-21.webp"];
@@ -3969,12 +4008,12 @@ function renderDesignStudio() {
   if(legacyIds.length){S.pet.customOutfits=[];S.pet.outfits=(S.pet.outfits||[]).filter(x=>!legacyIds.includes(x));S.pet.worn=(S.pet.worn||[]).filter(x=>!legacyIds.includes(x));save();}
   const done=taskDone();
   if(!S.testMode&&!(done.t1&&done.t2&&done.t3&&done.t4)){
-    $("#scr-design").innerHTML=`<div class="card" style="text-align:center;padding:28px 18px"><div style="font-size:42px">🔒</div><b style="display:block;color:#835aa2;margin:8px 0">完成今天的英语任务后开放</b><div style="font-size:12px;color:#aa94b8;line-height:1.7">复习、新学8个单词、玩5局游戏、完成3条自然拼读后，<br>就能来这里自由设计30分钟。</div><button class="btn ghost" id="designBack" style="margin-top:14px">先去完成今日任务</button></div>`;
+    $("#scr-design").innerHTML=`<div class="card" style="text-align:center;padding:28px 18px"><div style="font-size:42px">🔒</div><b style="display:block;color:#835aa2;margin:8px 0">完成今天的英语任务后开放</b><div style="font-size:12px;color:#aa94b8;line-height:1.7">复习、新学8个单词、玩5局游戏、完成3条自然拼读后，<br>就能来这里自由设计${S.designMinutes}分钟。</div><button class="btn ghost" id="designBack" style="margin-top:14px">先去完成今日任务</button></div>`;
     $("#designBack").onclick=()=>{navStack=[renderReward];renderReward()};show("design","🎨 设计工坊");return;
   }
   S.designPlay=S.designPlay||{date:"",used:0};if(S.designPlay.date!==todayStr())S.designPlay={date:todayStr(),used:0};
-  let left=Math.max(0,1800-(Number(S.designPlay.used)||0));
-  if(!S.testMode&&!left){$("#scr-design").innerHTML=`<div class="card" style="text-align:center;padding:30px 18px"><div style="font-size:44px">💾</div><b style="display:block;color:#835aa2;margin:8px 0">今天的设计已经保存</b><div style="font-size:13px;color:#aa94b8">今天的30分钟创作时间结束啦，下次打开继续吧。</div></div>`;show("design","🎨 设计工坊");return;}
+  let left=Math.max(0,S.designMinutes*60-(Number(S.designPlay.used)||0));
+  if(!S.testMode&&!left){$("#scr-design").innerHTML=`<div class="card" style="text-align:center;padding:30px 18px"><div style="font-size:44px">💾</div><b style="display:block;color:#835aa2;margin:8px 0">今天的设计已经保存</b><div style="font-size:13px;color:#aa94b8">今天的${S.designMinutes}分钟创作时间结束啦，下次打开继续吧。</div></div>`;show("design","🎨 设计工坊");return;}
   if(!designMode){const works=[...(S.designCards||[]),...(S.designDrawings||[])].slice(-6).reverse();$("#scr-design").innerHTML=`<div class="card designIntro studioHero"><b>🎨 白白创意工坊</b><span>想给白白换造型、做收藏卡，还是自由画一幅？每件作品都有清楚的去处。</span><div class="designClock">${S.testMode?'🧪 测试模式：不限时，不扣今日额度':`今日创作时间还剩 <strong id="designClock">${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}</strong>`}</div></div><div class="studioMenu"><button id="studioOutfit"><span>👗</span><b>白白造型屋</b><small>使用已经适配白白的精致衣橱<br>穿好后成为最新造型</small><em>去搭配衣服 →</em></button><button id="studioCard"><span>🖼️</span><b>白白卡片工坊</b><small>选姿势、背景和贴纸<br>保存到我的作品</small><em>做一张收藏卡 →</em></button><button id="studioDraw"><span>🖍️</span><b>自由画室</b><small>空白画布和完整绘画工具<br>画完再决定是否设为伙伴</small><em>开始画画 →</em></button></div>${works.length?`<div class="sectionTitle">💖 我的作品</div><div class="studioWorks">${works.map(x=>`<figure><img src="${x.art}" alt="${esc(x.title||x.name||'我的作品')}"><figcaption>${esc(x.title||x.name||'我的作品')}</figcaption></figure>`).join('')}</div>`:''}`;$("#studioOutfit").onclick=()=>{navStack=[()=>{designMode="";renderDesignStudio()}];renderOutfit()};$("#studioCard").onclick=()=>{designMode="card";renderDesignStudio()};$("#studioDraw").onclick=()=>{designMode="draw";renderDesignStudio()};show("design","🎨 创意工坊");startDesignTimer(left,()=>save());return;}
   if(designMode==="card"){renderCardStudio(left);return;}
   let kind="cape", main="#8f65d8", trim="#ffd56a", mark="star";
@@ -4003,7 +4042,7 @@ function renderDesignStudio() {
     };
   };
   $("#scr-design").innerHTML=`<button class="studioBack" id="studioBack">← 创意工坊</button><div class="card designIntro"><b>🖍️ 自由画室</b><span>自由画和精致底稿互不影响。作品先保存，只有你确认后才会成为学习伙伴。</span><div class="designClock">${S.testMode?'🧪 测试模式：不限时，不扣今日额度':`今日创作时间还剩 <strong id="designClock">${Math.floor(left/60)}:${String(left%60).padStart(2,"0")}</strong>`}</div></div>
-    <div class="sectionTitle">🖍️ 画布</div><div class="card easyDraw"><div class="drawStep"><b>① 选颜色</b><div class="drawColors"><button class="drawColor on" data-color="#7b4b2a" style="--c:#7b4b2a" aria-label="棕色"></button><button class="drawColor" data-color="#222222" style="--c:#222222" aria-label="黑色"></button><button class="drawColor" data-color="#f08eb5" style="--c:#f08eb5" aria-label="粉色"></button><button class="drawColor" data-color="#7667d8" style="--c:#7667d8" aria-label="紫色"></button><button class="drawColor" data-color="#41a98a" style="--c:#41a98a" aria-label="绿色"></button><button class="drawColor" data-color="#4e9fe8" style="--c:#4e9fe8" aria-label="蓝色"></button><label class="drawCustom" aria-label="更多颜色">🌈<input id="drawCustomColor" type="color" value="#ffb84d"></label></div></div><div class="drawStep"><b>② 选粗细</b><div class="drawPens"><button class="drawSize on" data-size="3"><i style="--s:3px"></i>细铅笔</button><button class="drawSize" data-size="6"><i style="--s:6px"></i>彩色笔</button><button class="drawSize" data-size="12"><i style="--s:12px"></i>粗画笔</button><button class="drawEraser" id="drawEraser">🧽 橡皮</button><button class="drawFill" id="drawFill">◉ 实心：关</button></div></div><div class="drawStep"><b>③ 选画法（左右滑动还有更多）</b><div class="drawShapes"><button class="drawShape on" data-tool="free">〰️ 曲线</button><button class="drawShape" data-tool="line">╱ 直线</button><button class="drawShape" data-tool="arrow">➜ 箭头</button><button class="drawShape" data-tool="circle">◯ 圆形</button><button class="drawShape" data-tool="rect">□ 矩形</button><button class="drawShape" data-tool="triangle">△ 三角</button><button class="drawShape" data-tool="diamond">◇ 菱形</button><button class="drawShape" data-tool="pentagon">⬠ 五边形</button><button class="drawShape" data-tool="hexagon">⬡ 六边形</button><button class="drawShape" data-tool="star">☆ 星星</button><button class="drawShape" data-tool="heart">♡ 爱心</button><button class="drawShape" data-tool="cloud">☁ 云朵</button><button class="drawShape" data-tool="bubble">▢ 对话框</button></div></div><div class="drawTip" id="drawTip">现在是：细铅笔画曲线 · 在画板上轻轻画</div><div class="drawBoard"><canvas id="characterCanvas" width="300" height="300" aria-label="自创角色画板"></canvas><span class="drawHint" id="drawHint">从这里开始画 ✨</span></div><div class="starterTitle">可选底稿 · 白白只占画布约55%，四周留给你创作</div><div class="starterRow"><button data-starter="assets/baibai-base.png"><img src="assets/baibai-base.png">白白坐姿</button><button data-starter="assets/poses/pose-03.webp"><img src="assets/poses/pose-03.webp">白白歪头</button><button data-starter="assets/poses/pose-05.webp"><img src="assets/poses/pose-05.webp">白白新姿势</button></div><div class="drawActions"><button class="btn small ghost" id="drawUndo">↶ 撤销</button><button class="btn small ghost" id="drawRedo">↷ 重做</button><button class="btn small ghost" id="drawClear">清空</button></div><label class="roleName">作品名字<input id="roleName" maxlength="8" placeholder="点击后起名字" autocomplete="off"></label><button class="btn wide" id="saveDrawing">💾 保存到我的作品</button><button class="btn ghost wide partnerBtn" id="saveCharacter">🌟 设为学习伙伴（会替换白白）</button>${S.pet.customCharacter?`<button class="btn ghost wide" id="useBaibai">🐶 切回白白</button>`:""}<div class="note">画作只保存在这台设备和备份码里，不会上传到公开网站。只有点击“设为学习伙伴”才会替换白白。</div></div>`;
+    <div class="sectionTitle">🖍️ 画布</div><div class="card easyDraw"><div class="drawStep"><b>① 选颜色</b><div class="drawColors"><button class="drawColor on" data-color="#7b4b2a" style="--c:#7b4b2a" aria-label="棕色"></button><button class="drawColor" data-color="#222222" style="--c:#222222" aria-label="黑色"></button><button class="drawColor" data-color="#f08eb5" style="--c:#f08eb5" aria-label="粉色"></button><button class="drawColor" data-color="#7667d8" style="--c:#7667d8" aria-label="紫色"></button><button class="drawColor" data-color="#41a98a" style="--c:#41a98a" aria-label="绿色"></button><button class="drawColor" data-color="#4e9fe8" style="--c:#4e9fe8" aria-label="蓝色"></button><label class="drawCustom" aria-label="更多颜色">🌈<input id="drawCustomColor" type="color" value="#ffb84d"></label></div></div><div class="drawStep"><b>② 选粗细</b><div class="drawPens"><button class="drawSize on" data-size="3"><i style="--s:3px"></i>细铅笔</button><button class="drawSize" data-size="6"><i style="--s:6px"></i>彩色笔</button><button class="drawSize" data-size="12"><i style="--s:12px"></i>粗画笔</button><button class="drawEraser" id="drawEraser">🧽 橡皮</button><button class="drawFill" id="drawFill">◉ 实心：关</button></div></div><div class="drawStep"><b>③ 选画法（左右滑动还有更多）</b><div class="drawShapes"><button class="drawShape on" data-tool="free">〰️ 曲线</button><button class="drawShape" data-tool="line">╱ 直线</button><button class="drawShape" data-tool="arrow">➜ 箭头</button><button class="drawShape" data-tool="circle">◯ 圆形</button><button class="drawShape" data-tool="rect">□ 矩形</button><button class="drawShape" data-tool="triangle">△ 三角</button><button class="drawShape" data-tool="diamond">◇ 菱形</button><button class="drawShape" data-tool="pentagon">⬠ 五边形</button><button class="drawShape" data-tool="hexagon">⬡ 六边形</button><button class="drawShape" data-tool="star">☆ 星星</button><button class="drawShape" data-tool="heart">♡ 爱心</button><button class="drawShape" data-tool="cloud">☁ 云朵</button><button class="drawShape" data-tool="bubble">▢ 对话框</button></div></div><div class="drawTip" id="drawTip">现在是：细铅笔画曲线 · 在画板上轻轻画</div><div class="drawBoard"><canvas id="characterCanvas" width="300" height="300" aria-label="自由画板"></canvas><span class="drawHint" id="drawHint">从这里开始画 ✨</span></div><div class="starterTitle">可选底稿 · 白白只占画布约55%，四周留给你创作</div><div class="starterRow"><button data-starter="assets/baibai-base.png"><img src="assets/baibai-base.png">白白坐姿</button><button data-starter="assets/poses/pose-03.webp"><img src="assets/poses/pose-03.webp">白白歪头</button><button data-starter="assets/poses/pose-05.webp"><img src="assets/poses/pose-05.webp">白白新姿势</button></div><div class="drawActions"><button class="btn small ghost" id="drawUndo">↶ 撤销</button><button class="btn small ghost" id="drawRedo">↷ 重做</button><button class="btn small ghost" id="drawClear">清空</button></div><label class="roleName">作品名字<input id="roleName" maxlength="8" placeholder="点击后起名字" autocomplete="off"></label><button class="btn wide" id="saveDrawing">💾 保存到我的作品</button><div class="note">画作只保存在这台设备和备份里，不会上传到公开网站，也不会替换白白。</div></div>`;
   const board=$(".drawBoard"),canvas=$("#characterCanvas"),world=document.createElement("div");world.className="drawWorld";board.insertBefore(world,canvas);world.appendChild(canvas);canvas.width=900;canvas.height=900;
   const panBtn=document.createElement("button");panBtn.className="drawShape on";panBtn.dataset.tool="pan";panBtn.textContent="✋ 拖动画布";$(".drawShapes").prepend(panBtn);$("[data-tool='free']").classList.remove("on");
   $(".starterTitle").insertAdjacentHTML("beforebegin",'<div class="drawViewTools"><button id="drawZoomOut">－ 缩小</button><button id="drawCenter">◎ 回中心</button><button id="drawZoomIn">＋ 放大</button></div>');
@@ -4039,8 +4078,6 @@ function renderDesignStudio() {
   $("#drawUndo").onclick=()=>{const x=history.pop();if(x){redo.push(ctx.getImageData(0,0,900,900));ctx.globalCompositeOperation="source-over";ctx.putImageData(x,0,0)}};$("#drawRedo").onclick=()=>{const x=redo.pop();if(x){history.push(ctx.getImageData(0,0,900,900));ctx.putImageData(x,0,0)}};$("#drawClear").onclick=()=>{snapshot();ctx.clearRect(0,0,900,900);hasInk=false;$("#drawHint").style.display="block";toast("画板清空啦，随时可以重新画")};
   const exportView=()=>{const out=document.createElement("canvas"),o=out.getContext("2d"),w=board.clientWidth||330,h=board.clientHeight||330;out.width=600;out.height=600;const sx=Math.max(0,-offset.x/zoom),sy=Math.max(0,-offset.y/zoom),sw=Math.min(900-sx,w/zoom),sh=Math.min(900-sy,h/zoom);o.drawImage(canvas,sx,sy,sw,sh,0,0,600,600);return out.toDataURL("image/png")};
   $("#saveDrawing").onclick=()=>{if(!hasInk){toast("先画一点内容再保存吧～");return;}S.designDrawings=S.designDrawings||[];S.designDrawings.push({date:todayStr(),name:$("#roleName").value.trim()||"我的作品",art:exportView()});if(S.designDrawings.length>12)S.designDrawings.shift();save();sndWin();toast("💾 已保存当前画面到我的作品，不会替换白白")};
-  $("#saveCharacter").onclick=()=>{if(!hasInk){toast("先在画板上画几笔吧～");return;}const name=$("#roleName").value.trim()||"我的伙伴";S.pet.baibaiWorn=(S.pet.worn||[]).slice();S.pet.customCharacter={name,art:exportView()};S.pet.useCustom=true;S.pet.worn=[];save();confetti();sndWin();toast("🌟 "+name+"成为你的新伙伴啦！",2400);renderDesignStudio()};
-  if($("#useBaibai"))$("#useBaibai").onclick=()=>{S.pet.useCustom=false;S.pet.worn=(S.pet.baibaiWorn||[]).filter(outfitOf);save();sndCoin();toast("白白回来陪你啦");renderDesignStudio()};
   $("#studioBack").onclick=()=>{designMode="";renderDesignStudio()};
   show("design","🎨 设计工坊");
   designSessionSave=()=>{try{S.designDraft={kind,main,trim,mark,name:$("#roleName")?$("#roleName").value:"",canvas:hasInk?canvas.toDataURL("image/webp",.72):(S.designDraft&&S.designDraft.canvas)||"",view:{offset:Object.assign({},offset),zoom}};save();}catch(_){save();}};
@@ -4065,6 +4102,7 @@ function renderReward() {
       <span class="aName">白白保管的奖励券<span class="aSub">${pend ? pend + " 张待兑换" : "转到的奖励由白白替你收好"}</span></span>
       <span class="aGo">▶</span>
     </div>
+    <div class="card" style="font-size:12px;line-height:1.8;color:#8d75a6;background:#f7f3ff"><b style="color:#805b99">🌟 三科探索奖励</b><br>今天探索任意两科：多 1 张转盘券<br>英语、语文、数学都探索：再得 1 张限定白白卡</div>
     <div class="card" id="gachaBox">
       <div id="gachaEgg">🥚</div>
       <div style="font-size:15px;font-weight:700;color:#9b59b6;margin-top:6px">白白百变扭蛋机</div>
@@ -4190,7 +4228,7 @@ function renderAlbum() {
         const have = S.testMode || ownedCount > 0;
         return `<div class="albumCell ${have ? "" : "no"} ${s.r === 3 ? "rr3" : ""}" data-i="${i}">
           <div class="ae">${have ? stickerVisual(s) : lockedStickerVisual(s)}</div>
-          <div class="an">${have ? s.n + (ownedCount > 1 ? " ×" + ownedCount : "") : "？？？"}</div>
+          <div class="an">${have ? s.n + (ownedCount > 1 ? " ×" + ownedCount : "") + (S.balanceCards&&S.balanceCards[s.n]?" · 三科限定":"") : "？？？"}</div>
         </div>`;
       }).join("")}
     </div>`;
@@ -4271,7 +4309,7 @@ setInterval(() => {
 }, 60000);
 if (new URLSearchParams(location.search).get("parent") === "1") { navStack=[renderHome,renderParent];navTabs=["home","home"];renderParent(); }
 else { navStack = [renderHome]; navTabs = ["home"]; renderHome(); }
-if (subjectCardsClaimed.total) setTimeout(() => toast("🐾 学习获得的 "+subjectCardsClaimed.total+" 张白白卡已点亮收藏册（语文 "+subjectCardsClaimed.chinese+"、数学 "+subjectCardsClaimed.math+"）！"+(lastChineseOutfitUnlocks.length ? " 同款「"+lastChineseOutfitUnlocks.join("、")+"」也已放入衣橱！" : ""),4200),900);
+if (subjectCardsClaimed.total) setTimeout(() => toast("🐾 学习获得的 "+subjectCardsClaimed.total+" 张白白卡已点亮收藏册（语文 "+subjectCardsClaimed.chinese+"、数学 "+subjectCardsClaimed.math+(subjectCardsClaimed.balance?"、三科限定 "+subjectCardsClaimed.balance:"")+"）！"+(lastChineseOutfitUnlocks.length ? " 同款「"+lastChineseOutfitUnlocks.join("、")+"」也已放入衣橱！" : ""),4200),900);
 if (!localStorage.getItem(LS_KEY + "_hi")) {
   localStorage.setItem(LS_KEY + "_hi", "1");
   setTimeout(() => toast("🌸 欢迎来到魔法英语乐园！先去完成今日任务吧～", 3000), 600);
